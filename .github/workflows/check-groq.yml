@@ -22,6 +22,14 @@ on:
         description: "Model id to test"
         required: false
         default: "openai/gpt-oss-20b"
+      system:
+        description: "OPTIONAL system prompt (with queries: evaluation mode)"
+        required: false
+        default: ""
+      queries:
+        description: "OPTIONAL newline-separated queries — runs them all with the given system prompt and prints one EVAL line each"
+        required: false
+        default: ""
 
 jobs:
   check:
@@ -32,6 +40,8 @@ jobs:
         env:
           RAW_KEY: ${{ secrets.GROQ_API_KEY }}
           MODEL: ${{ inputs.model }}
+          SYSTEM_IN: ${{ inputs.system }}
+          QUERIES: ${{ inputs.queries }}
         run: |
           set +e
           if [ -z "$RAW_KEY" ]; then echo "::error::GROQ_API_KEY secret is empty or not set on this repo"; exit 1; fi
@@ -69,6 +79,37 @@ jobs:
           Also extract any location mentioned; if the query implies the current location ("near me") return the literal string "NEAR_ME"; if none, null. Also return keywords: key symptom words.
           Respond with ONLY a single JSON object and nothing else, in exactly this shape:
           {"specialtyId": string | null, "city": string | null, "keywords": string[]}'
+
+          # ── Evaluation mode: run every supplied query with the supplied system prompt. Paced and retried on
+          # 429 (Groq free-tier rate limits) so throttling never masquerades as a model answer.
+          if [ -n "$QUERIES" ]; then
+            SYS="${SYSTEM_IN:-$SYSTEM}"
+            n=0
+            while IFS= read -r q; do
+              [ -z "$q" ] && continue
+              n=$((n+1))
+              body=$(jq -n --arg m "$MODEL" --arg s "$SYS" --arg q "$q" '
+                {model: $m, temperature: 0, max_completion_tokens: 1024,
+                 response_format: {type: "json_object"},
+                 messages: [{role:"system", content:$s}, {role:"user", content:$q}]}
+                + (if ($m|startswith("openai/gpt-oss")) then {reasoning_effort:"low"} else {} end)')
+              for attempt in 1 2 3 4 5 6; do
+                code=$(curl -s -D hdr.txt -o chat.json -w '%{http_code}' --max-time 40 https://api.groq.com/openai/v1/chat/completions \
+                         -H "Content-Type: application/json" -H "Authorization: Bearer $KEY" -d "$body")
+                [ "$code" = "429" ] || break
+                wait=$(grep -i '^retry-after:' hdr.txt | tr -dc '0-9.'); wait=${wait:-10}
+                echo "  (429 on query $n, waiting ${wait}s, attempt $attempt)" >&2; sleep $(( ${wait%.*} + 1 ))
+              done
+              if [ "$code" = "200" ]; then
+                content=$(jq -r '.choices[0].message.content // ""' chat.json | jq -c . 2>/dev/null || echo "NOT_JSON")
+                printf 'EVAL\t%s\t%s\n' "$q" "$content"
+              else
+                printf 'EVAL\t%s\tERR_%s\n' "$q" "$code"
+              fi
+              sleep 2
+            done <<< "$QUERIES"
+            echo; echo "evaluated $n queries with $MODEL"; exit 0
+          fi
 
           fail=0
           for q in "my elbow clicks when I type all day" "something feels off with my left ear after swimming, Pune" "bachhe ko tez bukhar hai near me"; do
