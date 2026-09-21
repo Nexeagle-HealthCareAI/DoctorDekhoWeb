@@ -46,6 +46,7 @@ See `.env.example` for the annotated list.
 | `EASYHMS_TRUSTED_PROXY_SECRET` | No | Lets the API's rate limiters see each visitor's real IP. Must match `Internal:ProxyForwardingSecret` in easyHMSAPI. |
 | `GROQ_API_KEY` | No | LLM fallback (Groq) for free-text symptom queries the NLP router can't classify. Unset = keyword search only. |
 | `GROQ_MODEL` | No | Groq model id (must support JSON mode). Defaults to `openai/gpt-oss-20b`. |
+| `SEARCH_ROUTER_MAX_CANDIDATES` | No | Free-text search trusts the NLP router only when it returns at most this many candidate specialties (default `3`); more means it is guessing, so the query goes to Groq instead. See the comment in `app/api/search/parse/route.ts` for the evidence behind the default. |
 
 `NEXT_PUBLIC_*` values are inlined at **build** time. `next build` always loads `.env.production`,
 so the dev image would silently bake in *prod* origins/data unless the deploy passes the dev values

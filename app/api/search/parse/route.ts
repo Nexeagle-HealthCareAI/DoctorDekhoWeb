@@ -18,12 +18,24 @@ const GROQ_URL = "https://api.groq.com/openai/v1/chat/completions";
 const GROQ_TIMEOUT_MS = 8000;
 
 // Optional — our own Hinglish-tuned symptom router (see the 1HMS-NLP-Router repo), tried
-// BEFORE the Groq call below since it's free and has no external-API round trip. Only
-// its confident answers are used; anything it defers on (or any failure calling it at all)
-// falls through to the Groq path unchanged — this is a pure fast-path addition,
-// not a replacement, so leaving this unset just means every query goes to Groq exactly
-// as it would without the router.
+// BEFORE the Groq call below since it's free, fast, and keeps the patient's text in-house. Only
+// its DECISIVE answers are used; anything it defers on, is unsure about, or fails to answer falls
+// through to Groq — so leaving this unset just means every query goes to Groq.
 const NLP_ROUTER_BASE_URL = process.env.NLP_ROUTER_BASE_URL ?? "";
+
+// What "decisive" means. The router returns a ranked candidate list, padded with every runner-up
+// within its CANDIDATE_MARGIN of the top score (up to 5). One to three candidates means it had a
+// clear favourite; FIVE means many near-ties, i.e. it is guessing — and its answers then are wrong
+// about half the time, often with a plausible-looking match_ratio. Measured 2026-09-21 against
+// model 2026-08-04-083503 on 121 hand-labelled queries (English / Hinglish / typos / multi-symptom /
+// non-medical; the rule was fixed on the first 71 and confirmed unchanged on 50 unseen):
+//   candidates 1-3 -> 40/40 correct     candidates 5 -> ~50-67% correct
+//   whole set: router alone 75%, this rule 99% (Groq gpt-oss-20b alone: 99%)
+// match_ratio ("confidence") is NOT used: it only measures similarity to the nearest training
+// example, it separated right from wrong poorly, and a wrong answer appeared at 0.80.
+// This depends on the router's candidate settings — re-measure if its model/config changes.
+// Override without a deploy via SEARCH_ROUTER_MAX_CANDIDATES.
+const ROUTER_MAX_CANDIDATES = Number.parseInt(process.env.SEARCH_ROUTER_MAX_CANDIDATES ?? "", 10) || 3;
 
 interface NlpRouterResult {
   specialtyIds: string[];
@@ -130,7 +142,32 @@ function sanitizeIntent(raw: unknown): SearchIntent {
   return { specialtyId, specialtyIds: specialtyId ? [specialtyId] : [], city, keywords };
 }
 
+// The response shape for a router-produced answer — method/confidence/modelVersion ride along so
+// the client's search_performed tracking can log what drove the suggestion (the router's own
+// feedback loop). `city` is extracted locally: the router doesn't do location parsing.
+function routerAnswer(r: NlpRouterResult, query: string) {
+  return {
+    specialtyId: r.specialtyIds[0],
+    specialtyIds: r.specialtyIds,
+    city: extractCityFromQuery(query),
+    keywords: query.split(/\s+/).filter((w) => w.length >= 3),
+    method: r.method,
+    confidence: r.confidence,
+    modelVersion: r.modelVersion,
+  };
+}
+
 // POST /api/search/parse — { query: string } -> SearchIntent | { notConfigured: true }
+//
+//   router decisive (1..ROUTER_MAX_CANDIDATES candidates) ........ router's answer (free, in-house)
+//   router undecided / declined ................................. Groq LLM: one specialty, or null
+//   ...and Groq is unset / rate-limited / down / returns junk .... the router's broader (5-candidate)
+//                                                                 answer if it had one — a hedge that
+//                                                                 usually still lists the right
+//                                                                 specialty — else the error (or
+//                                                                 notConfigured) as before.
+// A successful Groq "null" (nothing medical in the query) is honoured, NOT overridden by the router:
+// the router will happily "match" "cricket score today" to a specialty.
 export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => null);
   const query = typeof body?.query === "string" ? body.query.trim() : "";
@@ -139,20 +176,23 @@ export async function POST(req: NextRequest) {
   }
 
   const nlpResult = await callNlpRouter(query);
-  if (nlpResult && !nlpResult.usedDefault && nlpResult.specialtyIds.length > 0) {
-    return NextResponse.json({
-      specialtyId: nlpResult.specialtyIds[0],
-      specialtyIds: nlpResult.specialtyIds,
-      city: extractCityFromQuery(query),
-      keywords: query.split(/\s+/).filter((w) => w.length >= 3),
-      method: nlpResult.method,
-      confidence: nlpResult.confidence,
-      modelVersion: nlpResult.modelVersion,
-    });
+  // An answer the router actually gave (it can also decline, or fail to answer at all).
+  const routerGave = nlpResult && !nlpResult.usedDefault && nlpResult.specialtyIds.length > 0 ? nlpResult : null;
+
+  if (routerGave && routerGave.specialtyIds.length <= ROUTER_MAX_CANDIDATES) {
+    console.info(`search-parse: path=router candidates=${routerGave.specialtyIds.length}`);
+    return NextResponse.json(routerAnswer(routerGave, query));
   }
 
+  // Router undecided: ask Groq. If Groq can't help, fall back to the router's broad answer (if any).
+  const routerHedge = () => {
+    if (!routerGave) return null;
+    console.info(`search-parse: path=router-fallback candidates=${routerGave.specialtyIds.length}`);
+    return NextResponse.json(routerAnswer(routerGave, query));
+  };
+
   if (!GROQ_API_KEY) {
-    return NextResponse.json({ notConfigured: true });
+    return routerHedge() ?? NextResponse.json({ notConfigured: true });
   }
 
   try {
@@ -181,7 +221,7 @@ export async function POST(req: NextRequest) {
     if (!res.ok) {
       const errText = await res.text();
       console.error("Groq search-parse request failed:", res.status, errText);
-      return NextResponse.json({ error: "AI interpretation failed" }, { status: 502 });
+      return routerHedge() ?? NextResponse.json({ error: "AI interpretation failed" }, { status: 502 });
     }
 
     const data = await res.json();
@@ -193,12 +233,13 @@ export async function POST(req: NextRequest) {
       parsed = null;
     }
     if (!parsed) {
-      return NextResponse.json({ error: "AI returned no structured result" }, { status: 502 });
+      return routerHedge() ?? NextResponse.json({ error: "AI returned no structured result" }, { status: 502 });
     }
 
+    console.info(`search-parse: path=groq routerCandidates=${routerGave ? routerGave.specialtyIds.length : 0}`);
     return NextResponse.json(sanitizeIntent(parsed));
   } catch (err) {
     console.error("Groq search-parse threw:", err);
-    return NextResponse.json({ error: "AI interpretation failed" }, { status: 502 });
+    return routerHedge() ?? NextResponse.json({ error: "AI interpretation failed" }, { status: 502 });
   }
 }
