@@ -30,9 +30,10 @@
 #   SSH_PASSWORD          SSH password for the Dev App VM
 #   EASYHMS_PROD_API_KEY  OPTIONAL — the public API doesn't require a key (see PublicApiKeyFilter).
 #   EASYHMS_DEV_API_KEY   OPTIONAL, same, for dev.
-#   ANTHROPIC_API_KEY     OPTIONAL — AI search fallback (app/api/search/parse). Unset = literal
-#                         keyword search only, nothing breaks. NLP_ROUTER_BASE_URL (hardcoded in
-#                         the docker run below) is tried BEFORE this; Anthropic is the fallback.
+#   GROQ_API_KEY          OPTIONAL — LLM fallback for the free-text symptom search
+#                         (app/api/search/parse). Unset = literal keyword search only, nothing breaks.
+#                         NLP_ROUTER_BASE_URL (hardcoded in the docker run below) is tried BEFORE
+#                         this; Groq (llama-3.3-70b-versatile, overridable via GROQ_MODEL) is the fallback.
 #                         Dev's NLP_ROUTER_BASE_URL is still the raw http://151.185.45.77:5003 —
 #                         NOT yet switched to https://nlp-api-dev.nexeagle.com (as of 2026-08-13
 #                         that subdomain's Caddy/DNS wasn't resolving). Deliberate, not oversight.
@@ -140,7 +141,7 @@ jobs:
           PULL_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           ACTOR: ${{ github.actor }}
           EASYHMS_API_KEY: ${{ secrets.EASYHMS_DEV_API_KEY }}
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
           PROXY_SECRET: ${{ secrets.INTERNAL_PROXY_SECRET }}
         with:
           host: ${{ secrets.SSH_HOST }}
@@ -148,7 +149,7 @@ jobs:
           password: ${{ secrets.SSH_PASSWORD }}
           port: 22
           command_timeout: 10m
-          envs: IMAGE,PULL_TOKEN,ACTOR,EASYHMS_API_KEY,ANTHROPIC_API_KEY,PROXY_SECRET
+          envs: IMAGE,PULL_TOKEN,ACTOR,EASYHMS_API_KEY,GROQ_API_KEY,PROXY_SECRET
           script: |
             set -e
             NAME=doctordekho-web-dev
@@ -180,7 +181,7 @@ jobs:
                   -e EASYHMS_API_BASE_URL='http://host.docker.internal:5001' \
                   -e EASYHMS_API_KEY="$EASYHMS_API_KEY" \
                   -e EASYHMS_API_KEY_HEADER='X-Api-Key' \
-                  -e ANTHROPIC_API_KEY="$ANTHROPIC_API_KEY" \
+                  -e GROQ_API_KEY="$GROQ_API_KEY" \
                   -e EASYHMS_TRUSTED_PROXY_SECRET="$PROXY_SECRET" \
                   -e NLP_ROUTER_BASE_URL='http://151.185.45.77:5003' \
                   "$IMAGE_LC"; then
@@ -279,7 +280,7 @@ jobs:
           PULL_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           ACTOR: ${{ github.actor }}
           EASYHMS_API_KEY: ${{ secrets.EASYHMS_PROD_API_KEY }}
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
           PROXY_SECRET: ${{ secrets.INTERNAL_PROXY_SECRET }}
         with:
           host: ${{ secrets.PROD_SSH_HOST }}
@@ -289,7 +290,7 @@ jobs:
           key_path: deploy_key
           port: 22
           command_timeout: 10m
-          envs: IMAGE,PULL_TOKEN,ACTOR,EASYHMS_API_KEY,ANTHROPIC_API_KEY,PROXY_SECRET
+          envs: IMAGE,PULL_TOKEN,ACTOR,EASYHMS_API_KEY,GROQ_API_KEY,PROXY_SECRET
           script: |
             set -e
             NAME=doctordekho-web
@@ -315,7 +316,7 @@ jobs:
                   -e EASYHMS_API_BASE_URL='http://host.docker.internal:5001' \
                   -e EASYHMS_API_KEY="$EASYHMS_API_KEY" \
                   -e EASYHMS_API_KEY_HEADER='X-Api-Key' \
-                  -e ANTHROPIC_API_KEY="$ANTHROPIC_API_KEY" \
+                  -e GROQ_API_KEY="$GROQ_API_KEY" \
                   -e EASYHMS_TRUSTED_PROXY_SECRET="$PROXY_SECRET" \
                   -e NLP_ROUTER_BASE_URL='https://nlp-api.nexeagle.com' \
                   "$IMAGE_LC"; then

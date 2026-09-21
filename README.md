@@ -44,7 +44,8 @@ See `.env.example` for the annotated list.
 | `NEXT_PUBLIC_MAPBOX_TOKEN` | No | Mapbox public token (build-time). Restrict it to the doctordekho domains in the Mapbox dashboard. |
 | `EASYHMS_API_KEY` / `_HEADER` | No | Optional API-key identification. Server-side only. |
 | `EASYHMS_TRUSTED_PROXY_SECRET` | No | Lets the API's rate limiters see each visitor's real IP. Must match `Internal:ProxyForwardingSecret` in easyHMSAPI. |
-| `ANTHROPIC_API_KEY` | No | AI search fallback for free-text symptom queries. |
+| `GROQ_API_KEY` | No | LLM fallback (Groq) for free-text symptom queries the NLP router can't classify. Unset = keyword search only. |
+| `GROQ_MODEL` | No | Groq model id (must support JSON mode). Defaults to `llama-3.3-70b-versatile`. |
 
 `NEXT_PUBLIC_*` values are inlined at **build** time. `next build` always loads `.env.production`,
 so the dev image would silently bake in *prod* origins/data unless the deploy passes the dev values
