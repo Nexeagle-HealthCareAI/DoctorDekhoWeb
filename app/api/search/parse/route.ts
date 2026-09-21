@@ -4,10 +4,14 @@ import { CITIES, specialties } from "@/data/patient";
 export const dynamic = "force-dynamic";
 
 // Server-only — reads the secret key from env, must never reach the browser bundle.
-const GROQ_API_KEY = process.env.GROQ_API_KEY ?? "";
-// Overridable without a code change (e.g. to a cheaper/faster model) via GROQ_MODEL. Must be a
-// model that supports JSON mode (response_format: json_object) on Groq.
-const GROQ_MODEL = process.env.GROQ_MODEL || "llama-3.3-70b-versatile";
+// Trimmed: a secret pasted into GitHub with a trailing newline would otherwise put a newline in the
+// Authorization header value, which corrupts the request.
+const GROQ_API_KEY = (process.env.GROQ_API_KEY ?? "").trim();
+// Which models a Groq key can use varies per account (llama-3.3-70b-versatile, for one, is not
+// available on ours), so verify with the manual "Check — Groq key" workflow before changing this.
+// Overridable without a code change via GROQ_MODEL. Must support JSON mode (json_object).
+// openai/gpt-oss-20b: ~0.3s and correct on the Hinglish/typo-heavy queries we tested.
+const GROQ_MODEL = (process.env.GROQ_MODEL || "openai/gpt-oss-20b").trim();
 // Groq exposes an OpenAI-compatible chat-completions API.
 const GROQ_URL = "https://api.groq.com/openai/v1/chat/completions";
 // A stalled fallback must not hang the search box — the client just skips the AI suggestion.
@@ -161,7 +165,10 @@ export async function POST(req: NextRequest) {
       body: JSON.stringify({
         model: GROQ_MODEL,
         temperature: 0,
-        max_completion_tokens: 300,
+        // Reasoning models (gpt-oss) count their hidden reasoning against this budget, so it has to
+        // leave room beyond the ~50 tokens of actual JSON; "low" effort keeps that reasoning short.
+        max_completion_tokens: 1024,
+        ...(GROQ_MODEL.startsWith("openai/gpt-oss") ? { reasoning_effort: "low" } : {}),
         response_format: { type: "json_object" },
         messages: [
           { role: "system", content: buildSystemPrompt() },

@@ -33,7 +33,7 @@
 #   GROQ_API_KEY          OPTIONAL — LLM fallback for the free-text symptom search
 #                         (app/api/search/parse). Unset = literal keyword search only, nothing breaks.
 #                         NLP_ROUTER_BASE_URL (hardcoded in the docker run below) is tried BEFORE
-#                         this; Groq (llama-3.3-70b-versatile, overridable via GROQ_MODEL) is the fallback.
+#                         this; Groq (openai/gpt-oss-20b, overridable via GROQ_MODEL) is the fallback.
 #                         Dev's NLP_ROUTER_BASE_URL is still the raw http://151.185.45.77:5003 —
 #                         NOT yet switched to https://nlp-api-dev.nexeagle.com (as of 2026-08-13
 #                         that subdomain's Caddy/DNS wasn't resolving). Deliberate, not oversight.

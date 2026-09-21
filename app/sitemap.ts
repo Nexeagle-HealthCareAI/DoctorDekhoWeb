@@ -4,7 +4,12 @@ import { getAllDoctors } from "@/lib/api/server";
 import { doctorSlug, specialties, CITIES, AREAS_BY_CITY } from "@/data/patient";
 import { medicalArticles } from "@/data/wiki";
 
-export const revalidate = 3600;
+// Must be dynamic. As a statically prerendered route (the old `revalidate = 3600`) the sitemap runs
+// at BUILD time, where the doctors fetch fails and the try/catch below swallows it, freezing a
+// sitemap with only the home page into the image — the live nexeagle.com sitemap had the same
+// problem (23 URLs, 0 doctor/specialty pages). At request time the fetch works, and
+// getAllDoctors() is itself cached, so this stays cheap.
+export const dynamic = "force-dynamic";
 
 const BASE_URL = SITE_URL;
 
