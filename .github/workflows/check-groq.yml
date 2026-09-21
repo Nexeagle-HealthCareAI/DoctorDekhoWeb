@@ -1,16 +1,16 @@
 # ═══════════════════════════════════════════════════════════════════════════════
-# MANUAL DIAGNOSTIC: is the GROQ_API_KEY secret valid, and can it use the model the site calls?
+# MANUAL DIAGNOSTIC: is the GROQ_API_KEY secret valid, and does a model work for the site's search?
 # ═══════════════════════════════════════════════════════════════════════════════
 #
-# workflow_dispatch only — no push/PR trigger, touches no VM, deploys nothing. It sends the same
-# kind of request app/api/search/parse makes (Groq's OpenAI-compatible chat-completions API in JSON
-# mode) from the GitHub runner, and prints ONLY: the key's length and prefix shape, whether the
-# model is available to the key, the HTTP status, and Groq's own error message. The key itself is
+# workflow_dispatch only — no push/PR trigger, touches no VM, deploys nothing. It sends requests
+# shaped like app/api/search/parse's (Groq's OpenAI-compatible chat-completions API, JSON mode)
+# from the GitHub runner and prints ONLY: the key's length / prefix shape, the models the key can
+# see, and per query the HTTP status, latency, token usage and the model's reply. The key itself is
 # never printed (and GitHub masks it in logs anyway).
 #
-# Use it when the site's search fallback returns 502 "AI interpretation failed" — the container's
-# own log line ("Groq search-parse request failed: <status> <body>") says the same thing, but this
-# needs no SSH access to the VM.
+# Use it when the site's search fallback returns 502 "AI interpretation failed", or to compare
+# candidate models before changing GROQ_MODEL / the default in app/api/search/parse/route.ts.
+# Which models a key can use varies per Groq account, so check here rather than trusting the docs.
 # ═══════════════════════════════════════════════════════════════════════════════
 
 name: Check — Groq key
@@ -19,59 +19,76 @@ on:
   workflow_dispatch:
     inputs:
       model:
-        description: "Model id to test (default = what the site uses)"
+        description: "Model id to test"
         required: false
-        default: "llama-3.3-70b-versatile"
+        default: "openai/gpt-oss-20b"
 
 jobs:
   check:
-    name: "Validate GROQ_API_KEY + model access"
+    name: "Validate GROQ_API_KEY + model"
     runs-on: ubuntu-latest
     steps:
-      - name: Check the key
+      - name: Check the key and model
         env:
-          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          RAW_KEY: ${{ secrets.GROQ_API_KEY }}
           MODEL: ${{ inputs.model }}
         run: |
           set +e
-          if [ -z "$GROQ_API_KEY" ]; then echo "::error::GROQ_API_KEY secret is empty or not set on this repo"; exit 1; fi
+          if [ -z "$RAW_KEY" ]; then echo "::error::GROQ_API_KEY secret is empty or not set on this repo"; exit 1; fi
 
-          echo "key length : ${#GROQ_API_KEY}"
-          case "$GROQ_API_KEY" in
-            gsk_*) echo "key prefix : gsk_  (looks like a Groq key)" ;;
-            xai-*) echo "::error::Key starts with xai- — that is an xAI *Grok* key, not a Groq key. Groq keys come from console.groq.com and start with gsk_." ;;
+          # Strip ALL whitespace before use — a secret pasted with a trailing newline otherwise
+          # splits the HTTP header and corrupts the request (server sees "Content-Length" as the body).
+          KEY=$(printf '%s' "$RAW_KEY" | tr -d '[:space:]')
+          echo "secret length : ${#RAW_KEY}   after trimming whitespace: ${#KEY}"
+          if [ "${#RAW_KEY}" != "${#KEY}" ]; then
+            echo "::warning::The GROQ_API_KEY secret contains whitespace/newline characters (a Groq key is 56 chars). The site code trims it, but re-save the secret cleanly."
+          fi
+          case "$KEY" in
+            gsk_*) echo "key prefix    : gsk_  (looks like a Groq key)" ;;
+            xai-*) echo "::error::Key starts with xai- — that is an xAI *Grok* key, not a Groq key." ;;
             *)     echo "::warning::Key does not start with gsk_ — unexpected for a Groq key." ;;
-          esac
-          case "$GROQ_API_KEY" in
-            *[[:space:]]*) echo "::error::Key contains whitespace/newline — re-paste it without a trailing newline or spaces." ;;
           esac
 
           echo; echo "── GET /openai/v1/models"
-          code=$(curl -s -o models.json -w '%{http_code}' --max-time 30 https://api.groq.com/openai/v1/models -H "Authorization: Bearer $GROQ_API_KEY")
+          code=$(curl -s -o models.json -w '%{http_code}' --max-time 30 https://api.groq.com/openai/v1/models -H "Authorization: Bearer $KEY")
           echo "HTTP $code"
           if [ "$code" = "200" ]; then
             echo "models visible to this key:"; jq -r '.data[].id' models.json | sort | sed 's/^/  /'
-            if jq -e --arg m "$MODEL" '.data[] | select(.id==$m)' models.json >/dev/null; then echo "model $MODEL : AVAILABLE"; else echo "::error::model $MODEL is NOT available to this key"; fi
+            if jq -e --arg m "$MODEL" '.data[] | select(.id==$m)' models.json >/dev/null; then echo "model $MODEL : AVAILABLE"; else echo "::error::model $MODEL is NOT available to this key"; exit 1; fi
           else
-            echo "error: $(jq -r '.error.message // .' models.json 2>/dev/null | head -c 300)"
+            echo "error: $(jq -r '.error.message // .' models.json 2>/dev/null | head -c 300)"; exit 1
           fi
 
-          echo; echo "── POST /openai/v1/chat/completions (same request shape the site sends)"
-          body=$(jq -n --arg m "$MODEL" '{
-            model: $m, temperature: 0, max_completion_tokens: 300,
-            response_format: {type: "json_object"},
-            messages: [
-              {role: "system", content: "You interpret a patient search. Respond with ONLY a single JSON object: {\"specialtyId\": string|null, \"city\": string|null, \"keywords\": string[]}. Valid specialtyIds: cardiology, orthopedics, general."},
-              {role: "user", content: "my elbow clicks when I type all day"}
-            ]}')
-          code=$(curl -s -o chat.json -w '%{http_code}' --max-time 40 https://api.groq.com/openai/v1/chat/completions \
-                   -H "Content-Type: application/json" -H "Authorization: Bearer $GROQ_API_KEY" -d "$body")
-          echo "HTTP $code"
-          if [ "$code" = "200" ]; then
-            echo "model reply: $(jq -r '.choices[0].message.content' chat.json | head -c 400)"
-            echo "✅ The key and request shape work — if the site still 502s, the problem is on the container side (env var not delivered / stale image)."
-          else
-            echo "error: $(jq -r '.error.message // .' chat.json 2>/dev/null | head -c 500)"
-            echo "error code: $(jq -r '.error.code // .error.type // "n/a"' chat.json 2>/dev/null)"
-            exit 1
-          fi
+          SYSTEM='You interpret a patient'"'"'s free-text or voice-transcribed search on a doctor-booking website. Map it to the closest medical specialty from this fixed list (use the id exactly as given, or null if nothing reasonably matches):
+          - general: General Physician — Fever, cold, everyday health
+          - cardiology: Cardiologist — Heart, BP & chest concerns
+          - orthopedics: Orthopedist — Bones, joints & muscles
+          - dermatology: Dermatologist — Skin, hair & nails
+          - pediatrics: Pediatrician — Child health
+          - ent: ENT — Ear, nose & throat
+          Also extract any location mentioned; if the query implies the current location ("near me") return the literal string "NEAR_ME"; if none, null. Also return keywords: key symptom words.
+          Respond with ONLY a single JSON object and nothing else, in exactly this shape:
+          {"specialtyId": string | null, "city": string | null, "keywords": string[]}'
+
+          fail=0
+          for q in "my elbow clicks when I type all day" "something feels off with my left ear after swimming, Pune" "bachhe ko tez bukhar hai near me"; do
+            echo; echo "── chat: \"$q\""
+            body=$(jq -n --arg m "$MODEL" --arg s "$SYSTEM" --arg q "$q" '
+              {model: $m, temperature: 0, max_completion_tokens: 1024,
+               response_format: {type: "json_object"},
+               messages: [{role:"system", content:$s}, {role:"user", content:$q}]}
+              + (if ($m|startswith("openai/gpt-oss")) then {reasoning_effort:"low"} else {} end)')
+            res=$(curl -s -o chat.json -w '%{http_code} %{time_total}' --max-time 40 https://api.groq.com/openai/v1/chat/completions \
+                    -H "Content-Type: application/json" -H "Authorization: Bearer $KEY" -d "$body")
+            code=${res%% *}; secs=${res##* }
+            echo "HTTP $code in ${secs}s"
+            if [ "$code" = "200" ]; then
+              content=$(jq -r '.choices[0].message.content // ""' chat.json)
+              echo "usage: $(jq -c '.usage | {prompt_tokens, completion_tokens, total_tokens}' chat.json)  finish_reason: $(jq -r '.choices[0].finish_reason' chat.json)"
+              echo "reply: $content"
+              if printf '%s' "$content" | jq -e 'type=="object"' >/dev/null 2>&1; then echo "valid JSON object: yes"; else echo "::error::reply is NOT a valid JSON object"; fail=1; fi
+            else
+              echo "error: $(jq -r '.error.message // .' chat.json 2>/dev/null | head -c 400)"; fail=1
+            fi
+          done
+          echo; [ "$fail" = 0 ] && echo "✅ $MODEL works with this key for the site's request shape" || { echo "❌ see errors above"; exit 1; }
