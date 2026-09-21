@@ -1,0 +1,77 @@
+# ═══════════════════════════════════════════════════════════════════════════════
+# MANUAL DIAGNOSTIC: is the GROQ_API_KEY secret valid, and can it use the model the site calls?
+# ═══════════════════════════════════════════════════════════════════════════════
+#
+# workflow_dispatch only — no push/PR trigger, touches no VM, deploys nothing. It sends the same
+# kind of request app/api/search/parse makes (Groq's OpenAI-compatible chat-completions API in JSON
+# mode) from the GitHub runner, and prints ONLY: the key's length and prefix shape, whether the
+# model is available to the key, the HTTP status, and Groq's own error message. The key itself is
+# never printed (and GitHub masks it in logs anyway).
+#
+# Use it when the site's search fallback returns 502 "AI interpretation failed" — the container's
+# own log line ("Groq search-parse request failed: <status> <body>") says the same thing, but this
+# needs no SSH access to the VM.
+# ═══════════════════════════════════════════════════════════════════════════════
+
+name: Check — Groq key
+
+on:
+  workflow_dispatch:
+    inputs:
+      model:
+        description: "Model id to test (default = what the site uses)"
+        required: false
+        default: "llama-3.3-70b-versatile"
+
+jobs:
+  check:
+    name: "Validate GROQ_API_KEY + model access"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check the key
+        env:
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          MODEL: ${{ inputs.model }}
+        run: |
+          set +e
+          if [ -z "$GROQ_API_KEY" ]; then echo "::error::GROQ_API_KEY secret is empty or not set on this repo"; exit 1; fi
+
+          echo "key length : ${#GROQ_API_KEY}"
+          case "$GROQ_API_KEY" in
+            gsk_*) echo "key prefix : gsk_  (looks like a Groq key)" ;;
+            xai-*) echo "::error::Key starts with xai- — that is an xAI *Grok* key, not a Groq key. Groq keys come from console.groq.com and start with gsk_." ;;
+            *)     echo "::warning::Key does not start with gsk_ — unexpected for a Groq key." ;;
+          esac
+          case "$GROQ_API_KEY" in
+            *[[:space:]]*) echo "::error::Key contains whitespace/newline — re-paste it without a trailing newline or spaces." ;;
+          esac
+
+          echo; echo "── GET /openai/v1/models"
+          code=$(curl -s -o models.json -w '%{http_code}' --max-time 30 https://api.groq.com/openai/v1/models -H "Authorization: Bearer $GROQ_API_KEY")
+          echo "HTTP $code"
+          if [ "$code" = "200" ]; then
+            echo "models visible to this key:"; jq -r '.data[].id' models.json | sort | sed 's/^/  /'
+            if jq -e --arg m "$MODEL" '.data[] | select(.id==$m)' models.json >/dev/null; then echo "model $MODEL : AVAILABLE"; else echo "::error::model $MODEL is NOT available to this key"; fi
+          else
+            echo "error: $(jq -r '.error.message // .' models.json 2>/dev/null | head -c 300)"
+          fi
+
+          echo; echo "── POST /openai/v1/chat/completions (same request shape the site sends)"
+          body=$(jq -n --arg m "$MODEL" '{
+            model: $m, temperature: 0, max_completion_tokens: 300,
+            response_format: {type: "json_object"},
+            messages: [
+              {role: "system", content: "You interpret a patient search. Respond with ONLY a single JSON object: {\"specialtyId\": string|null, \"city\": string|null, \"keywords\": string[]}. Valid specialtyIds: cardiology, orthopedics, general."},
+              {role: "user", content: "my elbow clicks when I type all day"}
+            ]}')
+          code=$(curl -s -o chat.json -w '%{http_code}' --max-time 40 https://api.groq.com/openai/v1/chat/completions \
+                   -H "Content-Type: application/json" -H "Authorization: Bearer $GROQ_API_KEY" -d "$body")
+          echo "HTTP $code"
+          if [ "$code" = "200" ]; then
+            echo "model reply: $(jq -r '.choices[0].message.content' chat.json | head -c 400)"
+            echo "✅ The key and request shape work — if the site still 502s, the problem is on the container side (env var not delivered / stale image)."
+          else
+            echo "error: $(jq -r '.error.message // .' chat.json 2>/dev/null | head -c 500)"
+            echo "error code: $(jq -r '.error.code // .error.type // "n/a"' chat.json 2>/dev/null)"
+            exit 1
+          fi
