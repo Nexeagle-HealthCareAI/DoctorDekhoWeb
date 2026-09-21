@@ -120,9 +120,9 @@ jobs:
         run: |
           echo "Waiting for Caddy to complete the ACME handshake (a 502 is fine — it means TLS works and the app just isn't deployed yet)..."
           for i in 1 2 3 4 5 6 7 8; do
-            S=$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 https://doctordekho-dev.nexeagle.com/ 2>/dev/null || echo 000)
+            S=$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 https://doctordekho-dev.nexeagle.com/ 2>/dev/null || true)
             echo "Attempt $i — HTTP $S"
-            if [ "$S" != "000" ]; then echo "✅ TLS is up on doctordekho-dev.nexeagle.com (HTTP $S)"; exit 0; fi
+            if [ -n "$S" ] && [ "$S" != "000" ]; then echo "✅ TLS is up on doctordekho-dev.nexeagle.com (HTTP $S)"; exit 0; fi
             sleep 15
           done
           echo "::warning::No TLS response yet — check the Diagnostics step, and that DNS for doctordekho-dev.nexeagle.com -> 151.185.45.77 still resolves."
@@ -230,9 +230,9 @@ jobs:
         run: |
           echo "Waiting for Caddy to complete the ACME handshake (a 502 is fine — it means TLS works and the app just isn't deployed yet)..."
           for i in 1 2 3 4 5 6 7 8; do
-            S=$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 https://doctordekho.nexeagle.com/ 2>/dev/null || echo 000)
+            S=$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 https://doctordekho.nexeagle.com/ 2>/dev/null || true)
             echo "Attempt $i — HTTP $S"
-            if [ "$S" != "000" ]; then echo "✅ TLS is up on doctordekho.nexeagle.com (HTTP $S)"; exit 0; fi
+            if [ -n "$S" ] && [ "$S" != "000" ]; then echo "✅ TLS is up on doctordekho.nexeagle.com (HTTP $S)"; exit 0; fi
             sleep 15
           done
           echo "::warning::No TLS response yet — check the Diagnostics step, and that DNS for doctordekho.nexeagle.com -> 151.185.45.67 still resolves."
