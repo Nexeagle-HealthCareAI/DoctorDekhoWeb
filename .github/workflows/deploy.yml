@@ -41,8 +41,9 @@
 #                         see src/lib/api/server.ts). Must match Internal:ProxyForwardingSecret in
 #                         the easyHMSAPI repo. Unset on either side = previous site-wide rate-limit
 #                         budget; nothing breaks.
-#   NEXT_PUBLIC_MAPBOX_TOKEN  Mapbox public token (build-time). Restrict it in the Mapbox dashboard
-#                         to the doctordekho domains (URL restrictions) — the old nexeagle.com-only
+#   MAPBOX_TOKEN          Mapbox public token (build-time; passed to the image as the
+#                         NEXT_PUBLIC_MAPBOX_TOKEN build-arg). Restrict it in the Mapbox dashboard to the
+#                         doctordekho domains (URL restrictions) — the old nexeagle.com-only
 #                         allowlist will reject the new hosts.
 # ═══════════════════════════════════════════════════════════════════════════════
 
@@ -130,7 +131,7 @@ jobs:
             NEXT_PUBLIC_SITE_URL=https://doctordekho-dev.nexeagle.com
             NEXT_PUBLIC_BUSINESS_URL=https://nexeagle-dev.nexeagle.com
             EASYHMS_API_BASE_URL=https://1hms-dev-api.nexeagle.com
-            NEXT_PUBLIC_MAPBOX_TOKEN=${{ secrets.NEXT_PUBLIC_MAPBOX_TOKEN }}
+            NEXT_PUBLIC_MAPBOX_TOKEN=${{ secrets.MAPBOX_TOKEN }}
 
       - name: Deploy to Dev VM
         uses: appleboy/ssh-action@v1.0.3
@@ -260,7 +261,7 @@ jobs:
             NEXT_PUBLIC_SITE_URL=https://doctordekho.nexeagle.com
             NEXT_PUBLIC_BUSINESS_URL=https://nexeagle.com
             EASYHMS_API_BASE_URL=https://1hms-api.nexeagle.com
-            NEXT_PUBLIC_MAPBOX_TOKEN=${{ secrets.NEXT_PUBLIC_MAPBOX_TOKEN }}
+            NEXT_PUBLIC_MAPBOX_TOKEN=${{ secrets.MAPBOX_TOKEN }}
 
       - name: Prepare SSH key
         run: |
