@@ -1,3 +1,4 @@
+import { SITE_URL } from "@/lib/site";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import DoctorDetailClient from "@/components/patient/DoctorDetailClient";
@@ -79,7 +80,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     ". Verify by OTP. No login required.",
   ].filter(Boolean).join("");
   const canonicalSlug = doctorSlug(doctor, doctor.city);
-  const ogImageUrl = `https://nexeagle.com/api/og?title=${encodeURIComponent(doctor.name)}&subtitle=${encodeURIComponent(doctor.specialty)}&rating=${doctor.rating || ""}`;
+  const ogImageUrl = `${SITE_URL}/api/og?title=${encodeURIComponent(doctor.name)}&subtitle=${encodeURIComponent(doctor.specialty)}&rating=${doctor.rating || ""}`;
 
   return {
     title,
@@ -177,19 +178,19 @@ export default async function DoctorDetailPage({ params }: PageProps) {
         "@type": "ListItem",
         "position": 1,
         "name": "Home",
-        "item": "https://nexeagle.com"
+        "item": SITE_URL
       },
       ...(doctor.city ? [{
         "@type": "ListItem",
         "position": 2,
         "name": `Doctors in ${doctor.city}`,
-        "item": `https://nexeagle.com/specialties/general/${doctor.city.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`
+        "item": `${SITE_URL}/specialties/general/${doctor.city.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`
       }] : []),
       {
         "@type": "ListItem",
         "position": doctor.city ? 3 : 2,
         "name": doctor.name,
-        "item": `https://nexeagle.com/doctors/${canonicalSlug}`
+        "item": `${SITE_URL}/doctors/${canonicalSlug}`
       }
     ]
   };

@@ -1,0 +1,255 @@
+# ═══════════════════════════════════════════════════════════════════════════════
+# ONE-OFF: Map the Doctor Dekho domain -> this app's container (HTTPS via Caddy)
+# ═══════════════════════════════════════════════════════════════════════════════
+#
+# Manual (workflow_dispatch) only -- NOT part of the regular deploy pipeline. Run it ONCE per
+# environment, before (or after) the first deploy of that environment:
+#
+#   development -> doctordekho-dev.nexeagle.com -> localhost:84    (Dev VM  151.185.45.77)
+#   production  -> doctordekho.nexeagle.com     -> localhost:8081  (Prod VM 151.185.45.67)
+#
+# DNS A records for both hostnames already exist and point at the right VMs. What was missing is
+# the Caddy site block, so HTTPS fails at the TLS handshake until this runs.
+#
+# Both VMs are shared multi-tenant hosts that ALREADY run a Caddy reverse proxy for other
+# nexeagle.com subdomains. This workflow finds that Caddy, appends ONE site block to ITS
+# Caddyfile, validates the result, and reloads -- it never starts a second Caddy (a second one
+# fights the first for :80/:443/:2019). Caddy on the Dev VM is a NATIVE process; on Prod it may be
+# native or a Docker container named `caddy` (see the NexEagleWebsite repo's old OPS-HTTPS-SETUP
+# doc), so both are handled. `pgrep -x caddy` also matches a Dockerized Caddy's process in
+# the host's process table, hence the cgroup check that tells the two apart.
+#
+# Safety: the Caddyfile is backed up first and RESTORED if `caddy validate` rejects the new
+# config, so a bad block can't take down the other sites on that VM. Idempotent -- re-running is a
+# no-op once the block exists.
+#
+# Reuses the deploy pipeline's secrets -- no new credentials.
+#
+# NOTE: this only wires up TLS + the proxy. Until the app is deployed to that port, Caddy will
+# answer 502 -- which is expected, and still proves DNS + certificate issuance worked.
+# ═══════════════════════════════════════════════════════════════════════════════
+
+name: Setup — domain
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Which environment's domain to wire up"
+        type: choice
+        options: [development, production]
+        required: true
+
+jobs:
+# ═══════════════════════════════════════════════════════════════════════════════
+  setup-dev:
+    name: "Caddy → doctordekho-dev.nexeagle.com (Dev VM)"
+    if: inputs.environment == 'development'
+    runs-on: ubuntu-latest
+    environment: development
+
+    steps:
+      - name: Configure doctordekho-dev.nexeagle.com on Dev VM
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          password: ${{ secrets.SSH_PASSWORD }}
+          port: 22
+          command_timeout: 5m
+          script: |
+            set -e
+            DOMAIN=doctordekho-dev.nexeagle.com
+            PORT=84
+
+            echo "--- what is listening on :$PORT right now (informational; deploy.yml enforces ownership)"
+            (ss -tlnp 2>/dev/null || netstat -tlnp 2>/dev/null || true) | grep ":$PORT " || echo "(nothing yet — expected before the first deploy)"
+
+            echo "--- locating Caddy"
+            MODE=""; CFG=""
+            for PID in $(pgrep -x caddy || true); do
+              if ! grep -qE 'docker|containerd|kubepods' "/proc/$PID/cgroup" 2>/dev/null; then
+                MODE=native
+                CFG=$(ps -p "$PID" -o args= | grep -oP '(?<=--config )\S+' || true)
+                [ -z "$CFG" ] && CFG=/etc/caddy/Caddyfile
+                break
+              fi
+            done
+            if [ -z "$MODE" ] && docker ps --format '{{.Names}}' | grep -qx caddy; then
+              MODE=docker
+              CFG=$(docker inspect caddy --format '{{range .Mounts}}{{if eq .Destination "/etc/caddy/Caddyfile"}}{{.Source}}{{end}}{{end}}')
+              [ -z "$CFG" ] && CFG=/opt/caddy/Caddyfile
+            fi
+            if [ -z "$MODE" ]; then
+              echo "::error::Found neither a native Caddy process nor a 'caddy' container on this VM — refusing to guess."
+              exit 1
+            fi
+            echo "Caddy mode: $MODE, Caddyfile: $CFG"
+            [ -f "$CFG" ] || { echo "::error::Caddyfile not found at $CFG"; exit 1; }
+
+            if grep -q "$DOMAIN" "$CFG"; then
+              echo "Block for $DOMAIN already present — leaving as-is."
+              exit 0
+            fi
+
+            BACKUP="$CFG.bak-doctordekho-$(date +%Y%m%d%H%M%S)"
+            cp "$CFG" "$BACKUP"
+            echo "Backed up to $BACKUP"
+            printf '\n%s {\n    reverse_proxy localhost:%s\n}\n' "$DOMAIN" "$PORT" >> "$CFG"
+
+            validate() {
+              if [ "$MODE" = native ]; then caddy validate --config "$CFG" --adapter caddyfile
+              else docker exec caddy caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile; fi
+            }
+            if ! validate; then
+              echo "::error::Caddy rejected the new config — restoring the backup (other sites unaffected)."
+              cat "$BACKUP" > "$CFG"   # in-place write keeps the inode (matters for a bind-mounted file)
+              exit 1
+            fi
+
+            echo "--- reloading Caddy"
+            if [ "$MODE" = native ]; then
+              if systemctl is-active --quiet caddy 2>/dev/null; then systemctl reload caddy
+              else caddy reload --config "$CFG" --adapter caddyfile; fi
+            else
+              docker exec caddy caddy reload --config /etc/caddy/Caddyfile --adapter caddyfile
+            fi
+            echo "Reloaded."
+
+      - name: Verify HTTPS is up
+        run: |
+          echo "Waiting for Caddy to complete the ACME handshake (a 502 is fine — it means TLS works and the app just isn't deployed yet)..."
+          for i in 1 2 3 4 5 6 7 8; do
+            S=$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 https://doctordekho-dev.nexeagle.com/ 2>/dev/null || echo 000)
+            echo "Attempt $i — HTTP $S"
+            if [ "$S" != "000" ]; then echo "✅ TLS is up on doctordekho-dev.nexeagle.com (HTTP $S)"; exit 0; fi
+            sleep 15
+          done
+          echo "::warning::No TLS response yet — check the Diagnostics step, and that DNS for doctordekho-dev.nexeagle.com -> 151.185.45.77 still resolves."
+          exit 0
+
+      - name: Diagnostics (always runs)
+        if: always()
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          password: ${{ secrets.SSH_PASSWORD }}
+          port: 22
+          command_timeout: 2m
+          script: |
+            echo "--- Caddy processes"; pgrep -ax caddy || echo "(none)"
+            echo "--- caddy containers"; docker ps -a --filter name=caddy --format 'table {{.Names}}\t{{.Status}}' || true
+            echo "--- listening on 80/443?"; (ss -tlnp 2>/dev/null || netstat -tlnp 2>/dev/null) | grep -E ':80 |:443 ' || echo "(nothing listening)"
+            echo "--- doctordekho blocks in any Caddyfile we know of"
+            grep -A2 "doctordekho" /etc/caddy/Caddyfile /opt/caddy/Caddyfile 2>/dev/null || echo "(none found)"
+
+# ═══════════════════════════════════════════════════════════════════════════════
+  setup-prod:
+    name: "Caddy → doctordekho.nexeagle.com (Prod VM)"
+    if: inputs.environment == 'production'
+    runs-on: ubuntu-latest
+    environment: production
+
+    steps:
+      - name: Prepare SSH key
+        run: |
+          echo "${{ secrets.PROD_SSH_KEY_B64 }}" | base64 -d > "$GITHUB_WORKSPACE/deploy_key"
+          # See deploy.yml: appleboy/ssh-action reads this from inside its own container as a
+          # different UID, so chmod 600 would EACCES. Ephemeral runner, so 644 is safe.
+          chmod 644 "$GITHUB_WORKSPACE/deploy_key"
+
+      - name: Configure doctordekho.nexeagle.com on Prod VM
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.PROD_SSH_HOST }}
+          username: ${{ secrets.PROD_SSH_USER }}
+          key_path: deploy_key
+          port: 22
+          command_timeout: 5m
+          script: |
+            set -e
+            DOMAIN=doctordekho.nexeagle.com
+            PORT=8081
+
+            echo "--- what is listening on :$PORT right now (informational; deploy.yml enforces ownership)"
+            (ss -tlnp 2>/dev/null || netstat -tlnp 2>/dev/null || true) | grep ":$PORT " || echo "(nothing yet — expected before the first deploy)"
+
+            echo "--- locating Caddy"
+            MODE=""; CFG=""
+            for PID in $(pgrep -x caddy || true); do
+              if ! grep -qE 'docker|containerd|kubepods' "/proc/$PID/cgroup" 2>/dev/null; then
+                MODE=native
+                CFG=$(ps -p "$PID" -o args= | grep -oP '(?<=--config )\S+' || true)
+                [ -z "$CFG" ] && CFG=/etc/caddy/Caddyfile
+                break
+              fi
+            done
+            if [ -z "$MODE" ] && docker ps --format '{{.Names}}' | grep -qx caddy; then
+              MODE=docker
+              CFG=$(docker inspect caddy --format '{{range .Mounts}}{{if eq .Destination "/etc/caddy/Caddyfile"}}{{.Source}}{{end}}{{end}}')
+              [ -z "$CFG" ] && CFG=/opt/caddy/Caddyfile
+            fi
+            if [ -z "$MODE" ]; then
+              echo "::error::Found neither a native Caddy process nor a 'caddy' container on this VM — refusing to guess."
+              exit 1
+            fi
+            echo "Caddy mode: $MODE, Caddyfile: $CFG"
+            [ -f "$CFG" ] || { echo "::error::Caddyfile not found at $CFG"; exit 1; }
+
+            if grep -q "$DOMAIN" "$CFG"; then
+              echo "Block for $DOMAIN already present — leaving as-is."
+              exit 0
+            fi
+
+            BACKUP="$CFG.bak-doctordekho-$(date +%Y%m%d%H%M%S)"
+            cp "$CFG" "$BACKUP"
+            echo "Backed up to $BACKUP"
+            printf '\n%s {\n    reverse_proxy localhost:%s\n}\n' "$DOMAIN" "$PORT" >> "$CFG"
+
+            validate() {
+              if [ "$MODE" = native ]; then caddy validate --config "$CFG" --adapter caddyfile
+              else docker exec caddy caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile; fi
+            }
+            if ! validate; then
+              echo "::error::Caddy rejected the new config — restoring the backup (other sites unaffected)."
+              cat "$BACKUP" > "$CFG"   # in-place write keeps the inode (matters for a bind-mounted file)
+              exit 1
+            fi
+
+            echo "--- reloading Caddy"
+            if [ "$MODE" = native ]; then
+              if systemctl is-active --quiet caddy 2>/dev/null; then systemctl reload caddy
+              else caddy reload --config "$CFG" --adapter caddyfile; fi
+            else
+              docker exec caddy caddy reload --config /etc/caddy/Caddyfile --adapter caddyfile
+            fi
+            echo "Reloaded."
+
+      - name: Verify HTTPS is up
+        run: |
+          echo "Waiting for Caddy to complete the ACME handshake (a 502 is fine — it means TLS works and the app just isn't deployed yet)..."
+          for i in 1 2 3 4 5 6 7 8; do
+            S=$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 https://doctordekho.nexeagle.com/ 2>/dev/null || echo 000)
+            echo "Attempt $i — HTTP $S"
+            if [ "$S" != "000" ]; then echo "✅ TLS is up on doctordekho.nexeagle.com (HTTP $S)"; exit 0; fi
+            sleep 15
+          done
+          echo "::warning::No TLS response yet — check the Diagnostics step, and that DNS for doctordekho.nexeagle.com -> 151.185.45.67 still resolves."
+          exit 0
+
+      - name: Diagnostics (always runs)
+        if: always()
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.PROD_SSH_HOST }}
+          username: ${{ secrets.PROD_SSH_USER }}
+          key_path: deploy_key
+          port: 22
+          command_timeout: 2m
+          script: |
+            echo "--- Caddy processes"; pgrep -ax caddy || echo "(none)"
+            echo "--- caddy containers"; docker ps -a --filter name=caddy --format 'table {{.Names}}\t{{.Status}}' || true
+            echo "--- listening on 80/443?"; (ss -tlnp 2>/dev/null || netstat -tlnp 2>/dev/null) | grep -E ':80 |:443 ' || echo "(nothing listening)"
+            echo "--- doctordekho blocks in any Caddyfile we know of"
+            grep -A2 "doctordekho" /etc/caddy/Caddyfile /opt/caddy/Caddyfile 2>/dev/null || echo "(none found)"

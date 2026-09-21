@@ -10,25 +10,28 @@ COPY . .
 ENV NEXT_TELEMETRY_DISABLED=1
 
 # NEXT_PUBLIC_* vars are inlined into the client bundle at BUILD time, not read at container
-# runtime — LiveChat.tsx (a "use client" component) reads this to reach CMSAPI's /chathub
-# SignalR endpoint, so it must arrive as a build-arg here, not a `docker run -e`.
-ARG NEXT_PUBLIC_API_URL
-ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
+# runtime, so they must arrive as build-args here, not `docker run -e`.
+#
+# SITE_URL is this deployment's own public origin (canonical URLs, sitemap, share links, JSON-LD)
+# and BUSINESS_URL is the separate NexEagle corporate site this app links out to. `next build`
+# always loads .env.production (Next.js runs every build in production mode) which hardcodes the
+# PROD origins -- so without these, the dev image would silently bake in prod's URLs. A real
+# process env var set here takes precedence over .env.production. See src/lib/site.ts.
+ARG NEXT_PUBLIC_SITE_URL
+ENV NEXT_PUBLIC_SITE_URL=$NEXT_PUBLIC_SITE_URL
+ARG NEXT_PUBLIC_BUSINESS_URL
+ENV NEXT_PUBLIC_BUSINESS_URL=$NEXT_PUBLIC_BUSINESS_URL
 
 # EASYHMS_API_BASE_URL is a runtime-only var everywhere else (read server-side per request via
 # `docker run -e`, see deploy.yml) — EXCEPT for statically-generated pages (the
 # /specialties/[specialty]/[city]/[area] tree, prerendered with getStaticProps), which fetch
-# doctor data once at THIS build step, not at request time. `next build` always loads
-# .env.production regardless of which environment's image is being built (Next.js runs every
-# build in production mode), and .env.production hardcodes the PROD api url — so without this,
-# every environment's static pages silently bake in prod's doctor data. Setting it as a real
-# process env var here (before the build) takes precedence over .env.production, the same way
-# NEXT_PUBLIC_API_URL above already does.
+# doctor data once at THIS build step, not at request time. Same .env.production precedence issue
+# as above: without this, every environment's static pages silently bake in prod's doctor data.
 ARG EASYHMS_API_BASE_URL
 ENV EASYHMS_API_BASE_URL=$EASYHMS_API_BASE_URL
 
 # Mapbox public token -- powers the static location-preview map on each doctor's detail page
-# (DoctorLocationMap.tsx). Same build-time-inlining reasoning as NEXT_PUBLIC_API_URL above.
+# (DoctorLocationMap.tsx). Same build-time-inlining reasoning as above.
 # Unset means the map is simply omitted; the "Get Directions" link still works either way.
 ARG NEXT_PUBLIC_MAPBOX_TOKEN
 ENV NEXT_PUBLIC_MAPBOX_TOKEN=$NEXT_PUBLIC_MAPBOX_TOKEN
@@ -49,7 +52,7 @@ COPY --from=builder /app/.next ./.next
 COPY --from=builder /app/public ./public
 COPY --from=builder /app/node_modules ./node_modules
 
-# Bind container port to 80 (deploy.yml maps host 8080 -> container 80)
+# Bind container port to 80 (deploy.yml maps a host port -> container 80)
 EXPOSE 80
 ENV PORT=80
 

@@ -1,5 +1,6 @@
 "use client";
 
+import { SITE_URL } from "@/lib/site";
 import Link from "next/link";
 import { ChevronLeft, FlaskConical, MapPin, Navigation, Phone, Mail, ShieldCheck } from "lucide-react";
 import AnalyticsTracker from "@/components/AnalyticsTracker";
@@ -51,7 +52,7 @@ export default function LabDetailClient({ lab, canonicalSlug }: LabDetailClientP
                     <ShareButton
                       title={`${lab.name} | Doctor Dekho`}
                       text={`${lab.name}${locationLine ? ` in ${locationLine}` : ""}`}
-                      url={`https://nexeagle.com/labs/${canonicalSlug}`}
+                      url={`${SITE_URL}/labs/${canonicalSlug}`}
                     />
                   </div>
                   {locationLine && <p className="text-sm text-slate-500 mt-1">{locationLine}</p>}

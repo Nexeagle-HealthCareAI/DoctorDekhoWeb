@@ -1,0 +1,355 @@
+# ═══════════════════════════════════════════════════════════════════════════════
+# DOCTOR DEKHO WEB — CI/CD Pipeline  (Next.js → Node container on GHCR)
+# ═══════════════════════════════════════════════════════════════════════════════
+#
+#   Stage 1 — Build       npm ci + next build  (runs on push + PRs)
+#   Stage 2 — Deploy      build Node image (next start) → push GHCR → run on VM
+#             dev branch  -> Dev VM   (151.185.45.77) :84   -- public: https://doctordekho-dev.nexeagle.com
+#             main branch -> Prod VM  (151.185.45.67) :8081 -- public: https://doctordekho.nexeagle.com
+#
+# This is the patient-facing "Doctor Dekho" site, split out of the NexEagleWebsite repo. The
+# corporate/B2B site (nexeagle.com) is a SEPARATE app and container -- it keeps :82 (dev) and
+# :8080 (prod). Both VMs are shared multi-tenant hosts (81=easyhms-web-dev, 83=cms-web-dev,
+# 80=1Rad on prod, ...), so the host ports above were picked to be next-free, NOT verified from
+# here: the deploy step below refuses to touch a port held by any container other than this
+# app's own, and fails with diagnostics instead. Run `Setup — domain` (setup-domain.yml) once per
+# environment to point the Caddy reverse proxy (TLS) at these ports.
+#
+# The container publishes plain HTTP; the native/Docker Caddy on each VM terminates HTTPS. The
+# health checks below deliberately test the raw port, not the public domain, so a transient
+# DNS/Caddy/cert hiccup can't fail a deploy that otherwise succeeded.
+#
+# ─────────────────────────────────────────────────────────────────────────────
+# SECRETS (Settings → Secrets → Actions) — same names/values as the NexEagleWebsite repo, because
+# the same VMs and the same backend serve both. Repo/org must define ALL of these:
+#   PROD_SSH_HOST         151.185.45.67
+#   PROD_SSH_USER         root
+#   PROD_SSH_KEY_B64      base64-encoded SSH private key for Prod App VM
+#   SSH_HOST              151.185.45.77 (Dev App VM — password auth via appleboy/ssh-action)
+#   SSH_USER              root
+#   SSH_PASSWORD          SSH password for the Dev App VM
+#   EASYHMS_PROD_API_KEY  OPTIONAL — the public API doesn't require a key (see PublicApiKeyFilter).
+#   EASYHMS_DEV_API_KEY   OPTIONAL, same, for dev.
+#   ANTHROPIC_API_KEY     OPTIONAL — AI search fallback (app/api/search/parse). Unset = literal
+#                         keyword search only, nothing breaks. NLP_ROUTER_BASE_URL (hardcoded in
+#                         the docker run below) is tried BEFORE this; Anthropic is the fallback.
+#                         Dev's NLP_ROUTER_BASE_URL is still the raw http://151.185.45.77:5003 —
+#                         NOT yet switched to https://nlp-api-dev.nexeagle.com (as of 2026-08-13
+#                         that subdomain's Caddy/DNS wasn't resolving). Deliberate, not oversight.
+#   INTERNAL_PROXY_SECRET OPTIONAL — lets easyHMSAPI's public rate limiters see each real visitor's
+#                         IP instead of this container's own (every API call is server-to-server —
+#                         see src/lib/api/server.ts). Must match Internal:ProxyForwardingSecret in
+#                         the easyHMSAPI repo. Unset on either side = previous site-wide rate-limit
+#                         budget; nothing breaks.
+#   NEXT_PUBLIC_MAPBOX_TOKEN  Mapbox public token (build-time). Restrict it in the Mapbox dashboard
+#                         to the doctordekho domains (URL restrictions) — the old nexeagle.com-only
+#                         allowlist will reject the new hosts.
+# ═══════════════════════════════════════════════════════════════════════════════
+
+name: Doctor Dekho Web — CI/CD
+
+on:
+  push:
+    branches: [main, dev]
+  pull_request:
+    branches: [main, dev]
+  workflow_dispatch:
+
+concurrency:
+  group: doctordekho-web-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+# ═══════════════════════════════════════════════════════════════════════════════
+  build:
+    name: "Stage 1 — Build"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - run: npm ci
+
+      - name: Build (validation)
+        run: npm run build
+
+# ═══════════════════════════════════════════════════════════════════════════════
+  deploy-dev:
+    name: "Stage 2 — Deploy → Dev"
+    runs-on: ubuntu-latest
+    needs: build
+    if: github.ref == 'refs/heads/dev' && github.event_name != 'pull_request'
+    environment: development
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Image vars
+        id: vars
+        run: |
+          echo "image=ghcr.io/$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')/doctordekho-web" >> "$GITHUB_OUTPUT"
+          echo "tag=dev-${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+
+      - name: Build & push image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: |
+            ${{ steps.vars.outputs.image }}:${{ steps.vars.outputs.tag }}
+            ${{ steps.vars.outputs.image }}:dev-latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          # NEXT_PUBLIC_* and EASYHMS_API_BASE_URL are inlined/fetched at BUILD time — see the
+          # Dockerfile comments. Without the origin overrides here the dev image would bake in
+          # .env.production's PROD origins (canonical URLs, sitemap, share links all pointing at
+          # prod), and without EASYHMS_API_BASE_URL its static specialty pages would bake in
+          # PROD doctor data.
+          #
+          # https://1hms-dev-api.nexeagle.com (NOT the raw 151.185.45.77:5001): the GitHub Actions
+          # runner cannot reach the VM's raw ports (only 80/443 are open to the internet), and the
+          # static-page build needs to fetch doctors. That domain is a native Caddy reverse proxy
+          # on the Dev VM forwarding to localhost:5001.
+          build-args: |
+            NEXT_PUBLIC_SITE_URL=https://doctordekho-dev.nexeagle.com
+            NEXT_PUBLIC_BUSINESS_URL=https://nexeagle-dev.nexeagle.com
+            EASYHMS_API_BASE_URL=https://1hms-dev-api.nexeagle.com
+            NEXT_PUBLIC_MAPBOX_TOKEN=${{ secrets.NEXT_PUBLIC_MAPBOX_TOKEN }}
+
+      - name: Deploy to Dev VM
+        uses: appleboy/ssh-action@v1.0.3
+        env:
+          IMAGE: ${{ steps.vars.outputs.image }}:${{ steps.vars.outputs.tag }}
+          PULL_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ACTOR: ${{ github.actor }}
+          EASYHMS_API_KEY: ${{ secrets.EASYHMS_DEV_API_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          PROXY_SECRET: ${{ secrets.INTERNAL_PROXY_SECRET }}
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          password: ${{ secrets.SSH_PASSWORD }}
+          port: 22
+          command_timeout: 10m
+          envs: IMAGE,PULL_TOKEN,ACTOR,EASYHMS_API_KEY,ANTHROPIC_API_KEY,PROXY_SECRET
+          script: |
+            set -e
+            NAME=doctordekho-web-dev
+            PORT=84
+            IMAGE_LC=$(printf '%s' "$IMAGE" | tr '[:upper:]' '[:lower:]')
+            echo "$PULL_TOKEN" | docker login ghcr.io -u "$ACTOR" --password-stdin
+            docker pull "$IMAGE_LC"
+            docker rm -f "$NAME" 2>/dev/null || true
+
+            # This is a shared VM. Only ever replace OUR OWN container -- if any OTHER container
+            # publishes this port, stop here rather than killing an unrelated service.
+            OTHER=$(docker ps --filter "publish=$PORT" --format '{{.Names}}' | grep -vx "$NAME" || true)
+            if [ -n "$OTHER" ]; then
+              echo "::error::Host port $PORT is already published by container(s): $OTHER. Refusing to remove another service. Pick a free port (edit PORT here, the -p mapping, and the Caddy block in setup-domain.yml)."
+              exit 1
+            fi
+
+            # --add-host + host.docker.internal (not the VM's own public IP) for
+            # EASYHMS_API_BASE_URL: this container runs on Docker's default bridge network
+            # (-p $PORT:80, no --network host), and a bridge-network container generally can't
+            # reach its own host's public IP/domain (NAT hairpin). Without this every server-side
+            # fetch to the API silently failed once and served mock doctor data with zero visible
+            # error (see the NexEagleWebsite repo history). host.docker.internal (host-gateway)
+            # reaches the host directly. Port 5001 is the API's real bound port on BOTH VMs.
+            for i in 1 2 3 4 5; do
+              if docker run -d --name "$NAME" --restart unless-stopped \
+                  -p $PORT:80 \
+                  --add-host=host.docker.internal:host-gateway \
+                  -e EASYHMS_API_BASE_URL='http://host.docker.internal:5001' \
+                  -e EASYHMS_API_KEY="$EASYHMS_API_KEY" \
+                  -e EASYHMS_API_KEY_HEADER='X-Api-Key' \
+                  -e ANTHROPIC_API_KEY="$ANTHROPIC_API_KEY" \
+                  -e EASYHMS_TRUSTED_PROXY_SECRET="$PROXY_SECRET" \
+                  -e NLP_ROUTER_BASE_URL='http://151.185.45.77:5003' \
+                  "$IMAGE_LC"; then
+                break
+              fi
+              echo "Port $PORT still busy (attempt $i) — what's holding it:"
+              (ss -tlnp 2>/dev/null || netstat -tlnp 2>/dev/null || true) | grep ":$PORT " || echo "  (nothing found via ss/netstat)"
+              docker ps -a --format 'table {{.Names}}\t{{.Status}}\t{{.Ports}}' || true
+              if [ "$i" = 5 ]; then
+                echo "Giving up after 5 attempts — see diagnostics above for what's actually on :$PORT."
+                exit 1
+              fi
+              sleep 3
+              docker rm -f "$NAME" 2>/dev/null || true
+            done
+            docker image prune -f || true
+
+      - name: Health check
+        run: |
+          sleep 5
+          for i in 1 2 3 4 5; do
+            S=$(curl -s -o /dev/null -w '%{http_code}' \
+                http://${{ secrets.SSH_HOST }}:84 2>/dev/null || echo 000)
+            echo "Attempt $i — HTTP $S"
+            [ "$S" = "200" ] && echo "✅ Doctor Dekho (dev) is live" && exit 0
+            sleep 5
+          done
+          echo "⚠️ Health check inconclusive — check: docker logs doctordekho-web-dev"
+          exit 0
+
+      - name: Write summary
+        if: always()
+        run: |
+          echo "## 🩺 Doctor Dekho — Dev" >> $GITHUB_STEP_SUMMARY
+          [ "${{ job.status }}" = "success" ] \
+            && echo "**Status:** ✅ Live at https://doctordekho-dev.nexeagle.com (container health-checked directly on :84)" >> $GITHUB_STEP_SUMMARY \
+            || echo "**Status:** ❌ Failed" >> $GITHUB_STEP_SUMMARY
+          echo "| Commit | \`${{ github.sha }}\` |" >> $GITHUB_STEP_SUMMARY
+
+# ═══════════════════════════════════════════════════════════════════════════════
+  deploy-prod:
+    name: "Stage 2 — Deploy → Prod"
+    runs-on: ubuntu-latest
+    needs: build
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    environment: production
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Image vars
+        id: vars
+        run: |
+          echo "image=ghcr.io/$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')/doctordekho-web" >> "$GITHUB_OUTPUT"
+          echo "tag=${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+
+      - name: Build & push image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: |
+            ${{ steps.vars.outputs.image }}:${{ steps.vars.outputs.tag }}
+            ${{ steps.vars.outputs.image }}:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          # Build-time vars — see the dev job's comment and the Dockerfile. These equal the
+          # in-code / .env.production defaults, passed explicitly so prod's values are visible here.
+          build-args: |
+            NEXT_PUBLIC_SITE_URL=https://doctordekho.nexeagle.com
+            NEXT_PUBLIC_BUSINESS_URL=https://nexeagle.com
+            EASYHMS_API_BASE_URL=https://1hms-api.nexeagle.com
+            NEXT_PUBLIC_MAPBOX_TOKEN=${{ secrets.NEXT_PUBLIC_MAPBOX_TOKEN }}
+
+      - name: Prepare SSH key
+        run: |
+          echo "${{ secrets.PROD_SSH_KEY_B64 }}" | base64 -d > "$GITHUB_WORKSPACE/deploy_key"
+          # appleboy/ssh-action reads this file from INSIDE its own Docker container, as a
+          # different UID than the runner that wrote it — chmod 600 locks it to the runner's own
+          # UID and the container gets EACCES. Go's SSH key parser does no permission-strictness
+          # check (unlike the OpenSSH CLI), so world-readable is safe on this ephemeral runner.
+          chmod 644 "$GITHUB_WORKSPACE/deploy_key"
+
+      - name: Deploy to Prod VM
+        uses: appleboy/ssh-action@v1.0.3
+        env:
+          IMAGE: ${{ steps.vars.outputs.image }}:${{ steps.vars.outputs.tag }}
+          PULL_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ACTOR: ${{ github.actor }}
+          EASYHMS_API_KEY: ${{ secrets.EASYHMS_PROD_API_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          PROXY_SECRET: ${{ secrets.INTERNAL_PROXY_SECRET }}
+        with:
+          host: ${{ secrets.PROD_SSH_HOST }}
+          username: ${{ secrets.PROD_SSH_USER }}
+          # appleboy/ssh-action runs inside its own Docker container, which only mounts the
+          # checked-out workspace (not /tmp on the runner) — the key file must live here.
+          key_path: deploy_key
+          port: 22
+          command_timeout: 10m
+          envs: IMAGE,PULL_TOKEN,ACTOR,EASYHMS_API_KEY,ANTHROPIC_API_KEY,PROXY_SECRET
+          script: |
+            set -e
+            NAME=doctordekho-web
+            PORT=8081
+            IMAGE_LC=$(printf '%s' "$IMAGE" | tr '[:upper:]' '[:lower:]')
+            echo "$PULL_TOKEN" | docker login ghcr.io -u "$ACTOR" --password-stdin
+            docker pull "$IMAGE_LC"
+            docker rm -f "$NAME" 2>/dev/null || true
+
+            # Shared VM — only ever replace OUR OWN container (see the dev job).
+            OTHER=$(docker ps --filter "publish=$PORT" --format '{{.Names}}' | grep -vx "$NAME" || true)
+            if [ -n "$OTHER" ]; then
+              echo "::error::Host port $PORT is already published by container(s): $OTHER. Refusing to remove another service. Pick a free port (edit PORT here, the -p mapping, and the Caddy block in setup-domain.yml)."
+              exit 1
+            fi
+
+            # host.docker.internal for the same NAT-hairpin reason as the dev job: reaching the
+            # API on THIS SAME VM via its public domain from a bridge-network container fails.
+            for i in 1 2 3 4 5; do
+              if docker run -d --name "$NAME" --restart unless-stopped \
+                  -p $PORT:80 \
+                  --add-host=host.docker.internal:host-gateway \
+                  -e EASYHMS_API_BASE_URL='http://host.docker.internal:5001' \
+                  -e EASYHMS_API_KEY="$EASYHMS_API_KEY" \
+                  -e EASYHMS_API_KEY_HEADER='X-Api-Key' \
+                  -e ANTHROPIC_API_KEY="$ANTHROPIC_API_KEY" \
+                  -e EASYHMS_TRUSTED_PROXY_SECRET="$PROXY_SECRET" \
+                  -e NLP_ROUTER_BASE_URL='https://nlp-api.nexeagle.com' \
+                  "$IMAGE_LC"; then
+                break
+              fi
+              echo "Port $PORT still busy (attempt $i) — what's holding it:"
+              (ss -tlnp 2>/dev/null || netstat -tlnp 2>/dev/null || true) | grep ":$PORT " || echo "  (nothing found via ss/netstat)"
+              docker ps -a --format 'table {{.Names}}\t{{.Status}}\t{{.Ports}}' || true
+              if [ "$i" = 5 ]; then
+                echo "Giving up after 5 attempts — see diagnostics above for what's actually on :$PORT."
+                exit 1
+              fi
+              sleep 3
+              docker rm -f "$NAME" 2>/dev/null || true
+            done
+            docker image prune -f || true
+
+      - name: Health check
+        run: |
+          sleep 5
+          for i in 1 2 3 4 5; do
+            S=$(curl -s -o /dev/null -w '%{http_code}' \
+                http://${{ secrets.PROD_SSH_HOST }}:8081 2>/dev/null || echo 000)
+            echo "Attempt $i — HTTP $S"
+            [ "$S" = "200" ] && echo "✅ Doctor Dekho is live" && exit 0
+            sleep 5
+          done
+          echo "⚠️ Health check inconclusive — check: docker logs doctordekho-web"
+          exit 0
+
+      - name: Write summary
+        if: always()
+        run: |
+          echo "## 🩺 Doctor Dekho — Prod" >> $GITHUB_STEP_SUMMARY
+          [ "${{ job.status }}" = "success" ] \
+            && echo "**Status:** ✅ Live at https://doctordekho.nexeagle.com (container health-checked directly on :8081)" >> $GITHUB_STEP_SUMMARY \
+            || echo "**Status:** ❌ Failed" >> $GITHUB_STEP_SUMMARY
+          echo "| Commit | \`${{ github.sha }}\` |" >> $GITHUB_STEP_SUMMARY

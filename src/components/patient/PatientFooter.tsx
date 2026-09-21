@@ -1,5 +1,6 @@
 "use client";
 
+import { BUSINESS_URL } from "@/lib/site";
 import Link from "next/link";
 import { Phone, Mail, Building2 } from "lucide-react";
 import { Logo } from "@/components/Logo";
@@ -45,7 +46,7 @@ export default function PatientFooter() {
             Email Us
           </a>
           
-          <Link href="/business" className="group flex items-center gap-2.5 px-5 py-2.5 rounded-full bg-brand-teal/5 border border-brand-teal/20 text-xs font-extrabold text-brand-teal hover:bg-brand-teal hover:text-white hover:shadow-xl hover:shadow-brand-teal/20 hover:-translate-y-0.5 transition-all duration-300">
+          <Link href={BUSINESS_URL} className="group flex items-center gap-2.5 px-5 py-2.5 rounded-full bg-brand-teal/5 border border-brand-teal/20 text-xs font-extrabold text-brand-teal hover:bg-brand-teal hover:text-white hover:shadow-xl hover:shadow-brand-teal/20 hover:-translate-y-0.5 transition-all duration-300">
             <div className="w-6 h-6 rounded-full bg-white/50 flex items-center justify-center group-hover:bg-white/20 transition-colors">
               <Building2 className="w-3.5 h-3.5 text-brand-teal group-hover:text-white transition-colors" />
             </div>
@@ -59,8 +60,8 @@ export default function PatientFooter() {
           <span>© {new Date().getFullYear()} NexEagle.</span>
           <span className="hidden sm:inline-block w-1 h-1 rounded-full bg-slate-200" />
           <div className="flex items-center gap-4">
-            <Link href="/privacy" className="hover:text-slate-900 transition-colors">{t("footer.privacy")}</Link>
-            <Link href="/terms" className="hover:text-slate-900 transition-colors">{t("footer.terms")}</Link>
+            <Link href={`${BUSINESS_URL}/privacy`} className="hover:text-slate-900 transition-colors">{t("footer.privacy")}</Link>
+            <Link href={`${BUSINESS_URL}/terms`} className="hover:text-slate-900 transition-colors">{t("footer.terms")}</Link>
           </div>
         </div>
 

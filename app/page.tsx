@@ -1,3 +1,4 @@
+import { SITE_URL } from "@/lib/site";
 import type { Metadata } from "next";
 import HomeClient from "./home-client";
 import { getAllDoctors, getWhatsAppEntryQrCodeDataUrl } from "@/lib/api/server";
@@ -17,11 +18,8 @@ export const metadata: Metadata = {
     "hospital appointment booking",
     "verified doctors India",
     "online appointment booking",
+    "Doctor Dekho",
     "NexEagle",
-    "1HMS",
-    "1Rad",
-    "1Lab",
-    "1Pharma",
   ],
   alternates: { canonical: "/" },
   openGraph: {
@@ -38,12 +36,12 @@ const structuredData = {
   "@graph": [
     {
       "@type": "WebSite",
-      "@id": "https://nexeagle.com/#website",
-      name: "NexEagle",
-      url: "https://nexeagle.com",
+      "@id": `${SITE_URL}/#website`,
+      name: "Doctor Dekho",
+      url: SITE_URL,
       potentialAction: {
         "@type": "SearchAction",
-        target: "https://nexeagle.com/?q={search_term_string}",
+        target: `${SITE_URL}/?q={search_term_string}`,
         "query-input": "required name=search_term_string",
       },
     },

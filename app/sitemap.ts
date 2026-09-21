@@ -1,3 +1,4 @@
+import { SITE_URL } from "@/lib/site";
 import type { MetadataRoute } from "next";
 import { getAllDoctors } from "@/lib/api/server";
 import { doctorSlug, specialties, CITIES, AREAS_BY_CITY } from "@/data/patient";
@@ -5,32 +6,10 @@ import { medicalArticles } from "@/data/wiki";
 
 export const revalidate = 3600;
 
-const BASE_URL = "https://nexeagle.com";
+const BASE_URL = SITE_URL;
 
 const STATIC_ROUTES: { path: string; priority: number; changeFrequency: MetadataRoute.Sitemap[number]["changeFrequency"] }[] = [
   { path: "/", priority: 1.0, changeFrequency: "daily" },
-  { path: "/solutions/1hms", priority: 0.9, changeFrequency: "weekly" },
-  { path: "/solutions/1rad", priority: 0.9, changeFrequency: "weekly" },
-  { path: "/solutions/1lab", priority: 0.9, changeFrequency: "weekly" },
-  { path: "/solutions/1pharma", priority: 0.9, changeFrequency: "weekly" },
-  { path: "/ai", priority: 0.9, changeFrequency: "weekly" },
-  { path: "/business", priority: 0.8, changeFrequency: "weekly" },
-  { path: "/products", priority: 0.8, changeFrequency: "weekly" },
-  { path: "/services", priority: 0.8, changeFrequency: "weekly" },
-  { path: "/pricing", priority: 0.8, changeFrequency: "weekly" },
-  { path: "/why", priority: 0.8, changeFrequency: "weekly" },
-  { path: "/how-it-works", priority: 0.8, changeFrequency: "weekly" },
-  { path: "/faqs", priority: 0.7, changeFrequency: "monthly" },
-  { path: "/team", priority: 0.7, changeFrequency: "monthly" },
-  { path: "/team/engineering", priority: 0.5, changeFrequency: "monthly" },
-  { path: "/team/healthcare", priority: 0.5, changeFrequency: "monthly" },
-  { path: "/team/leadership", priority: 0.5, changeFrequency: "monthly" },
-  { path: "/team/product-design", priority: 0.5, changeFrequency: "monthly" },
-  { path: "/careers", priority: 0.6, changeFrequency: "weekly" },
-  { path: "/contact", priority: 0.8, changeFrequency: "monthly" },
-  { path: "/security", priority: 0.6, changeFrequency: "monthly" },
-  { path: "/privacy", priority: 0.3, changeFrequency: "yearly" },
-  { path: "/terms", priority: 0.3, changeFrequency: "yearly" },
 ];
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {

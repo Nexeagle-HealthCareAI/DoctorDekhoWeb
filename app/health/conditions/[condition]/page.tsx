@@ -1,3 +1,4 @@
+import { SITE_URL } from "@/lib/site";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import Link from "next/link";
@@ -49,14 +50,14 @@ export default function HealthArticlePage({ params }: PageProps) {
       "author": {
         "@type": "Physician",
         "name": author.name,
-        "url": `https://nexeagle.com/doctors/${author.name.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`
+        "url": `${SITE_URL}/doctors/${author.name.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`
       }
     } : {}),
     ...(reviewer ? {
       "reviewedBy": {
         "@type": "Physician",
         "name": reviewer.name,
-        "url": `https://nexeagle.com/doctors/${reviewer.name.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`
+        "url": `${SITE_URL}/doctors/${reviewer.name.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`
       }
     } : {}),
     "about": {

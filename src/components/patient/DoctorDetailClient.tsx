@@ -1,5 +1,6 @@
 "use client";
 
+import { SITE_URL } from "@/lib/site";
 import { useEffect } from "react";
 import Image from "next/image";
 import Link from "next/link";
@@ -119,7 +120,7 @@ export default function DoctorDetailClient({ doctor, similarDoctors, canonicalSl
                       <ShareButton
                         title={t("shareButton.bookAppointmentTitle", { name: doctor.name })}
                         text={t("shareButton.shareText", { name: doctor.name, specialty: doctor.specialty, city: doctor.city })}
-                        url={`https://nexeagle.com/doctors/${canonicalSlug}`}
+                        url={`${SITE_URL}/doctors/${canonicalSlug}`}
                       />
                     </div>
                     <p className="text-sm font-bold text-brand-teal mt-1">{doctor.specialty}</p>

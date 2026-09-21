@@ -27,10 +27,6 @@ const securityHeaders = [
   { key: 'X-Frame-Options', value: 'SAMEORIGIN' },
   { key: 'X-Content-Type-Options', value: 'nosniff' },
   { key: 'Referrer-Policy', value: 'origin-when-cross-origin' },
-  // connect-src needs both the https: and wss: schemes for cms-api.nexeagle.com --
-  // LiveChat.tsx's SignalR connection (CHAT_HUB_URL) negotiates over https: first, then
-  // upgrades to a WebSocket, and CSP enforces connect-src per-scheme (an https: entry alone
-  // does not also permit the wss: upgrade).
   // Mapbox needs three separate allowances: connect-src for the Directions Matrix API
   // (geo.ts's getDrivingDistances) and the vector tile/style/glyph/sprite requests the
   // interactive map (HospitalsMapView.tsx) makes itself, img-src for the static preview
@@ -39,7 +35,7 @@ const securityHeaders = [
   // router.project-osrm.org is gone -- geo.ts no longer calls the OSRM demo server (see
   // "Swap OSRM public demo server for Mapbox Matrix API"). BigDataCloud's reverse-geocode
   // endpoint redirects from api.bigdatacloud.net to api-bdc.io, so both are needed.
-  { key: 'Content-Security-Policy', value: "default-src 'self'; script-src 'self' 'unsafe-eval' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://nexeagle-dev.in-south1-objectstore.e2enetworks.net https://api.mapbox.com; worker-src 'self' blob:; connect-src 'self' https://api.bigdatacloud.net https://api-bdc.io https://api.mapbox.com https://events.mapbox.com https://1hms-api.nexeagle.com https://cms-api.nexeagle.com wss://cms-api.nexeagle.com;" }
+  { key: 'Content-Security-Policy', value: "default-src 'self'; script-src 'self' 'unsafe-eval' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://nexeagle-dev.in-south1-objectstore.e2enetworks.net https://api.mapbox.com; worker-src 'self' blob:; connect-src 'self' https://api.bigdatacloud.net https://api-bdc.io https://api.mapbox.com https://events.mapbox.com;" }
 ];
 
 /** @type {import('next').NextConfig} */
