@@ -1,76 +1,89 @@
-# NexEagle Website
+# Doctor Dekho Web
 
-A Next.js (App Router) site with two distinct halves living in the same app:
+The patient-facing doctor-booking portal — **Doctor Dekho** — as a standalone Next.js app.
 
-1. **Corporate / B2B site** — NexEagle's marketing site for its healthcare product suite
-   (1HMS, 1Rad, 1Lab, 1Pharma): `/business` (home), `/products`, `/services`,
-   `/solutions/{1hms,1rad,1lab,1pharma}`, `/why`, `/how-it-works`, `/team` (+ leadership /
-   engineering / healthcare / product-design subpages), `/careers`, `/contact`, `/ai`, `/faqs`,
-   `/security`, `/privacy`, `/terms`.
-2. **Patient-facing doctor booking portal** ("Doctor Dekho") — mounted at the site root `/`,
-   backed live by EasyHMS's public API: `/doctors/[doctorSlug]`, `/specialties/[specialty]`,
-   `/conditions/[condition]`, `/hospitals/[hospital]`, city-targeted SEO variants
-   (`/specialties/[specialty]/[city]`, `/conditions/[condition]/[city]`), `/appointments`,
-   `/profile`.
+It was split out of the `NexEagleWebsite` repo (which now holds only the corporate / B2B site at
+`nexeagle.com`). Full git history up to the split is preserved here.
 
-`app/layout-wrapper.tsx` picks which chrome to render (`Navbar`/`Footer` for the corporate
-routes, `PatientTopBar`/`PatientFooter` + bottom nav for the patient-portal routes) based on the
-current path — there's no route-group split, just the one wrapper switching on `pathname`.
+| | Dev | Prod |
+|---|---|---|
+| Public URL | https://doctordekho-dev.nexeagle.com | https://doctordekho.nexeagle.com |
+| Branch | `dev` | `main` |
+| VM / host port | Dev VM `151.185.45.77` : `84` | Prod VM `151.185.45.67` : `8081` |
+| Container | `doctordekho-web-dev` | `doctordekho-web` |
+
+The corporate site is a **separate** app/container (`nexeagle-dev.nexeagle.com` → `:82`,
+`nexeagle.com` → `:8080`). This app links out to it (For Hospitals, Privacy, Terms) via
+`BUSINESS_URL` in [`src/lib/site.ts`](src/lib/site.ts).
+
+## What's in here
+
+Backed live by EasyHMS's public API: `/` (search), `/doctors/[doctorSlug]`,
+`/specialties/[specialty]` (+ `/[city]`, `/[city]/[area]`), `/conditions/[condition]`
+(+ city/area), `/hospitals`, `/labs`, `/health/conditions/[condition]`, `/appointments`,
+`/profile` (+ health locker, personal info), `/login` (WhatsApp OTP), `/offline`.
+
+`app/api/**` are same-origin server-side proxies to the EasyHMS API — the browser never calls the
+API directly, so **no backend CORS entry is needed for this app's origin**.
 
 ## Tech stack
 
-- **Next.js 14** (App Router) + **React 18** + **TypeScript**
-- **Tailwind CSS** + **shadcn/ui** (Radix primitives) — brand colors are CSS custom properties
-  (`--brand-navy`, `--brand-teal`, `--brand-sky`, `--brand-iris`) wired into
-  `tailwind.config.ts`, not hardcoded hex
-- **framer-motion** for animation
-- **@tanstack/react-query** with `@tanstack/react-query-persist-client` (offline-tolerant caching)
-- **react-hook-form** + **zod** for forms
-- **Serwist** (`@serwist/next`) — PWA service worker (`app/sw.ts`, `app/manifest.ts`)
-- **@vercel/og** — dynamic OG image generation (`app/api/og`)
-- **@microsoft/signalr** — live chat client (see `NEXT_PUBLIC_API_URL` below)
-- i18n: English / Hindi / Bengali / Hinglish (`src/lib/i18n/dictionaries/`)
-- Fonts: Inter + Poppins (`next/font/google`)
+Next.js 14 (App Router) · React 18 · TypeScript · Tailwind + shadcn/ui · react-query (+ persisted
+cache) · Serwist PWA (`app/sw.ts`, `app/manifest.ts`) · Mapbox (maps/directions) · i18n
+(English / Hindi / Bengali / Hinglish).
 
 ## Environment variables
 
-See `.env.example` for the full annotated list. The essentials:
+See `.env.example` for the annotated list.
 
 | Variable | Required | Purpose |
 |---|---|---|
-| `EASYHMS_API_BASE_URL` | Yes | Root of the EasyHMS public API that powers the patient portal (doctors, specialties, appointments). No trailing slash, no `/api` prefix. |
-| `EASYHMS_API_KEY` / `EASYHMS_API_KEY_HEADER` | No | Optional — the public API works anonymously. Only set if this deployment's traffic needs to be identified/revocable separately. Server-side only, never `NEXT_PUBLIC_`. |
-| `ANTHROPIC_API_KEY` | No | Powers the AI-assisted search fallback (`app/api/search/parse`) for free-text symptom queries. Leave blank to disable — search stays literal-keyword-only. |
-| `NEXT_PUBLIC_API_URL` | Yes (for chat) | Origin of the CMS API backing the live-chat SignalR hub. Must be `NEXT_PUBLIC_`-prefixed and correct **before** `next build` — it's inlined into the client bundle at build time, not read at container start. |
+| `EASYHMS_API_BASE_URL` | Yes | Root of the EasyHMS public API (no trailing slash, no `/api`). Also read at **build** time by the statically generated specialty pages. |
+| `NEXT_PUBLIC_SITE_URL` | Build-time | This deployment's own public origin. Drives canonical URLs, sitemap, share links, JSON-LD, and whether robots allow indexing. Defaults to the prod origin. |
+| `NEXT_PUBLIC_BUSINESS_URL` | Build-time | The corporate site's origin, for outbound links. Defaults to `https://nexeagle.com`. |
+| `NEXT_PUBLIC_MAPBOX_TOKEN` | No | Mapbox public token (build-time). Restrict it to the doctordekho domains in the Mapbox dashboard. |
+| `EASYHMS_API_KEY` / `_HEADER` | No | Optional API-key identification. Server-side only. |
+| `EASYHMS_TRUSTED_PROXY_SECRET` | No | Lets the API's rate limiters see each visitor's real IP. Must match `Internal:ProxyForwardingSecret` in easyHMSAPI. |
+| `GROQ_API_KEY` | No | LLM fallback (Groq) for free-text symptom queries the NLP router can't classify. Unset = keyword search only. |
+| `GROQ_MODEL` | No | Groq model id (must support JSON mode). Defaults to `openai/gpt-oss-20b`. |
+| `SEARCH_ROUTER_MAX_CANDIDATES` | No | Free-text search trusts the NLP router only when it returns at most this many candidate specialties (default `3`); more means it is guessing, so the query goes to Groq instead. See the comment in `app/api/search/parse/route.ts` for the evidence behind the default. |
+
+`NEXT_PUBLIC_*` values are inlined at **build** time. `next build` always loads `.env.production`,
+so the dev image would silently bake in *prod* origins/data unless the deploy passes the dev values
+as Docker build-args — `deploy.yml` does; don't remove them.
+
+Non-production origins (`SITE_URL` ≠ the prod origin) serve `robots: Disallow /` and
+`noindex`, so the dev host can never compete with the real site in search.
 
 ## Development
 
 ```bash
 npm install
 npm run dev      # http://localhost:3000
-npm run build    # production build
-npm run start    # run the production build (Node server — see Dockerfile)
-npm run lint
+npm run build
+npm run start
 ```
-
-This is a server-rendered Next.js app, not a static export — it needs a Node runtime.
 
 ## Deployment
 
-`.github/workflows/deploy.yml`: on push, builds a Docker image (`Dockerfile`, multi-stage
-`next build` → `next start`) and pushes it to GHCR, then deploys via SSH:
+`.github/workflows/deploy.yml` — on push, builds the Docker image → GHCR → SSH-deploys.
+The deploy only ever replaces **its own** container; if another container holds the target host
+port it fails rather than removing it (both VMs are shared with other services).
 
-| Branch | Target | Host port |
-|---|---|---|
-| `dev` | Dev VM (`151.185.45.77`) | `8080` |
-| `main` | Prod VM (`151.185.45.67`), `nexeagle.com` | `8080` |
+**One-off per environment:** run the `Setup — domain` workflow (`setup-domain.yml`, manual) to add
+the Caddy site block that terminates HTTPS for the hostname and proxies to the port above. Until
+that runs, the domain has DNS but no TLS.
 
-Both VMs also run other EasyHMS-family services on different ports (e.g. 1Rad's `easyrad` UI on
-port 80 on Prod) — see the workflow file for the exact `docker run` invocation and required
-GitHub secrets.
+Required GitHub Actions secrets are listed at the top of `deploy.yml` (same names as the
+NexEagleWebsite repo — same VMs, same backend).
 
-## Notes
+## Cut-over notes (moving off nexeagle.com)
 
-- Package manager: `npm` (`package-lock.json` is the lockfile in use).
-- Contact form (`app/contact/contact-client.tsx`) posts client-side straight to
-  `https://formsubmit.co/ajax/info@nexeagle.com` — no local `/api/contact` route involved.
+Doctor Dekho used to be served from `nexeagle.com/`. Old URLs keep working through permanent
+redirects in the corporate site (`nexeagle.com/doctors/*`, `/specialties/*`, … → here); **keep
+those redirects indefinitely** — printed hospital QR posters and shared WhatsApp links point at the
+old paths. Order matters: this app must be live on the new domain *before* the corporate site
+starts redirecting to it.
+
+Per-origin state does not migrate: the patient login cookie, guest-appointment history
+(localStorage) and installed PWAs are tied to the old origin, so returning users sign in again.

@@ -8,6 +8,7 @@ import LayoutWrapper from "./layout-wrapper";
 import ConnectionStatusBanner from "@/components/patient/ConnectionStatusBanner";
 import InstallAppPrompt from "@/components/patient/InstallAppPrompt";
 import LaunchSplash from "@/components/patient/LaunchSplash";
+import { SITE_URL, BUSINESS_URL, IS_PRODUCTION_SITE } from "@/lib/site";
 import "./globals.css";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter", display: "swap" });
@@ -18,25 +19,28 @@ const poppins = Poppins({
   display: "swap"
 });
 
+const DESCRIPTION =
+  "Doctor Dekho by NexEagle: find verified doctors, clinics and pathology labs near you, compare experience and ratings, and book appointments online in under a minute.";
+
 export const metadata: Metadata = {
   title: {
-    default: "NexEagle — AI-Powered Healthcare Operating System",
+    default: "Doctor Dekho — Find & Book Doctors Near You",
     template: "%s | NexEagle"
   },
-  description: "NexEagle builds modern, AI-powered healthcare software for hospitals & clinics: 1HMS EMR, 1Rad Cloud PACS, 1Lab LIS diagnostics, and 1Pharma inventory systems.",
-  keywords: ["NexEagle", "1HMS", "1Rad", "1Lab", "1Pharma", "Healthcare software", "EMR", "Cloud PACS", "LIS diagnostics", "Doctor Dekho", "find doctors near me"],
-  metadataBase: new URL("https://nexeagle.com"),
+  description: DESCRIPTION,
+  keywords: ["Doctor Dekho", "NexEagle", "find doctors near me", "book doctor appointment online", "pathology lab near me"],
+  metadataBase: new URL(SITE_URL),
   openGraph: {
-    title: "NexEagle — AI-Powered Healthcare Operating System",
-    description: "NexEagle builds modern, AI-powered healthcare software for hospitals & clinics: 1HMS EMR, 1Rad Cloud PACS, 1Lab LIS diagnostics, and 1Pharma inventory systems.",
-    url: "https://nexeagle.com",
-    siteName: "NexEagle",
+    title: "Doctor Dekho — Find & Book Doctors Near You",
+    description: DESCRIPTION,
+    url: SITE_URL,
+    siteName: "Doctor Dekho",
     images: [
       {
         url: "/assets/logo.webp",
         width: 1200,
         height: 630,
-        alt: "NexEagle - Healthcare AI Solutions",
+        alt: "Doctor Dekho by NexEagle",
       },
     ],
     locale: "en_IN",
@@ -44,8 +48,8 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "NexEagle — AI-Powered Healthcare Operating System",
-    description: "NexEagle builds modern, AI-powered healthcare software for hospitals & clinics: 1HMS EMR, 1Rad Cloud PACS, 1Lab LIS diagnostics, and 1Pharma inventory systems.",
+    title: "Doctor Dekho — Find & Book Doctors Near You",
+    description: DESCRIPTION,
     images: ["/assets/logo.webp"],
     creator: "@nexeagle",
   },
@@ -61,6 +65,8 @@ export const metadata: Metadata = {
     statusBarStyle: "default",
     title: "Doctor Dekho",
   },
+  // Belt-and-braces with robots.ts: a non-production host must never be indexed.
+  ...(IS_PRODUCTION_SITE ? {} : { robots: { index: false, follow: false } }),
   verification: {
     // Google Search Console site-ownership check.
     google: "24K8hQuZVcT5jq6MC0ga0cNvIlVRxN1psoti8ASiuNk",
@@ -80,17 +86,24 @@ export const viewport: Viewport = {
 };
 
 // Sitewide entity schema (NEX-9) — every page shares one @id so Google/AI
-// crawlers resolve "NexEagle" to a single, consistent, verifiable entity
-// rather than re-deriving it per page.
+// crawlers resolve "Doctor Dekho" to a single, consistent, verifiable entity
+// rather than re-deriving it per page. NexEagle is declared as the parent org, which is the
+// link between this site's entity and the corporate site's own (nexeagle.com/#organization).
 const organizationSchema = {
   "@context": "https://schema.org",
   "@type": "MedicalOrganization",
-  "@id": "https://nexeagle.com/#organization",
-  name: "NexEagle",
-  url: "https://nexeagle.com",
-  logo: "https://nexeagle.com/assets/logo.webp",
+  "@id": `${SITE_URL}/#organization`,
+  name: "Doctor Dekho",
+  url: SITE_URL,
+  logo: `${SITE_URL}/assets/logo.webp`,
   description:
-    "NexEagle connects patients with verified doctors across its network of hospitals for online appointment booking.",
+    "Doctor Dekho connects patients with verified doctors across NexEagle's network of hospitals for online appointment booking.",
+  parentOrganization: {
+    "@type": "Organization",
+    "@id": `${BUSINESS_URL}/#organization`,
+    name: "NexEagle",
+    url: BUSINESS_URL,
+  },
   sameAs: ["https://linkedin.com/company/nexeagle"],
   contactPoint: {
     "@type": "ContactPoint",
@@ -109,8 +122,6 @@ export default function RootLayout({
   return (
     <html lang="en-IN" className={`${inter.variable} ${poppins.variable}`}>
       <head>
-        <link rel="preconnect" href="https://1hms-api.nexeagle.com" crossOrigin="anonymous" />
-        <link rel="dns-prefetch" href="https://1hms-api.nexeagle.com" />
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationSchema) }}

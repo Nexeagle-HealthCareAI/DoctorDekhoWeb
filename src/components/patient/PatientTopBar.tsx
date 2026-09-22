@@ -1,5 +1,6 @@
 "use client";
 
+import { SITE_URL, BUSINESS_URL } from "@/lib/site";
 import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -196,7 +197,7 @@ export default function PatientTopBar({
             )}
 
             {/* Provider CTA */}
-            <Link href="/business" className="shrink-0">
+            <Link href={BUSINESS_URL} className="shrink-0">
               <button className="hidden sm:inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-brand-teal hover:bg-teal-500 text-white text-sm font-bold transition-all duration-300 shadow-[0_4px_14px_0_rgba(20,184,166,0.3)] hover:shadow-[0_6px_20px_rgba(20,184,166,0.4)] hover:-translate-y-0.5">
                 <span>{t("topbar.forHospitals")}</span>
                 <ArrowRight className="w-4 h-4" />
@@ -211,7 +212,7 @@ export default function PatientTopBar({
               <ShareButton 
                 title="NexEagle Doctor Dekho"
                 text="Find and book appointments with the best doctors near you on NexEagle Doctor Dekho!"
-                url="https://nexeagle.com"
+                url={SITE_URL}
               />
             </div>
 

@@ -315,7 +315,7 @@ export function useMarkReviewHelpful(doctorId: string | undefined) {
 // Interprets free-text/voice-transcribed search into { specialtyId, city, keywords } —
 // see app/api/search/parse/route.ts. Only meant to be called when the plain keyword
 // search (DoctorDirectory.tsx) comes up empty; notConfigured lets the caller degrade to
-// "no results" silently when ANTHROPIC_API_KEY isn't set, same convention as the other
+// "no results" silently when GROQ_API_KEY isn't set, same convention as the other
 // notConfigured-aware hooks above.
 export interface SmartSearchIntent {
   specialtyId: string | null;
@@ -326,7 +326,7 @@ export interface SmartSearchIntent {
   city: string | null;
   keywords: string[];
   notConfigured: boolean;
-  // Only populated when the NLP router (not Anthropic) produced this result — lets
+  // Only populated when the NLP router (not the Groq fallback) produced this result — lets
   // DoctorDirectory.tsx's search_performed tracking log what actually drove the suggestion,
   // feeding the 1HMS-NLP-Router feedback loop.
   method: string | null;

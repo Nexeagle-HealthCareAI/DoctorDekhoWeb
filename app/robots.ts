@@ -1,6 +1,13 @@
 import { MetadataRoute } from 'next';
+import { SITE_URL, IS_PRODUCTION_SITE } from '@/lib/site';
 
 export default function robots(): MetadataRoute.Robots {
+  // Dev (doctordekho-dev.*) serves the same content as prod under a different host --
+  // keep it out of search indexes so it can't compete with, or be mistaken for, the real site.
+  if (!IS_PRODUCTION_SITE) {
+    return { rules: [{ userAgent: '*', disallow: '/' }] };
+  }
+
   return {
     rules: [
       {
@@ -23,6 +30,6 @@ export default function robots(): MetadataRoute.Robots {
         allow: '/',
       },
     ],
-    sitemap: 'https://nexeagle.com/sitemap.xml',
+    sitemap: `${SITE_URL}/sitemap.xml`,
   };
 }
