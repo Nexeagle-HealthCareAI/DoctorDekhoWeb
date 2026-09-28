@@ -33,6 +33,8 @@ export const en = {
   "hero.allSpecialities": "All Specialities",
   "hero.search": "Search",
   "hero.browseAll": "Browse All Specialities",
+  "hero.popularSearches": "Popular searches:",
+  "hero.others": "Others",
   "hero.voiceNotSupported": "Voice search is not supported in this browser. Please try Chrome, Edge, or Safari.",
   "hero.voiceSearchTitle": "Search by voice",
 

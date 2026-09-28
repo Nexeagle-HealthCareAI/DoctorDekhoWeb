@@ -22,6 +22,8 @@ export const bn: Record<keyof typeof en, string> = {
   "hero.allSpecialities": "সব বিশেষত্ব",
   "hero.search": "খুঁজুন",
   "hero.browseAll": "সব বিশেষত্ব দেখুন",
+  "hero.popularSearches": "জনপ্রিয় অনুসন্ধান:",
+  "hero.others": "অন্যান্য",
   "hero.voiceNotSupported": "এই ব্রাউজারে ভয়েস সার্চ সম্ভব নয়। অনুগ্রহ করে Chrome, Edge বা Safari ব্যবহার করুন।",
   "hero.voiceSearchTitle": "বলে খুঁজুন",
 

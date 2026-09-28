@@ -48,6 +48,16 @@ const DEPARTMENT_NAME_ALIASES: Record<string, string> = {
   "family medicine": "general",
   "internal medicine": "general",
   "general medicine": "general",
+  // British-spelling / compound-title department names seen in real hospital data that the
+  // fuzzy `norm.includes(s.id)` match in matchSpecialtyId() below can't catch (e.g. "gynaecologist"
+  // doesn't contain the substring "gynecology") — without these, doctors get a non-canonical
+  // synthesized specialtyId that never matches a /specialties/{specialty}/{city} page.
+  "gynaecologist / obstetrician": "gynecology",
+  "gynaecologist/obstetrician": "gynecology",
+  "gynaecologist": "gynecology",
+  "obstetrician": "gynecology",
+  "obstetrician / gynaecologist": "gynecology",
+  "paediatrician": "pediatrics",
 };
 
 /** Match a free-text department/specialization string to one of our taxonomy ids. */
@@ -75,6 +85,8 @@ const PATIENT_CATEGORY_TO_SPECIALTY_ID: Record<string, string> = {
   "General Physician": "general",
   "Paediatrician": "pediatrics",
   "Gynaecologist": "gynecology",
+  "Gynaecologist / Obstetrician": "gynecology",
+  "Obstetrician / Gynaecologist": "gynecology",
   "Dermatologist (Skin)": "dermatology",
   "ENT Specialist": "ent",
   "Ophthalmologist (Eye)": "ophthalmology",

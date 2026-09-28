@@ -22,6 +22,8 @@ export const hi: Record<keyof typeof en, string> = {
   "hero.allSpecialities": "सभी विशेषज्ञताएं",
   "hero.search": "खोजें",
   "hero.browseAll": "सभी विशेषज्ञताएं देखें",
+  "hero.popularSearches": "लोकप्रिय खोजें:",
+  "hero.others": "अन्य",
   "hero.voiceNotSupported": "इस ब्राउज़र में आवाज़ से खोज संभव नहीं है। कृपया Chrome, Edge या Safari आज़माएं।",
   "hero.voiceSearchTitle": "बोलकर खोजें",
 

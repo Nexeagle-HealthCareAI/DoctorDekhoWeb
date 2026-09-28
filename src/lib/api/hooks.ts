@@ -128,6 +128,11 @@ export function usePaginatedDoctors(filters: DoctorsFilterParams, seed?: Doctor[
     isFetchingNextPage: query.isFetchingNextPage,
     hasNextPage: query.hasNextPage ?? false,
     fetchNextPage: query.fetchNextPage,
+    // True once the most recent fetchNextPage attempt failed and exhausted its retries (see
+    // the global `retry: 1` default in providers.tsx) — callers doing background pagination
+    // backfill (DoctorDirectory.tsx) check this to stop auto-retrying a page that's
+    // consistently failing, rather than looping forever against a struggling upstream.
+    isError: query.isError,
   };
 }
 

@@ -49,11 +49,31 @@ const config: Config = {
                 fadeIn: {
                     '0%': { opacity: '0', transform: 'translateY(5px)' },
                     '100%': { opacity: '1', transform: 'translateY(0)' }
-                }
+                },
+                // Slow, organic drift for background mesh-gradient blobs (see PatientHero) —
+                // subtle position + scale wander, not a bounce, so it reads as "alive" rather
+                // than distracting from the search CTA sitting on top of it.
+                blobDrift: {
+                    '0%, 100%': { transform: 'translate(0, 0) scale(1)' },
+                    '33%': { transform: 'translate(3%, 4%) scale(1.08)' },
+                    '66%': { transform: 'translate(-3%, 2%) scale(0.95)' },
+                },
+                // Subtle animated sheen on the "Dekho" gradient wordmark (PatientHero) — the
+                // gradient itself doesn't move, just where in it the text's fill window sits.
+                gradientShift: {
+                    '0%, 100%': { backgroundPosition: '0% 50%' },
+                    '50%': { backgroundPosition: '100% 50%' },
+                },
             },
             animation: {
                 float: 'float 6s ease-in-out infinite',
                 marquee: 'marquee 30s linear infinite',
+                'gradient-shift': 'gradientShift 6s ease-in-out infinite',
+                // Three durations sharing one keyframe so the hero's 3 blobs drift out of sync
+                // with each other instead of visibly breathing in unison.
+                'blob-drift': 'blobDrift 20s ease-in-out infinite',
+                'blob-drift-slow': 'blobDrift 28s ease-in-out infinite',
+                'blob-drift-slower': 'blobDrift 35s ease-in-out infinite',
             }
 		},
 	},

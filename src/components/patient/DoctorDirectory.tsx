@@ -1,10 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useIsRestoring } from "@tanstack/react-query";
-import { useWindowVirtualizer } from "@tanstack/react-virtual";
 import { motion, useReducedMotion } from "framer-motion";
-import { Frown, Loader2, ChevronDown, SlidersHorizontal, MapPin, Sparkles } from "lucide-react";
+import { Frown, Loader2, ChevronDown, ChevronLeft, ChevronRight, SlidersHorizontal, MapPin, Sparkles } from "lucide-react";
 import DoctorCard from "./DoctorCard";
 import { specialties, cityLabel } from "@/data/patient";
 import type { CityOption, Doctor } from "@/data/patient";
@@ -16,12 +15,10 @@ import { useTranslation } from "@/lib/i18n/I18nContext";
 import { translateSpecialty } from "@/lib/i18n/specialties";
 import type { TranslationKey } from "@/lib/i18n/dictionaries/en";
 
-// Minimum visible-result count worth keeping on screen before auto-requesting another
-// server page — client-side filters (specialty chip, AI merge, coords/radius, keyword)
-// still run over whatever's been fetched so far, so a narrow filter over a broad
-// (unfiltered-by-specialty) server page can legitimately match very few of it. Keeps
-// fetching in the background until either this is met or the server runs out of pages.
-const MIN_VISIBLE_BEFORE_STOP_PREFETCH = 24;
+// Doctors shown per pagination page (numbered Previous/Next controls), independent of the
+// server's own fetch batch size (still 24/request — see usePaginatedDoctors) — that's an
+// internal loading-efficiency detail, not what a patient sees on screen at once.
+const PAGE_SIZE = 10;
 
 interface DoctorDirectoryProps {
   city: CityOption | null;
@@ -36,6 +33,21 @@ interface DoctorDirectoryProps {
    * getAllDoctors + src/lib/filters/doctorLocation.ts). Seeds the first render — server AND
    * client hydration pass — with real content instead of an empty array. */
   initialDoctors?: Doctor[];
+}
+
+// Builds the compact page-number list for the pagination bar — all pages when there are few
+// (<=7), otherwise first/last plus a moving window around the current page with "ellipsis"
+// markers, so the bar stays a fixed, scannable width even once a specialty/city has many pages.
+function paginationItems(current: number, total: number): (number | "ellipsis")[] {
+  if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
+  const items: (number | "ellipsis")[] = [1];
+  const start = Math.max(2, current - 1);
+  const end = Math.min(total - 1, current + 1);
+  if (start > 2) items.push("ellipsis");
+  for (let p = start; p <= end; p++) items.push(p);
+  if (end < total - 1) items.push("ellipsis");
+  items.push(total);
+  return items;
 }
 
 type SortKey = "relevance" | "distance" | "experience" | "patients" | "fee" | "rating";
@@ -76,10 +88,12 @@ export default function DoctorDirectory({
   const hasSeedData = initialDoctors !== undefined;
   const {
     doctors: allDoctors,
+    totalCount: serverTotalCount,
     isLoading: queryIsLoading,
     isFetchingNextPage,
     hasNextPage,
     fetchNextPage,
+    isError: pagesErrored,
   } = usePaginatedDoctors({ city: serverCity, state: serverState }, initialDoctors);
   // The QueryClient persists to localStorage (see app/providers.tsx), so on a
   // repeat visit the client's very first render can already see a *restored*
@@ -243,16 +257,34 @@ export default function DoctorDirectory({
     return sorted;
   }, [keywordFiltered, aiFiltered, usingAiResults, aiCandidateRank, sort, drivingData]);
 
-  // Server pages are only scoped by City/State — specialty/area/coords-radius/keyword all
-  // still filter client-side over whatever's loaded so far, so a narrow filter can leave too
-  // few visible results even though more doctors exist on later server pages. Keep pulling
-  // pages in the background until either there's enough to fill a screen or the server is
-  // genuinely out of matches — invisible to the user, just a few extra network round trips.
+  // ── Pagination ───────────────────────────────────────────────────────────
+  const [page, setPage] = useState(1);
+
+  // A filter/sort change can shrink the result set out from under whatever page the user was
+  // on (e.g. viewing page 3 of "all doctors", then picking a specialty with only 1 page of
+  // matches) — reset to page 1 whenever the inputs that reshape `filtered` change, rather than
+  // silently landing on a now-empty or out-of-range page.
   useEffect(() => {
-    if (isLoading || isFetchingNextPage || !hasNextPage) return;
-    if (filtered.length >= MIN_VISIBLE_BEFORE_STOP_PREFETCH) return;
+    setPage(1);
+  }, [query, specialtyId, city?.id, area, sort, usingAiResults]);
+
+  // On-demand server-page fetching: only pull another server page (24 doctors) when the page
+  // the visitor is actually ON needs data beyond what's loaded so far — NOT an eager
+  // background drain of the entire server-side dataset. An earlier version fetched every
+  // remaining server page proactively (just to show an exact "Page X of 48" count up front),
+  // which against a directory with dozens of pages meant 40+ requests fired in quick
+  // succession on every load — a real burst against the live EasyHMS environment, and a
+  // contributor to observed 503s. This was never actually necessary: the very first page
+  // response already reports `totalCount`, which is enough to size the pagination control
+  // without fetching anything further (see `pageCount` below) — further pages are then only
+  // fetched exactly when a visitor pages far enough to need them, capped at one attempt after
+  // any failure (`pagesErrored`) so a struggling upstream can't be retried forever.
+  useEffect(() => {
+    if (isLoading || isFetchingNextPage || !hasNextPage || pagesErrored) return;
+    const neededForCurrentPage = page * PAGE_SIZE;
+    if (filtered.length >= neededForCurrentPage) return;
     fetchNextPage();
-  }, [filtered.length, isLoading, isFetchingNextPage, hasNextPage, fetchNextPage]);
+  }, [isLoading, isFetchingNextPage, hasNextPage, pagesErrored, page, filtered.length, fetchNextPage]);
 
   // Fetch real driving distances from OSRM for the top displayed doctors
   useEffect(() => {
@@ -338,62 +370,32 @@ export default function DoctorDirectory({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [query, specialtyId, filtered.length, usingAiResults, aiIntent]);
 
-  // ── Virtualized grid ─────────────────────────────────────────────────────
-  // Renders only the rows near the viewport, regardless of how many doctors matched —
-  // the DOM no longer grows with the platform's total doctor count. Tracks the same
-  // 1/2/3-column breakpoints the CSS grid used (md=768px, lg=1024px) so each virtual
-  // "row" holds exactly as many cards as actually render side by side.
-  const [columns, setColumns] = useState(1);
-  useEffect(() => {
-    const compute = () => setColumns(window.innerWidth >= 1024 ? 3 : window.innerWidth >= 768 ? 2 : 1);
-    compute();
-    window.addEventListener("resize", compute);
-    return () => window.removeEventListener("resize", compute);
-  }, []);
+  // ── Paginated page slice ─────────────────────────────────────────────────
+  // When browsing unfiltered (no specialty chip, free-text query, GPS radius, or area narrowing
+  // the results beyond the server's own city/state scoping), `filtered` is just every doctor
+  // loaded so far — so the server's own `totalCount` (reported on the very first page, no extra
+  // fetch needed) gives the true page count immediately instead of only counting whatever
+  // background pages happen to have loaded in by now. Any client-only filter narrows the set in
+  // a way the server total can't reflect, so those cases still fall back to counting `filtered`.
+  const hasClientOnlyFilter = Boolean(specialtyId || query.trim() || coords || (city && area));
+  const knownTotal = !hasClientOnlyFilter && serverTotalCount > filtered.length ? serverTotalCount : filtered.length;
+  // Clamped (not raw `page`) so a filter change that shrinks the result set — or a page still
+  // being fetched on-demand — never indexes past the end and silently renders an empty page;
+  // the effect above corrects `page` itself right after.
+  const pageCount = Math.max(1, Math.ceil(knownTotal / PAGE_SIZE));
+  const clampedPage = Math.min(page, pageCount);
+  const pageDoctors = useMemo(
+    () => filtered.slice((clampedPage - 1) * PAGE_SIZE, clampedPage * PAGE_SIZE),
+    [filtered, clampedPage]
+  );
 
-  const rows = useMemo(() => {
-    const chunks: Doctor[][] = [];
-    for (let i = 0; i < filtered.length; i += columns) chunks.push(filtered.slice(i, i + columns));
-    return chunks;
-  }, [filtered, columns]);
-
-  // useWindowVirtualizer needs a real browser window to know what's actually visible —
-  // on the server (and on the client's very first render, before hydration completes)
-  // there isn't one, so it renders zero virtual items. Left unguarded, that means crawlers
-  // (and anyone whose JS hasn't run yet) see an empty grid — exactly the empty-shell problem
-  // this whole SSR effort exists to fix. `isMounted` gates which rendering path is used:
-  // the full, unvirtualized list until mount (matching server output exactly, so no
-  // hydration mismatch), then virtualized rendering once a real window exists to measure.
-  const [isMounted, setIsMounted] = useState(false);
-  useEffect(() => {
-    setIsMounted(true);
-  }, []);
-
-  const gridParentRef = useRef<HTMLDivElement | null>(null);
-  const [gridParentOffset, setGridParentOffset] = useState(0);
-  useEffect(() => {
-    setGridParentOffset(gridParentRef.current?.offsetTop ?? 0);
-  }, [isLoading, isMounted]);
-
-  const rowVirtualizer = useWindowVirtualizer({
-    count: rows.length,
-    estimateSize: () => 460,
-    overscan: 4,
-    scrollMargin: gridParentOffset,
-  });
-
-  // Trigger the next server page as the user scrolls near the bottom of what's already
-  // been fetched — separate from (and in addition to) the backfill effect above, which
-  // only covers "too few results to fill a screen at all"; this covers "scrolled past
-  // what's loaded so far" for the common case where a page fully renders fine on its own.
-  const virtualItems = rowVirtualizer.getVirtualItems();
-  useEffect(() => {
-    const last = virtualItems[virtualItems.length - 1];
-    if (!last) return;
-    if (last.index >= rows.length - 2 && hasNextPage && !isFetchingNextPage) {
-      fetchNextPage();
-    }
-  }, [virtualItems, rows.length, hasNextPage, isFetchingNextPage, fetchNextPage]);
+  // Jumping to a page (especially several pages down a long list) should return the visitor
+  // to the top of the results, not leave them scrolled to wherever the old page 4 happened to
+  // end — otherwise "Next" can land in the middle of nothing familiar on screen.
+  function goToPage(p: number) {
+    setPage(p);
+    document.getElementById("doctors")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
 
   return (
     <section id="doctors" className="bg-slate-50/50 pb-24 pt-10 sm:pt-16 scroll-mt-20">
@@ -512,61 +514,67 @@ export default function DoctorDirectory({
           </div>
         ) : filtered.length > 0 ? (
           <>
-            {!isMounted ? (
-              // Server render + first client paint: full list, no virtualization — this is
-              // what crawlers and pre-hydration users actually see, and it must match between
-              // server and client exactly to avoid a hydration mismatch.
-              <div className="flex flex-col gap-6 sm:gap-8 pb-6 sm:pb-8">
-                {rows.map((row, rowIdx) => (
-                  <div key={rowIdx} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
-                    {row.map((doctor, colIdx) => (
-                      <DoctorCard
-                        key={doctor.id}
-                        doctor={doctor}
-                        index={colIdx}
-                        reducedMotion={reducedMotion ?? false}
-                      />
-                    ))}
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div
-                ref={gridParentRef}
-                style={{ position: "relative", height: rowVirtualizer.getTotalSize() }}
-              >
-                {virtualItems.map((virtualRow) => (
-                  <div
-                    key={virtualRow.key}
-                    data-index={virtualRow.index}
-                    ref={rowVirtualizer.measureElement}
-                    style={{
-                      position: "absolute",
-                      top: 0,
-                      left: 0,
-                      width: "100%",
-                      transform: `translateY(${virtualRow.start - rowVirtualizer.options.scrollMargin}px)`,
-                    }}
-                  >
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8 pb-6 sm:pb-8">
-                      {rows[virtualRow.index]?.map((doctor, colIdx) => (
-                        <DoctorCard
-                          key={doctor.id}
-                          doctor={doctor}
-                          index={colIdx}
-                          reducedMotion={reducedMotion ?? false}
-                        />
-                      ))}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8 pb-6 sm:pb-8">
+              {pageDoctors.map((doctor, idx) => (
+                <DoctorCard
+                  key={doctor.id}
+                  doctor={doctor}
+                  index={idx}
+                  reducedMotion={reducedMotion ?? false}
+                />
+              ))}
+            </div>
+
             {isFetchingNextPage && (
-              <div className="flex items-center justify-center gap-2 py-8 text-slate-400 text-sm">
-                <Loader2 className="w-5 h-5 animate-spin text-brand-teal" />
+              <div className="flex items-center justify-center gap-2 py-4 text-slate-400 text-sm">
+                <Loader2 className="w-4 h-4 animate-spin text-brand-teal" />
                 {t("directory.loading")}
               </div>
+            )}
+
+            {/* ── Pagination ── */}
+            {pageCount > 1 && (
+              <nav aria-label="Doctor results pages" className="flex items-center justify-center gap-1.5 sm:gap-2 pt-2">
+                <button
+                  onClick={() => goToPage(Math.max(1, clampedPage - 1))}
+                  disabled={clampedPage === 1}
+                  aria-label="Previous page"
+                  className="flex items-center justify-center w-9 h-9 sm:w-10 sm:h-10 rounded-xl border border-slate-200 bg-white text-slate-500 hover:border-brand-teal/40 hover:text-brand-teal disabled:opacity-40 disabled:hover:border-slate-200 disabled:hover:text-slate-500 disabled:cursor-not-allowed transition-colors"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                </button>
+
+                {paginationItems(clampedPage, pageCount).map((item, i) =>
+                  item === "ellipsis" ? (
+                    <span key={`e-${i}`} className="w-9 h-9 sm:w-10 sm:h-10 flex items-center justify-center text-slate-400 text-sm">
+                      …
+                    </span>
+                  ) : (
+                    <button
+                      key={item}
+                      onClick={() => goToPage(item)}
+                      aria-current={item === clampedPage ? "page" : undefined}
+                      className={cn(
+                        "w-9 h-9 sm:w-10 sm:h-10 rounded-xl text-sm font-bold transition-colors",
+                        item === clampedPage
+                          ? "bg-brand-teal text-white shadow-sm shadow-teal-500/30"
+                          : "border border-slate-200 bg-white text-slate-600 hover:border-brand-teal/40 hover:text-brand-teal"
+                      )}
+                    >
+                      {item}
+                    </button>
+                  )
+                )}
+
+                <button
+                  onClick={() => goToPage(Math.min(pageCount, clampedPage + 1))}
+                  disabled={clampedPage === pageCount}
+                  aria-label="Next page"
+                  className="flex items-center justify-center w-9 h-9 sm:w-10 sm:h-10 rounded-xl border border-slate-200 bg-white text-slate-500 hover:border-brand-teal/40 hover:text-brand-teal disabled:opacity-40 disabled:hover:border-slate-200 disabled:hover:text-slate-500 disabled:cursor-not-allowed transition-colors"
+                >
+                  <ChevronRight className="w-4 h-4" />
+                </button>
+              </nav>
             )}
           </>
         ) : (

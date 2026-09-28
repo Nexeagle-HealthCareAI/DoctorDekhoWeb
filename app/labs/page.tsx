@@ -7,14 +7,17 @@ import { getAllLabs } from "@/lib/api/server";
 
 export const revalidate = 3600;
 
+// Not "... | Doctor Dekho" in the title/og title below — the root layout's title template
+// already appends that brand suffix to every non-absolute title; adding it here too would
+// double it up.
 export const metadata: Metadata = {
-  title: "Find a Pathology Lab Near Me | Doctor Dekho",
+  title: "Find a Pathology Lab Near Me",
   description:
     "Find diagnostic and pathology labs near you -- compare test categories, addresses, and contact details, then get directions in a click.",
   keywords: ["pathology lab near me", "diagnostic centre", "blood test lab", "Doctor Dekho"],
   alternates: { canonical: "/labs" },
   openGraph: {
-    title: "Find a Pathology Lab Near Me | Doctor Dekho",
+    title: "Find a Pathology Lab Near Me",
     description: "Find diagnostic and pathology labs near you across every NexEagle-powered hospital.",
     url: "/labs",
     type: "website",

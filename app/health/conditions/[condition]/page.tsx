@@ -2,9 +2,9 @@ import { SITE_URL } from "@/lib/site";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { ChevronRight, CheckCircle, Clock, ShieldCheck, Stethoscope } from "lucide-react";
+import { ChevronRight, CheckCircle, Clock, ShieldCheck, Stethoscope, BookOpen } from "lucide-react";
 import { medicalArticles } from "@/data/wiki";
-import { doctors } from "@/data/patient";
+import { doctors, CITIES, cityId } from "@/data/patient";
 import PatientTopBar from "@/components/patient/PatientTopBar";
 import PatientFooter from "@/components/patient/PatientFooter";
 import Image from "next/image";
@@ -24,7 +24,10 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   if (!article) return { title: "Not Found" };
 
   return {
-    title: `${article.title} | NexEagle Health Wiki`,
+    // Not "... | NexEagle Health Wiki" — the root layout's title template already appends
+    // "| Doctor Dekho" to every non-absolute title; this used to be the one place still ending
+    // in "NexEagle" instead, breaking the site-wide consistent brand suffix.
+    title: `${article.title} | Health Wiki`,
     description: article.description,
     alternates: { canonical: `/health/conditions/${article.id}` },
     openGraph: { title: article.title, description: article.description, url: `/health/conditions/${article.id}`, type: "article" },
@@ -37,6 +40,20 @@ export default function HealthArticlePage({ params }: PageProps) {
 
   const author = doctors.find((d) => d.id === article.authorId);
   const reviewer = doctors.find((d) => d.id === article.reviewerId);
+
+  // Was hardcoded to "/conditions/{condition}/mumbai-maharashtra" for every reader regardless
+  // of where they actually are — funneling all Health Wiki link equity into a Mumbai page the
+  // site doesn't even serve doctors for. Links into the site's real, currently-served coverage
+  // area instead (Purnea, Bihar — see CITIES's own comment in data/patient.ts) until geo-IP-based
+  // city detection replaces this.
+  const primaryCity = CITIES.find((c) => c.name === "Purnea") ?? CITIES[0];
+  const conditionCta = `/conditions/${article.relatedConditionSlug}/${cityId(primaryCity.name, primaryCity.state)}`;
+
+  // Cross-links the Health Wiki's articles to each other — previously each was a dead-end page
+  // with no way to discover the site's other content, which reads as thin (2 disconnected
+  // pages) rather than a real content hub to both readers and AI engines evaluating how
+  // comprehensive/citable this source is.
+  const relatedArticles = medicalArticles.filter((a) => a.id !== article.id);
 
   // Pillar 4: MedicalWebPage & Article Schema
   const structuredData = {
@@ -66,11 +83,25 @@ export default function HealthArticlePage({ params }: PageProps) {
     }
   };
 
+  const breadcrumbs = {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    "itemListElement": [
+      { "@type": "ListItem", "position": 1, "name": "Home", "item": SITE_URL },
+      { "@type": "ListItem", "position": 2, "name": "Health Wiki", "item": `${SITE_URL}/health` },
+      { "@type": "ListItem", "position": 3, "name": article.title, "item": `${SITE_URL}/health/conditions/${article.id}` },
+    ],
+  };
+
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col font-sans text-slate-800">
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }}
+      />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbs) }}
       />
       <PatientTopBar />
 
@@ -153,8 +184,8 @@ export default function HealthArticlePage({ params }: PageProps) {
               <p className="text-teal-50 text-sm mb-6 leading-relaxed">
                 Don&apos;t wait if you are experiencing symptoms of {article.relatedConditionSlug.replace(/-/g, " ")}. Consult with top-rated doctors near you instantly.
               </p>
-              <Link 
-                href={`/conditions/${article.relatedConditionSlug}/mumbai-maharashtra`} // Example city fallback, ideally dynamic by geo IP
+              <Link
+                href={conditionCta}
                 className="block w-full bg-white text-brand-teal text-center py-3.5 rounded-xl font-bold text-sm hover:bg-slate-50 transition shadow-lg active:scale-[0.98]"
               >
                 Find Doctors Near Me
@@ -163,6 +194,29 @@ export default function HealthArticlePage({ params }: PageProps) {
                 <ShieldCheck className="w-4 h-4" /> 100% Verified Experts
               </div>
             </div>
+
+            {relatedArticles.length > 0 && (
+              <div className="bg-white rounded-3xl border border-slate-200/80 shadow-sm p-6">
+                <h3 className="font-display text-sm font-extrabold text-slate-900 mb-4 flex items-center gap-2">
+                  <BookOpen className="w-4 h-4 text-brand-teal" /> More from the Health Wiki
+                </h3>
+                <div className="space-y-3">
+                  {relatedArticles.map((a) => (
+                    <Link
+                      key={a.id}
+                      href={`/health/conditions/${a.id}`}
+                      className="block p-3 rounded-xl border border-slate-100 hover:border-brand-teal/30 hover:bg-slate-50 transition"
+                    >
+                      <p className="text-sm font-bold text-slate-800 leading-snug">{a.title}</p>
+                      <p className="text-xs text-slate-500 mt-1 line-clamp-2">{a.description}</p>
+                    </Link>
+                  ))}
+                </div>
+                <Link href="/health" className="block mt-4 text-xs font-bold text-brand-teal hover:underline">
+                  View all Health Wiki articles →
+                </Link>
+              </div>
+            )}
           </aside>
           
         </div>

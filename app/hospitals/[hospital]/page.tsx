@@ -4,6 +4,9 @@ import HomeClient from "@/app/home-client";
 import HospitalPageViewTracker from "@/components/patient/HospitalPageViewTracker";
 import { getAllDoctors } from "@/lib/api/server";
 import { filterDoctorsByHospital } from "@/lib/filters/doctorLocation";
+import type { Doctor } from "@/data/patient";
+import { SITE_URL } from "@/lib/site";
+import PageBreadcrumb from "@/components/patient/PageBreadcrumb";
 
 export const revalidate = 3600;
 
@@ -15,8 +18,19 @@ function slugify(text: string) {
   return text.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
 }
 
+// Title-cases every word, which mangles acronym hospital names (e.g. "AIIMS" -> "Aiims") — this
+// is only a last-resort fallback for when no real hospitalName can be found in the doctor data
+// (e.g. at generateStaticParams time before any doctor filter has run); resolveHospitalName()
+// below prefers the actual display name whenever it's available.
 function unslugify(slug: string) {
   return slug.split("-").map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
+}
+
+/** Prefer the hospital's real display name (as entered on its own profile) over an
+ * unslugify() guess, which can't reconstruct acronyms/casing lost by slugification. */
+function resolveHospitalName(slug: string, doctors: Doctor[]): string {
+  const match = doctors.find((d) => d.hospitalName && slugify(d.hospitalName) === slug);
+  return match?.hospitalName || unslugify(slug);
 }
 
 export async function generateStaticParams() {
@@ -33,8 +47,9 @@ export async function generateStaticParams() {
 }
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
-  const hospitalName = unslugify(params.hospital);
-  
+  const { doctors } = await getAllDoctors();
+  const hospitalName = resolveHospitalName(params.hospital, doctors);
+
   const title = `Top Doctors in ${hospitalName} | Book Appointment Online`;
   const description = `Find and book appointments with the best doctors practicing at ${hospitalName}. Compare verified reviews, experience, and book instantly on NexEagle Doctor Dekho.`;
 
@@ -47,11 +62,10 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 }
 
 export default async function HospitalPage({ params }: PageProps) {
-  const hospitalName = unslugify(params.hospital);
-
   // Server-fetched + pre-filtered so this page ships real doctor content in the
   // raw HTML — see src/lib/api/server.ts's getAllDoctors.
   const { doctors } = await getAllDoctors();
+  const hospitalName = resolveHospitalName(params.hospital, doctors);
   const initialDoctors = filterDoctorsByHospital(doctors, params.hospital);
 
   // All doctors filtered to this hospital share one real-world location — use
@@ -107,6 +121,21 @@ export default async function HospitalPage({ params }: PageProps) {
     ]
   };
 
+  const breadcrumbItems = [
+    { label: "Home", href: "/" },
+    { label: "Hospitals", href: "/hospitals" },
+    { label: hospitalName },
+  ];
+  const breadcrumbSchema = {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    "itemListElement": [
+      { "@type": "ListItem", "position": 1, "name": "Home", "item": SITE_URL },
+      { "@type": "ListItem", "position": 2, "name": "Hospitals", "item": `${SITE_URL}/hospitals` },
+      { "@type": "ListItem", "position": 3, "name": hospitalName, "item": `${SITE_URL}/hospitals/${params.hospital}` },
+    ],
+  };
+
   return (
     <>
       {clinicSchema && (
@@ -119,11 +148,15 @@ export default async function HospitalPage({ params }: PageProps) {
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(faqSchema) }}
       />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbSchema) }}
+      />
       {/* Not initialQuery={hospitalName}: the free-text search filter matches doctor
           name/specialty/focusAreas, never hospitalName, so seeding it here would
           silently filter the correctly hospital-scoped initialDoctors back to zero. */}
       <HospitalPageViewTracker hospitalId={locationSource?.hospitalId} />
-      <HomeClient initialDoctors={initialDoctors} />
+      <HomeClient initialDoctors={initialDoctors} breadcrumb={<PageBreadcrumb items={breadcrumbItems} />} />
     </>
   );
 }

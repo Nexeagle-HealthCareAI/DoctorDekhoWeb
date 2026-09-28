@@ -31,7 +31,9 @@ export type AnalyticsEventType =
   | "otp_verify_failed"
   | "search_performed"
   | "doctor_profile_viewed"
-  | "booking_step_reached";
+  | "booking_step_reached"
+  | "chat_widget_opened"
+  | "chat_whatsapp_handoff";
 
 interface TrackEventPayload {
   mobile?: string;

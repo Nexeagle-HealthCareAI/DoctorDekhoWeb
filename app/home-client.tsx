@@ -1,10 +1,11 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { MessageCircle } from "lucide-react";
 import AnalyticsTracker from "@/components/AnalyticsTracker";
 import PatientTopBar from "@/components/patient/PatientTopBar";
 import PatientHero from "@/components/patient/PatientHero";
+import TrustStrip from "@/components/patient/TrustStrip";
 import DoctorDirectory from "@/components/patient/DoctorDirectory";
 import PatientFooter from "@/components/patient/PatientFooter";
 import { CITIES, cityId as makeCityId, type CityOption, type Doctor } from "@/data/patient";
@@ -27,6 +28,11 @@ interface HomeClientProps {
    * getWhatsAppEntryQrCodeDataUrl) -- null when the backend endpoint is
    * unreachable/unconfigured, in which case the CTA section is simply omitted. */
   whatsAppQrCodeDataUrl?: string | null;
+  /** Visible breadcrumb trail (see PageBreadcrumb) for pSEO hub pages that reuse this
+   * component — e.g. /specialties/{specialty}/{city}/{area}. Previously those pages had no
+   * on-site navigation trail into their own hierarchical URL structure, only the XML sitemap.
+   * Omitted on the plain homepage. */
+  breadcrumb?: ReactNode;
 }
 
 export default function HomeClient({
@@ -36,6 +42,7 @@ export default function HomeClient({
   initialQuery = "",
   initialDoctors,
   whatsAppQrCodeDataUrl,
+  breadcrumb,
 }: HomeClientProps = {}) {
   const { t } = useTranslation();
   const { data: doctorsData } = useDoctors(
@@ -65,11 +72,25 @@ export default function HomeClient({
   const [userPicked, setUserPicked] = useState(false);
   const geo = useGeolocatedCity(dynamicCities);
 
-  // Auto-adopt geo city once resolved (unless user already picked manually)
+  // Business's primary market — the default city whenever geolocation isn't available
+  // (denied or unsupported), instead of leaving the search unscoped with only an "Allow
+  // Location" prompt as the way forward. A visitor who declines location still lands on a
+  // locally-relevant, pre-filtered result set rather than an empty/generic "All India" one.
+  const defaultCity = useMemo(
+    () => dynamicCities.find((c) => c.name === "Purnea") ?? null,
+    [dynamicCities]
+  );
+
+  // Auto-adopt geo city once resolved (unless user already picked manually); fall back to
+  // the default city once geolocation is known to be unavailable, rather than staying unset.
   useEffect(() => {
     if (userPicked) return;
-    if (geo.status === "found" && geo.city) setCity(geo.city);
-  }, [geo.status, geo.city, userPicked]);
+    if (geo.status === "found" && geo.city) {
+      setCity(geo.city);
+    } else if ((geo.status === "denied" || geo.status === "unsupported") && defaultCity) {
+      setCity(defaultCity);
+    }
+  }, [geo.status, geo.city, userPicked, defaultCity]);
 
   function handleCityChange(next: CityOption | null) {
     setUserPicked(true);
@@ -104,23 +125,27 @@ export default function HomeClient({
     <div className="min-h-screen bg-white flex flex-col font-sans text-slate-800">
       <AnalyticsTracker title="Doctor Dekho — Find a Doctor Near Me | NexEagle" />
 
-      {/* Topbar: Doctor Dekho brand + location pill */}
-      <PatientTopBar
-        geoStatus={geo.status}
-        city={city}
-        cities={dynamicCities}
-        onCityChange={handleCityChange}
-        onRequestLocation={handleRequestLocation}
-      />
+      {/* Topbar: Doctor Dekho brand */}
+      <PatientTopBar />
+
+      {breadcrumb}
 
       <main className="flex-1">
-        {/* Compact search section (replaces old hero) */}
+        {/* Compact search section (replaces old hero) — location picker now lives inside its
+            search pill, see PatientHero, rather than as a separate topbar pill. */}
         <PatientHero
           query={query}
           onQueryChange={setQuery}
           specialtyId={specialtyId}
           onSpecialtyChange={handleSpecialtySelect}
+          geoStatus={geo.status}
+          city={city}
+          cities={dynamicCities}
+          onCityChange={handleCityChange}
+          onRequestLocation={handleRequestLocation}
         />
+
+        <TrustStrip />
 
         {/* Doctor grid with location banner integrated inside */}
         <DoctorDirectory

@@ -5,28 +5,45 @@ import Link from "next/link";
 import { Phone, Mail, Building2 } from "lucide-react";
 import { Logo } from "@/components/Logo";
 import { useTranslation } from "@/lib/i18n/I18nContext";
-
 export default function PatientFooter() {
   const { t } = useTranslation();
 
   return (
     <footer className="relative mt-8 sm:mt-16 pb-28 md:pb-12 bg-white overflow-hidden">
-      
+
       {/* Premium Gradient Top Line */}
       <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-slate-200 to-transparent" />
       <div className="absolute top-0 left-1/2 -translate-x-1/2 w-1/3 h-[1px] bg-gradient-to-r from-transparent via-brand-teal/40 to-transparent" />
-      
+
       {/* Subtle Background Glow */}
       <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-full max-w-lg h-40 bg-brand-teal/5 blur-[80px] pointer-events-none rounded-full" />
 
       <div className="relative max-w-4xl mx-auto px-4 py-12 flex flex-col items-center text-center z-10">
-        
+
         {/* Brand */}
         <div className="mb-8 hover:scale-105 transition-transform duration-500 ease-out">
           <Logo textSize="text-2xl" />
           <p className="mt-3 text-xs text-slate-400 max-w-xs mx-auto font-medium">
             {t("footer.brandBlurb")}
           </p>
+        </div>
+
+        {/* Browse links — hospitals, labs, company */}
+        <div className="w-full max-w-md mb-10 grid grid-cols-2 gap-x-4 gap-y-6 text-left">
+          <div>
+            <p className="text-[11px] font-extrabold text-slate-400 uppercase tracking-wide mb-2.5">Explore</p>
+            <ul className="space-y-1.5">
+              <li><Link href="/hospitals" className="text-xs font-semibold text-slate-500 hover:text-brand-teal transition-colors">Hospitals</Link></li>
+              <li><Link href="/labs" className="text-xs font-semibold text-slate-500 hover:text-brand-teal transition-colors">Pathology Labs</Link></li>
+              <li><Link href="/health" className="text-xs font-semibold text-slate-500 hover:text-brand-teal transition-colors">Health Wiki</Link></li>
+            </ul>
+          </div>
+          <div>
+            <p className="text-[11px] font-extrabold text-slate-400 uppercase tracking-wide mb-2.5">Company</p>
+            <ul className="space-y-1.5">
+              <li><Link href="/about" className="text-xs font-semibold text-slate-500 hover:text-brand-teal transition-colors">About &amp; Verification</Link></li>
+            </ul>
+          </div>
         </div>
 
         {/* Premium Action Pills */}

@@ -1,7 +1,8 @@
 import { SITE_URL } from "@/lib/site";
 import type { MetadataRoute } from "next";
-import { getAllDoctors } from "@/lib/api/server";
+import { getAllDoctors, getAllLabs } from "@/lib/api/server";
 import { doctorSlug, specialties, CITIES, AREAS_BY_CITY } from "@/data/patient";
+import { labSlug } from "@/data/labs";
 import { medicalArticles } from "@/data/wiki";
 
 // Must be dynamic. As a statically prerendered route (the old `revalidate = 3600`) the sitemap runs
@@ -15,6 +16,8 @@ const BASE_URL = SITE_URL;
 
 const STATIC_ROUTES: { path: string; priority: number; changeFrequency: MetadataRoute.Sitemap[number]["changeFrequency"] }[] = [
   { path: "/", priority: 1.0, changeFrequency: "daily" },
+  { path: "/hospitals", priority: 0.6, changeFrequency: "weekly" },
+  { path: "/labs", priority: 0.6, changeFrequency: "weekly" },
 ];
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
@@ -126,9 +129,28 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       });
     }
 
-  } catch {
-    // Sitemap generation must never fail the build over a flaky upstream call.
+  } catch (err) {
+    // Sitemap generation must never fail the build over a flaky upstream call — but silently
+    // swallowing this is exactly what produced the 23-URL/0-doctor-page incident this file's
+    // own history describes, so at minimum surface it in server logs/monitoring.
+    console.error("[sitemap] doctor/pSEO entry generation failed; sitemap will be missing these URLs:", err);
   }
 
-  return [...staticEntries, ...doctorEntries, ...pseoEntries];
+  // Isolated from the block above: a labs API failure shouldn't also wipe out the doctor/pSEO
+  // entries that already succeeded (previously labs were never in the sitemap at all, despite
+  // /labs and /labs/[labSlug] having full metadata/canonical support).
+  let labEntries: MetadataRoute.Sitemap = [];
+  try {
+    const { labs } = await getAllLabs();
+    labEntries = labs.map((l) => ({
+      url: `${BASE_URL}/labs/${labSlug(l, l.city)}`,
+      lastModified: now,
+      changeFrequency: "weekly",
+      priority: 0.6,
+    }));
+  } catch (err) {
+    console.error("[sitemap] lab entry generation failed; sitemap will be missing lab pages:", err);
+  }
+
+  return [...staticEntries, ...doctorEntries, ...pseoEntries, ...labEntries];
 }

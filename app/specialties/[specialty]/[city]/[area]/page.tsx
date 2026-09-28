@@ -4,6 +4,8 @@ import { specialties, CITIES, AREAS_BY_CITY } from "@/data/patient";
 import HomeClient from "@/app/home-client";
 import { getAllDoctors } from "@/lib/api/server";
 import { filterDoctorsByLocation } from "@/lib/filters/doctorLocation";
+import { SITE_URL } from "@/lib/site";
+import PageBreadcrumb from "@/components/patient/PageBreadcrumb";
 
 export const revalidate = 3600;
 
@@ -90,17 +92,39 @@ export default async function SpecialtyCityAreaPage({ params }: PageProps) {
     ]
   };
 
+  const breadcrumbItems = [
+    { label: "Home", href: "/" },
+    { label: `${specialty.name}s`, href: `/specialties/${specialty.id}` },
+    { label: city.name, href: `/specialties/${specialty.id}/${city.id}` },
+    { label: areaName },
+  ];
+  const breadcrumbSchema = {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    "itemListElement": [
+      { "@type": "ListItem", "position": 1, "name": "Home", "item": SITE_URL },
+      { "@type": "ListItem", "position": 2, "name": `${specialty.name}s`, "item": `${SITE_URL}/specialties/${specialty.id}` },
+      { "@type": "ListItem", "position": 3, "name": city.name, "item": `${SITE_URL}/specialties/${specialty.id}/${city.id}` },
+      { "@type": "ListItem", "position": 4, "name": areaName, "item": `${SITE_URL}/specialties/${specialty.id}/${city.id}/${params.area}` },
+    ],
+  };
+
   return (
     <>
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(faqSchema) }}
       />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbSchema) }}
+      />
       <HomeClient
         initialSpecialtyId={specialty.id}
         initialCityId={city.id}
         initialArea={areaName}
         initialDoctors={initialDoctors}
+        breadcrumb={<PageBreadcrumb items={breadcrumbItems} />}
       />
     </>
   );

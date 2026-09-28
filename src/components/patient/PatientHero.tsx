@@ -1,36 +1,49 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { Search, MapPin, Stethoscope, Mic, ChevronDown } from "lucide-react";
-import { specialties } from "@/data/patient";
+import { useState, useEffect, useMemo, useRef } from "react";
+import { motion } from "framer-motion";
+import { Search, Mic, MapPin, ChevronDown, X } from "lucide-react";
+import { specialties, cityLabel, type CityOption } from "@/data/patient";
 import { cn } from "@/lib/utils";
+import type { GeoStatus } from "@/lib/geo";
 import { useTranslation } from "@/lib/i18n/I18nContext";
 import { translateSpecialty } from "@/lib/i18n/specialties";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  Drawer,
-  DrawerContent,
-  DrawerHeader,
-  DrawerTitle,
-  DrawerTrigger,
-} from "@/components/ui/drawer";
+import { useDoctors } from "@/lib/api/hooks";
 
 // en-IN handles Indian English + Hinglish; hi-IN/bn-IN give the speech engine a much
 // better shot at actual Hindi/Bengali sentences once the UI locale says that's what
 // the visitor speaks.
 const SPEECH_LANG: Record<string, string> = { en: "en-IN", hi: "hi-IN", bn: "bn-IN", hinglish: "en-IN" };
 
+// A handful of tags inline ("Popular searches: X, Y, Z, Others") reads faster than a wall of
+// 31 equal-weight chips — matches the compact reference pattern (Practo-style), with "Others"
+// opening the full flat list (no categories — the business only lists allopathic specialties,
+// so Practo's Dentist/Alternative-Medicine/Therapist groupings don't map onto this data).
+const POPULAR_TAG_COUNT = 4;
+
+// TODO(popular-specialties-v2): "Popular" is currently ranked by how many doctors are listed
+// under each specialty (a supply-side proxy — see rankedSpecialties below), NOT by real patient
+// search demand. The site already fires a `search_performed` analytics event per search (see
+// DoctorDirectory.tsx) carrying specialtyId, but that pipeline is write-only today — there is no
+// endpoint anywhere (WhatsApp bot or Doctor Dekho) that reads back aggregated search counts.
+// Once the combined WhatsApp+Doctor Dekho search-count backend endpoint exists, replace
+// `rankedSpecialties`'s sort key below with real counts fetched from it — everything else
+// (slicing into popular/more, the expand toggle, etc.) stays the same.
+
 interface PatientHeroProps {
   query: string;
   onQueryChange: (q: string) => void;
   specialtyId: string;
   onSpecialtyChange: (id: string) => void;
+  /** Geolocation detection status — was previously shown as an "Allow Location" pill in the
+   * topbar; moved here into the search pill itself, in the slot the specialty selector used
+   * to occupy, so location is picked as part of the actual search action instead of a
+   * separate control floating in the header. */
+  geoStatus?: GeoStatus;
+  city?: CityOption | null;
+  cities?: CityOption[];
+  onCityChange?: (city: CityOption | null) => void;
+  onRequestLocation?: () => void;
 }
 
 export default function PatientHero({
@@ -38,6 +51,11 @@ export default function PatientHero({
   onQueryChange,
   specialtyId,
   onSpecialtyChange,
+  geoStatus = "idle",
+  city = null,
+  cities = [],
+  onCityChange,
+  onRequestLocation,
 }: PatientHeroProps) {
   const { t, locale } = useTranslation();
 
@@ -45,9 +63,165 @@ export default function PatientHero({
     document.getElementById("doctors")?.scrollIntoView({ behavior: "smooth" });
   }
 
+  // ── Location picker (moved out of PatientTopBar) ──────────────────────────
+  const [showLocationDropdown, setShowLocationDropdown] = useState(false);
+  const [showLocationPrompt, setShowLocationPrompt] = useState(false);
+  const locationRef = useRef<HTMLDivElement>(null);
+  // The dropdown panel itself is rendered OUTSIDE the hero <section> (fixed-positioned, at the
+  // very end of this component) — the hero section has `overflow-hidden` to clip its decorative
+  // background blobs, and that was silently clipping the bottom of this dropdown too whenever
+  // it was tall enough to extend past the section's own bottom edge. The dropdown's own
+  // `overflow-y-auto` had nothing to do with it: its content fit inside its own box just fine
+  // (scrollHeight === clientHeight, confirmed by inspecting it directly), so scrolling never did
+  // anything — the missing rows were being cut off by an ANCESTOR's clipping, not hidden by lack
+  // of internal scroll. Coordinates are computed from the button's own position since the panel
+  // is no longer a DOM descendant of it.
+  const dropdownPanelRef = useRef<HTMLDivElement>(null);
+  const [dropdownPos, setDropdownPos] = useState<{ top: number; left: number; width: number } | null>(null);
+  const hasLocationProps = onCityChange !== undefined;
+  const detecting = geoStatus === "detecting" || geoStatus === "idle";
+  const denied = geoStatus === "denied" || geoStatus === "unsupported";
+
+  function updateDropdownPosition() {
+    if (!locationRef.current) return;
+    const rect = locationRef.current.getBoundingClientRect();
+    setDropdownPos({ top: rect.bottom + 8, left: rect.left, width: rect.width });
+  }
+
+  useEffect(() => {
+    if (!showLocationDropdown) return;
+    function handleClick(e: MouseEvent) {
+      const target = e.target as Node;
+      const insideButton = locationRef.current?.contains(target);
+      const insidePanel = dropdownPanelRef.current?.contains(target);
+      if (!insideButton && !insidePanel) setShowLocationDropdown(false);
+    }
+    document.addEventListener("mousedown", handleClick);
+    // A fixed-position panel doesn't move with the page, so it'd visually drift away from the
+    // button it belongs to if the *page* scrolls while it's open — closing on scroll matches
+    // how most native pickers behave rather than leaving a stray panel floating mid-page.
+    // Critical: a capture-phase listener on `window` fires for EVERY scroll event, including
+    // the dropdown's own internal list scrolling (a "scroll" event doesn't bubble, but capture
+    // still passes through ancestors on its way down to the real target first) — without the
+    // `contains()` check below, scrolling the city list itself would immediately close the
+    // dropdown on the very first scroll tick, which is exactly the bug this was reported as
+    // ("scroll nahi ho raha" — it wasn't that scrolling failed, it's that opening a scroll
+    // instantly closed the panel before anything visibly moved).
+    function handleScroll(e: Event) {
+      if (dropdownPanelRef.current && e.target instanceof Node && dropdownPanelRef.current.contains(e.target)) {
+        return;
+      }
+      setShowLocationDropdown(false);
+    }
+    window.addEventListener("scroll", handleScroll, true);
+    return () => {
+      document.removeEventListener("mousedown", handleClick);
+      window.removeEventListener("scroll", handleScroll, true);
+    };
+  }, [showLocationDropdown]);
+
+  function handleLocationClick() {
+    // A city is selected — including the Purnea default applied once geolocation is known to
+    // be unavailable (see home-client.tsx) — so clicking opens the picker to change it, same
+    // as it would for a geo-detected city; it no longer re-prompts for location permission
+    // just because the underlying geoStatus happens to be "denied".
+    if (city) {
+      if (!showLocationDropdown) updateDropdownPosition();
+      setShowLocationDropdown((v) => !v);
+    } else if (denied) {
+      setShowLocationPrompt(true);
+    } else if (!detecting) {
+      onRequestLocation?.();
+    } else {
+      if (!showLocationDropdown) updateDropdownPosition();
+      setShowLocationDropdown((v) => !v);
+    }
+  }
+
+  function handleCitySelect(c: CityOption | null) {
+    onCityChange?.(c);
+    setShowLocationDropdown(false);
+  }
+
+  // No seed here — shares the same ["public","doctors"] query-key cache HomeClient/
+  // DoctorDirectory already populate (see PatientFooter.tsx for the identical pattern), so this
+  // is a cache read, not an extra fetch, on pages where those already mounted.
+  const { data: doctorsData } = useDoctors();
+
+  // Doctor-count-per-specialty, descending, as today's stand-in for real search demand (see the
+  // TODO above the imports) — a specialty with more listed doctors is a reasonable proxy for
+  // patient demand until the real search-count endpoint exists. `Array.prototype.sort` is
+  // stable (ES2019+), so specialties tied on count (including the common case of 0 vs 0 for
+  // ones with no doctors yet) keep their original relative order rather than shuffling randomly
+  // on every render.
+  const rankedSpecialties = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const d of doctorsData?.doctors ?? []) {
+      counts.set(d.specialtyId, (counts.get(d.specialtyId) ?? 0) + 1);
+    }
+    return [...specialties].sort((a, b) => (counts.get(b.id) ?? 0) - (counts.get(a.id) ?? 0));
+  }, [doctorsData]);
+
+  const popularTags = useMemo(() => rankedSpecialties.slice(0, POPULAR_TAG_COUNT), [rankedSpecialties]);
+
+  // ── "Others" mega-panel (all specialties, flat list) ─────────────────────
+  // Same fixed-position-rendered-outside-the-<section> pattern as the location dropdown above,
+  // for the identical reason: the hero section's `overflow-hidden` (for its background blobs)
+  // would otherwise clip this panel's bottom edge whenever it's taller than the remaining
+  // section height.
+  const [showSpecialtyPanel, setShowSpecialtyPanel] = useState(false);
+  const specialtyAnchorRef = useRef<HTMLButtonElement>(null);
+  const specialtyPanelRef = useRef<HTMLDivElement>(null);
+  const [specialtyPanelPos, setSpecialtyPanelPos] = useState<{ top: number; left: number; width: number } | null>(null);
+
+  function updateSpecialtyPanelPosition() {
+    if (!specialtyAnchorRef.current) return;
+    const rect = specialtyAnchorRef.current.getBoundingClientRect();
+    const width = Math.min(640, window.innerWidth - 32);
+    const left = Math.max(16, Math.min(window.innerWidth - width - 16, rect.left + rect.width / 2 - width / 2));
+    setSpecialtyPanelPos({ top: rect.bottom + 8, left, width });
+  }
+
+  function toggleSpecialtyPanel() {
+    if (!showSpecialtyPanel) updateSpecialtyPanelPosition();
+    setShowSpecialtyPanel((v) => !v);
+  }
+
+  useEffect(() => {
+    if (!showSpecialtyPanel) return;
+    function handleClick(e: MouseEvent) {
+      const target = e.target as Node;
+      const insideButton = specialtyAnchorRef.current?.contains(target);
+      const insidePanel = specialtyPanelRef.current?.contains(target);
+      if (!insideButton && !insidePanel) setShowSpecialtyPanel(false);
+    }
+    // See the location dropdown's identical listener above for why this needs the
+    // `contains()` guard: a naive "close on any scroll" handler also fires for scrolling
+    // *inside* this panel's own list (capture-phase listeners see every scroll event on
+    // their way down to the real target), which would close the panel the instant someone
+    // tried to scroll through the specialty list rather than actually letting them scroll it.
+    function handleScroll(e: Event) {
+      if (specialtyPanelRef.current && e.target instanceof Node && specialtyPanelRef.current.contains(e.target)) {
+        return;
+      }
+      setShowSpecialtyPanel(false);
+    }
+    document.addEventListener("mousedown", handleClick);
+    window.addEventListener("scroll", handleScroll, true);
+    return () => {
+      document.removeEventListener("mousedown", handleClick);
+      window.removeEventListener("scroll", handleScroll, true);
+    };
+  }, [showSpecialtyPanel]);
+
+  function handleSpecialtyPick(id: string) {
+    onSpecialtyChange(specialtyId === id ? "" : id);
+    setShowSpecialtyPanel(false);
+    scrollToDoctors();
+  }
+
   const [isListening, setIsListening] = useState(false);
   const [hasSpeechSupport, setHasSpeechSupport] = useState(false);
-  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
 
   useEffect(() => {
     if (typeof window !== "undefined" && ("SpeechRecognition" in window || "webkitSpeechRecognition" in window)) {
@@ -97,34 +271,64 @@ export default function PatientHero({
   };
 
   return (
-    <section className="relative overflow-hidden bg-white pt-16 pb-24 sm:pt-24 sm:pb-32">
-      {/* ── Background Mesh Gradient ── */}
+    <>
+    {/* min-h fills exactly what's left below the sticky topbar (h-16 mobile / h-20 desktop,
+        see PatientTopBar) using svh (small-viewport-height, stable against mobile browser
+        chrome showing/hiding) — so on first load only the hero is visible, and everything
+        below it (TrustStrip, "Top Specialists") only comes into view on scroll, instead of
+        the doctor grid already peeking onto the initial screen. */}
+    <section className="relative overflow-hidden bg-white flex items-center min-h-[calc(100svh-4rem)] sm:min-h-[calc(100svh-5rem)]">
+      {/* ── Background Mesh Gradient — slow organic drift, motion-safe so it respects a
+          visitor's OS-level "reduce motion" preference without any extra JS check. ── */}
       <div className="absolute inset-0 pointer-events-none z-0">
-        <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] rounded-full bg-teal-100/40 blur-[100px] mix-blend-multiply" />
-        <div className="absolute top-[20%] right-[-10%] w-[40%] h-[40%] rounded-full bg-sky-100/50 blur-[100px] mix-blend-multiply" />
-        <div className="absolute bottom-[-10%] left-[20%] w-[60%] h-[40%] rounded-full bg-brand-sand/40 blur-[120px] mix-blend-multiply" />
+        <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] rounded-full bg-teal-100/40 blur-[100px] mix-blend-multiply motion-safe:animate-blob-drift" />
+        <div className="absolute top-[20%] right-[-10%] w-[40%] h-[40%] rounded-full bg-sky-100/50 blur-[100px] mix-blend-multiply motion-safe:animate-blob-drift-slow" />
+        <div className="absolute bottom-[-10%] left-[20%] w-[60%] h-[40%] rounded-full bg-brand-sand/40 blur-[120px] mix-blend-multiply motion-safe:animate-blob-drift-slower" />
       </div>
 
-      <div className="relative z-10 max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-        {/* Title */}
-        <h1 className="font-display text-5xl sm:text-6xl md:text-7xl font-extrabold text-slate-900 tracking-tight leading-[1.1] mb-6 flex flex-col items-center">
-          <span className="sr-only">Find & Book Top Specialists Near You on </span>
-          <span>
-            Doctor{" "}
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-brand-teal to-sky-500">
-              Dekho
+      <div className="relative z-10 max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-12 text-center">
+        {/* Title — a one-time spring "pop" entrance (fade + scale overshoot, not a plain
+            linear fade) on the outer wrapper, then the inner h1 settles into a slow, gentle,
+            infinite float once the spring has visibly landed — the heading reads as if it
+            bounced into place and is now quietly "alive" rather than a static image. */}
+        <motion.div
+          initial={{ opacity: 0, scale: 0.8, y: 30 }}
+          animate={{ opacity: 1, scale: 1, y: 0 }}
+          transition={{ type: "spring", stiffness: 200, damping: 15, mass: 0.8 }}
+          className="mb-10"
+        >
+          <motion.h1
+            animate={{ y: [0, -10, 0] }}
+            transition={{ duration: 4, repeat: Infinity, ease: "easeInOut", delay: 1 }}
+            className="font-display text-6xl sm:text-7xl md:text-8xl lg:text-9xl font-extrabold text-slate-900 tracking-tighter leading-[1.05] flex flex-col items-center"
+          >
+            <span className="sr-only">Find & Book Top Specialists Near You on </span>
+            <span>
+              {/* mr- instead of a trailing "Doctor " text space — inline-block trims trailing
+                  whitespace at its own edge, so a plain space character here would silently
+                  collapse to nothing between the two words. */}
+              <span className="inline-block mr-3 sm:mr-4">Doctor</span>
+              <span className="inline-block text-transparent bg-clip-text bg-gradient-to-r from-brand-teal to-sky-500 bg-[length:200%_auto] motion-safe:animate-gradient-shift">
+                Dekho
+              </span>
             </span>
-          </span>
-        </h1>
-        <p className="max-w-2xl mx-auto text-base sm:text-lg text-slate-500 font-medium mb-12">
-          {t("hero.subtitle")}
-        </p>
-
-        {/* ── The Floating Search Pill ── */}
-        <div className="max-w-4xl mx-auto bg-white/80 backdrop-blur-2xl p-1.5 sm:p-3 rounded-[1.5rem] sm:rounded-full border border-white/60 shadow-[0_20px_60px_-15px_rgba(0,0,0,0.05),0_0_40px_-10px_rgba(20,184,166,0.1)] ring-1 ring-black/5 flex flex-col sm:flex-row items-center gap-1.5 sm:gap-0 transition-shadow duration-500 hover:shadow-[0_25px_60px_-15px_rgba(0,0,0,0.08),0_0_50px_-10px_rgba(20,184,166,0.15)]">
-          
-          {/* Input 1: Doctor/Symptom */}
-          <div className="flex-1 h-14 sm:h-16 rounded-2xl sm:rounded-l-full sm:rounded-r-none hover:bg-slate-50/50 focus-within:bg-slate-50/80 transition-colors w-full group relative">
+          </motion.h1>
+        </motion.div>
+        {/* ── Search row: three independent capsules (input, location, button) instead of one
+            merged pill — each reads as its own control at a glance, matching how the location
+            picker used to look as its own standalone pill in the topbar. ── */}
+        <motion.div
+          initial={{ opacity: 0, y: 20, scale: 0.98 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          transition={{ duration: 0.5, delay: 0.55, ease: "easeOut" }}
+          className="max-w-4xl mx-auto flex flex-col sm:flex-row items-stretch sm:items-center gap-3"
+        >
+          {/* Input capsule: Doctor/Symptom — a specialty picker used to live here too (Select
+              on desktop, a Drawer on mobile), redundant with both the icon chips below
+              (explicit specialty picking) and the AI smart-search fallback in
+              DoctorDirectory.tsx (infers specialty from free text like "skin doctor" or a
+              symptom when there's no literal match), so that slot was dropped. */}
+          <div className="flex-1 h-14 sm:h-16 rounded-full bg-white/80 backdrop-blur-2xl border border-white/60 shadow-[0_20px_60px_-15px_rgba(0,0,0,0.05),0_0_40px_-10px_rgba(20,184,166,0.1)] ring-1 ring-black/5 hover:bg-white/90 focus-within:bg-white transition-colors w-full group relative">
             <div className="absolute left-5 sm:left-6 top-1/2 -translate-y-1/2 pointer-events-none">
               <Search className="w-5 h-5 text-slate-400 group-focus-within:text-brand-teal transition-colors" />
             </div>
@@ -134,9 +338,9 @@ export default function PatientHero({
               onChange={(e) => onQueryChange(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && scrollToDoctors()}
               placeholder={t("hero.searchPlaceholder")}
-              className="w-full h-full bg-transparent pl-12 sm:pl-14 pr-[80px] text-base text-slate-800 placeholder:text-slate-400 font-medium focus:outline-none"
+              className="w-full h-full bg-transparent pl-12 sm:pl-14 pr-[80px] text-base text-slate-800 placeholder:text-slate-400 font-medium focus:outline-none rounded-full"
             />
-            
+
             <div className="absolute right-2 sm:right-3 top-1/2 -translate-y-1/2 flex items-center gap-1 z-10">
               {query && (
                 <button
@@ -167,118 +371,198 @@ export default function PatientHero({
             </div>
           </div>
 
-          {/* Divider */}
-          <div className="w-[90%] h-px sm:w-px sm:h-10 bg-slate-200 shrink-0 my-1 sm:my-0" />
-
-          {/* Input 2: Specialty Selector (Desktop) */}
-          <div className="hidden sm:flex flex-1 max-w-[280px] w-full h-16 rounded-r-full hover:bg-slate-50/50 focus-within:bg-slate-50/80 transition-colors group relative border-l border-slate-200/60">
-            <div className="absolute left-6 top-1/2 -translate-y-1/2 pointer-events-none z-10">
-              <Stethoscope className="w-5 h-5 text-slate-400 group-focus-within:text-brand-teal transition-colors" />
+          {hasLocationProps && (
+            /* Location capsule — was a standalone "Allow Location" pill in the topbar; moved
+               here (and now genuinely its own capsule, not a segment squeezed into a shared
+               pill) so choosing where to search sits right alongside the search input. */
+            <div ref={locationRef} className="relative w-full sm:w-auto sm:max-w-[240px] shrink-0">
+              <button
+                onClick={handleLocationClick}
+                className="w-full h-14 sm:h-16 flex items-center gap-2.5 px-5 sm:px-6 text-left rounded-full bg-white/80 backdrop-blur-2xl border border-white/60 shadow-[0_20px_60px_-15px_rgba(0,0,0,0.05),0_0_40px_-10px_rgba(20,184,166,0.1)] ring-1 ring-black/5 hover:bg-white/90 focus:outline-none transition-colors group"
+              >
+                {detecting ? (
+                  <>
+                    <span className="w-2 h-2 rounded-full bg-brand-teal animate-pulse shadow-[0_0_8px_rgba(20,184,166,0.6)] shrink-0" />
+                    <span className="text-base font-medium text-brand-teal truncate">{t("topbar.detecting")}</span>
+                  </>
+                ) : city ? (
+                  <>
+                    <MapPin className="w-5 h-5 text-brand-teal shrink-0" />
+                    <span className="text-base font-medium text-slate-800 truncate">{cityLabel(city)}</span>
+                    <ChevronDown className="w-4 h-4 text-slate-400 shrink-0 ml-auto" />
+                  </>
+                ) : (
+                  <>
+                    <MapPin className="w-5 h-5 text-slate-400 group-hover:text-brand-teal transition-colors shrink-0" />
+                    <span className="text-base font-medium text-slate-500 truncate">{t("topbar.allIndia")}</span>
+                    <ChevronDown className="w-4 h-4 text-slate-400 shrink-0 ml-auto" />
+                  </>
+                )}
+              </button>
             </div>
-            <Select 
-              value={specialtyId || "all"} 
-              onValueChange={(val) => onSpecialtyChange(val === "all" ? "" : val)}
-            >
-              <SelectTrigger className="w-full h-full border-0 bg-transparent pl-14 pr-6 focus:ring-0 shadow-none text-base font-medium rounded-r-full text-slate-800">
-                <SelectValue placeholder={t("hero.allSpecialities")} />
-              </SelectTrigger>
-              <SelectContent className="max-h-[300px] z-[60]">
-                <SelectItem value="all">{t("hero.allSpecialities")}</SelectItem>
-                {specialties.map((s) => (
-                  <SelectItem key={s.id} value={s.id}>
-                    {translateSpecialty(s.id, s.name, locale)}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+          )}
 
-          {/* Input 2: Specialty Selector (Mobile) */}
-          <div className="sm:hidden flex-1 w-full h-14 hover:bg-slate-50/50 transition-colors group relative">
-            <Drawer open={isDrawerOpen} onOpenChange={setIsDrawerOpen}>
-              <DrawerTrigger asChild>
-                <button className="w-full h-full flex items-center justify-between px-5 text-left text-base font-medium text-slate-800 focus:outline-none">
-                  <div className="flex items-center gap-3 truncate pr-4">
-                    <Stethoscope className="w-5 h-5 text-slate-400 shrink-0" />
-                    <span className="truncate">
-                      {specialtyId 
-                        ? translateSpecialty(specialtyId, specialties.find(s => s.id === specialtyId)?.name || "", locale)
-                        : t("hero.allSpecialities")}
-                    </span>
-                  </div>
-                  <ChevronDown className="w-4 h-4 text-slate-400 shrink-0" />
-                </button>
-              </DrawerTrigger>
-              <DrawerContent className="z-[100] max-h-[85vh]">
-                <DrawerHeader>
-                  <DrawerTitle className="text-center">{t("hero.browseAll")}</DrawerTitle>
-                </DrawerHeader>
-                <div className="px-4 pb-8 overflow-y-auto flex flex-col gap-1.5 mt-2">
-                  <button 
-                    onClick={() => { onSpecialtyChange(""); setIsDrawerOpen(false); }}
-                    className={cn(
-                      "text-left px-5 py-3.5 rounded-2xl text-sm font-semibold transition-colors flex items-center justify-between", 
-                      !specialtyId ? "bg-teal-50 text-brand-teal" : "text-slate-600 hover:bg-slate-50"
-                    )}
-                  >
-                    <span>{t("hero.allSpecialities")}</span>
-                    {!specialtyId && <div className="w-2 h-2 rounded-full bg-brand-teal" />}
-                  </button>
-                  {specialties.map((s) => (
-                    <button
-                      key={s.id}
-                      onClick={() => { onSpecialtyChange(s.id); setIsDrawerOpen(false); }}
-                      className={cn(
-                        "text-left px-5 py-3.5 rounded-2xl text-sm font-semibold transition-colors flex items-center justify-between", 
-                        specialtyId === s.id ? "bg-teal-50 text-brand-teal" : "text-slate-600 hover:bg-slate-50"
-                      )}
-                    >
-                      <span>{translateSpecialty(s.id, s.name, locale)}</span>
-                      {specialtyId === s.id && <div className="w-2 h-2 rounded-full bg-brand-teal" />}
-                    </button>
-                  ))}
-                </div>
-              </DrawerContent>
-            </Drawer>
-          </div>
-
-          {/* Divider */}
-          <div className="w-[90%] h-px sm:hidden bg-slate-200 shrink-0 my-1" />
-
-          {/* Search Button */}
+          {/* Search capsule */}
           <button
             onClick={scrollToDoctors}
-            className="w-full sm:w-auto h-14 sm:h-16 px-8 sm:px-10 rounded-2xl sm:rounded-full bg-brand-teal text-white text-base sm:text-lg font-bold shadow-[0_8px_25px_-5px_rgba(20,184,166,0.4)] hover:bg-teal-500 hover:shadow-[0_12px_30px_-5px_rgba(20,184,166,0.5)] active:scale-[0.98] transition-all duration-300 shrink-0 flex items-center justify-center gap-2"
+            className="w-full sm:w-auto h-14 sm:h-16 px-8 sm:px-10 rounded-full bg-brand-teal text-white text-base sm:text-lg font-bold shadow-[0_8px_25px_-5px_rgba(20,184,166,0.4)] hover:bg-teal-500 hover:shadow-[0_12px_30px_-5px_rgba(20,184,166,0.5)] active:scale-[0.98] transition-all duration-300 shrink-0 flex items-center justify-center gap-2"
           >
             <Search className="w-5 h-5 sm:hidden" />
             <span>{t("hero.search")}</span>
           </button>
-        </div>
+        </motion.div>
 
-        {/* Quick specialty chips — all specialities */}
-        <div className="mt-8 hidden sm:flex flex-col items-center">
-          <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4">{t("hero.browseAll")}</p>
-          <div className="flex flex-wrap justify-center gap-2.5">
-            {specialties.map((s) => (
+        {/* Compact "Popular searches:" row — top specialties (by doctor-count, see
+            rankedSpecialties above) as plain text tags, "Others" opens the full flat list in a
+            separate panel below. Matches the reference pattern: quick scan of a few names
+            inline, full directory only one click away instead of always-visible. */}
+        <div className="mt-6 flex flex-wrap items-center justify-center gap-x-2 gap-y-1.5 text-sm">
+          <span className="text-slate-400 font-semibold">{t("hero.popularSearches")}</span>
+          {popularTags.map((s) => {
+            const isActive = specialtyId === s.id;
+            return (
               <button
                 key={s.id}
-                onClick={() => {
-                  onSpecialtyChange(specialtyId === s.id ? "" : s.id);
-                  scrollToDoctors();
-                }}
+                onClick={() => handleSpecialtyPick(s.id)}
                 className={cn(
-                  "px-4 py-2 rounded-full text-sm font-semibold transition-all duration-300 border backdrop-blur-sm",
-                  specialtyId === s.id
-                    ? "bg-slate-900 border-slate-900 text-white shadow-md shadow-slate-900/20"
-                    : "bg-white/60 border-slate-200/60 text-slate-600 hover:bg-white hover:border-brand-teal/30 hover:text-brand-teal hover:shadow-sm"
+                  "font-semibold underline-offset-4 decoration-2 hover:underline transition-colors",
+                  isActive ? "text-brand-teal underline" : "text-slate-600 hover:text-brand-teal"
                 )}
               >
                 {translateSpecialty(s.id, s.name, locale)}
               </button>
-            ))}
-          </div>
+            );
+          })}
+          <button
+            ref={specialtyAnchorRef}
+            onClick={toggleSpecialtyPanel}
+            className="inline-flex items-center gap-1 font-bold text-brand-teal hover:underline underline-offset-4 decoration-2"
+          >
+            {t("hero.others")}
+            <ChevronDown className={cn("w-3.5 h-3.5 transition-transform", showSpecialtyPanel && "rotate-180")} />
+          </button>
         </div>
       </div>
     </section>
+
+    {/* ── City dropdown — rendered here (fixed position, outside the hero <section>) rather
+        than nested inside the location button, specifically so the hero's own
+        `overflow-hidden` (used to clip its decorative background blobs) can never clip this
+        panel's bottom edge again — see the long comment by `dropdownPos` above for how that
+        was diagnosed. Height is capped to show exactly ~5 cities at a time with the rest
+        reachable by scrolling inside the panel, per the "show 5, make it scrollable" ask. ── */}
+    {showLocationDropdown && dropdownPos && cities.length > 0 && (
+      <div
+        ref={dropdownPanelRef}
+        style={{ top: dropdownPos.top, left: dropdownPos.left, width: Math.max(dropdownPos.width, 256) }}
+        className="fixed bg-white/95 backdrop-blur-xl border border-slate-200/60 rounded-2xl shadow-[0_10px_40px_-10px_rgba(0,0,0,0.15)] z-[70] ring-1 ring-black/5 text-left overflow-hidden"
+      >
+        <button
+          onClick={() => handleCitySelect(null)}
+          className={cn(
+            "w-full text-left px-5 py-3 text-sm transition-colors duration-200 border-b border-slate-100",
+            !city ? "text-brand-teal bg-teal-50/50 font-bold" : "text-slate-600 font-medium hover:bg-slate-50"
+          )}
+        >
+          🌍 {t("topbar.allIndia")}
+        </button>
+        {/* ~5 city rows tall (44px each); the rest scroll — overscroll-contain stops that
+            scroll from chaining to the page once this list's own end is reached. */}
+        <div className="max-h-[220px] overflow-y-auto overscroll-contain py-2">
+          {cities.map((c) => (
+            <button
+              key={c.id}
+              onClick={() => handleCitySelect(c)}
+              className={cn(
+                "w-full text-left px-5 py-3 text-sm transition-colors duration-200 flex items-center gap-3",
+                city?.id === c.id
+                  ? "text-brand-teal bg-teal-50/50 font-bold"
+                  : "text-slate-600 font-medium hover:bg-slate-50"
+              )}
+            >
+              <MapPin className={cn("w-4 h-4 shrink-0", city?.id === c.id ? "text-brand-teal" : "text-slate-400")} />
+              {cityLabel(c)}
+            </button>
+          ))}
+        </div>
+      </div>
+    )}
+
+    {/* ── "Others" specialty mega-panel — flat list, no categories (see the constant's own
+        comment for why: this business only lists allopathic specialties, so Practo-style
+        Dentist/Alternative-Medicine/Therapist groupings don't apply to this data). Fixed
+        position outside the <section> for the same clipping reason as the city dropdown. ── */}
+    {showSpecialtyPanel && specialtyPanelPos && (
+      <div
+        ref={specialtyPanelRef}
+        style={{ top: specialtyPanelPos.top, left: specialtyPanelPos.left, width: specialtyPanelPos.width }}
+        className="fixed bg-white/95 backdrop-blur-xl border border-slate-200/60 rounded-2xl shadow-[0_10px_40px_-10px_rgba(0,0,0,0.15)] z-[70] ring-1 ring-black/5 text-left overflow-hidden"
+      >
+        <div className="max-h-[60vh] overflow-y-auto overscroll-contain p-5">
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-6 gap-y-3">
+            {rankedSpecialties.map((s) => {
+              const isActive = specialtyId === s.id;
+              return (
+                <button
+                  key={s.id}
+                  onClick={() => handleSpecialtyPick(s.id)}
+                  className={cn(
+                    "text-left text-sm py-1 font-medium transition-colors truncate",
+                    isActive ? "text-brand-teal font-bold" : "text-slate-600 hover:text-brand-teal"
+                  )}
+                >
+                  {translateSpecialty(s.id, s.name, locale)}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+    )}
+
+    {/* ── Allow Location prompt overlay (moved from PatientTopBar) ── */}
+    {showLocationPrompt && (
+      <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm animate-in fade-in duration-200">
+        <div className="w-full max-w-sm bg-white rounded-[2rem] p-8 shadow-2xl space-y-5 animate-in slide-in-from-bottom-8 sm:slide-in-from-bottom-0 sm:zoom-in-95 duration-300">
+          <div className="flex items-start justify-between">
+            <div className="w-14 h-14 rounded-2xl bg-teal-50 border border-teal-100/50 flex items-center justify-center shadow-inner">
+              <MapPin className="w-7 h-7 text-brand-teal" />
+            </div>
+            <button
+              onClick={() => setShowLocationPrompt(false)}
+              className="w-8 h-8 rounded-full bg-slate-50 flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+          <div>
+            <h3 className="font-display font-bold text-slate-900 text-xl tracking-tight">
+              {t("topbar.findDoctorsNearYou")}
+            </h3>
+            <p className="text-sm text-slate-500 mt-2 leading-relaxed font-medium">
+              {t("topbar.allowLocationDesc")}
+            </p>
+          </div>
+          <div className="flex flex-col gap-3 pt-2">
+            <button
+              onClick={() => {
+                onRequestLocation?.();
+                setShowLocationPrompt(false);
+              }}
+              className="w-full py-3.5 rounded-xl bg-brand-teal text-white font-semibold text-sm shadow-[0_4px_14px_0_rgba(20,184,166,0.3)] hover:bg-brand-teal/90 hover:shadow-[0_6px_20px_rgba(20,184,166,0.4)] transition-all duration-300"
+            >
+              {t("topbar.allowLocationConfirm")}
+            </button>
+            <button
+              onClick={() => setShowLocationPrompt(false)}
+              className="w-full py-3.5 rounded-xl bg-slate-50 text-slate-700 font-semibold text-sm hover:bg-slate-100 transition-colors"
+            >
+              {t("topbar.chooseCityManually")}
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
+    </>
   );
 }

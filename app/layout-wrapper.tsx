@@ -3,6 +3,7 @@
 import { usePathname } from "next/navigation";
 import PatientBottomNav from "@/components/patient/PatientBottomNav";
 import InstallPrompt from "@/components/patient/InstallPrompt";
+import ChatWidget from "@/components/patient/ChatWidget";
 
 // Every route on this site is the patient portal, and each page renders its own PatientTopBar /
 // PatientFooter. The only pages that skip the app-style bottom nav + install banner are the
@@ -25,6 +26,7 @@ export default function LayoutWrapper({
         <>
           <PatientBottomNav />
           <InstallPrompt />
+          <ChatWidget />
         </>
       )}
     </>

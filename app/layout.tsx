@@ -23,9 +23,16 @@ const DESCRIPTION =
   "Doctor Dekho by NexEagle: find verified doctors, clinics and pathology labs near you, compare experience and ratings, and book appointments online in under a minute.";
 
 export const metadata: Metadata = {
+  // Template was "%s | NexEagle" — every non-homepage page's visible <title> ended in "NexEagle"
+  // while og:site_name/schema said "Doctor Dekho", a split-entity signal that risks AI engines
+  // merging this with the unrelated "Doctor Dekho" app on the Play Store (see the GEO audit's
+  // "Brand entity" finding). One consistent consumer-facing brand across title, og:site_name and
+  // twitter now; NexEagle's relationship is stated explicitly via description + the
+  // MedicalOrganization/parentOrganization JSON-LD below, which is the correct place for that
+  // disambiguation (not a concatenated title string on every page).
   title: {
     default: "Doctor Dekho — Find & Book Doctors Near You",
-    template: "%s | NexEagle"
+    template: "%s | Doctor Dekho"
   },
   description: DESCRIPTION,
   keywords: ["Doctor Dekho", "NexEagle", "find doctors near me", "book doctor appointment online", "pathology lab near me"],
@@ -38,8 +45,10 @@ export const metadata: Metadata = {
     images: [
       {
         url: "/assets/logo.webp",
-        width: 1200,
-        height: 630,
+        // Actual file is 1024x1024 (square) — declaring 1200x630 here mismatched the real
+        // asset and could cause Facebook/LinkedIn crawlers to crop/mis-render it.
+        width: 1024,
+        height: 1024,
         alt: "Doctor Dekho by NexEagle",
       },
     ],
@@ -94,10 +103,18 @@ const organizationSchema = {
   "@type": "MedicalOrganization",
   "@id": `${SITE_URL}/#organization`,
   name: "Doctor Dekho",
+  // Disambiguates this entity from an unrelated "Doctor Dekho" app on the Play Store (a
+  // different company/package) — the structured-data-correct way to do this (schema.org name
+  // stays clean for entity recognition; alternateName carries the fuller, searched-for form).
+  alternateName: "Doctor Dekho by NexEagle",
   url: SITE_URL,
   logo: `${SITE_URL}/assets/logo.webp`,
+  // Explicit originality/differentiation claim for AI engines to cite — deep, verified doctor
+  // coverage of the Seemanchal region (Purnea, Kishanganj and surrounding Bihar towns) is this
+  // site's actual differentiator versus national aggregators, which is otherwise nowhere stated
+  // as a citable fact (see the GEO audit's "Originality" finding).
   description:
-    "Doctor Dekho connects patients with verified doctors across NexEagle's network of hospitals for online appointment booking.",
+    "Doctor Dekho by NexEagle connects patients with verified doctors across NexEagle's network of hospitals for online appointment booking, with the deepest verified doctor coverage of the Seemanchal region (Purnea, Kishanganj and surrounding Bihar) of any platform.",
   parentOrganization: {
     "@type": "Organization",
     "@id": `${BUSINESS_URL}/#organization`,

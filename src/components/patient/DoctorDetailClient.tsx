@@ -26,7 +26,7 @@ import DoctorCard from "@/components/patient/DoctorCard";
 import DoctorLocationMap from "@/components/patient/DoctorLocationMap";
 import ShareButton from "@/components/patient/ShareButton";
 import { RatingBadge } from "@/components/patient/StarRating";
-import { getDirectionsUrl, formatCount, type Doctor } from "@/data/patient";
+import { getDirectionsUrl, formatCount, cityId, CITIES, specialties, type Doctor } from "@/data/patient";
 import { useTranslation } from "@/lib/i18n/I18nContext";
 import { useNavigation } from "@/components/navigation/NavigationProvider";
 import { joinAddress } from "@/lib/navigation";
@@ -60,6 +60,17 @@ export default function DoctorDetailClient({ doctor, similarDoctors, canonicalSl
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [doctor.id]);
+
+  // "View all {specialty} in {city}" must resolve to a real /specialties/{specialty}/{city}
+  // page or it 404s. That route validates specialty against the curated `specialties` list and
+  // city against `CITIES` keyed by cityId(name, state) — never a bare lowercased city name,
+  // since city names collide across states (see CITIES's own comment in data/patient.ts). Only
+  // render the link when both resolve to a real, statically-generated page.
+  const specialtyIsCanonical = specialties.some((s) => s.id === doctor.specialtyId);
+  const doctorCityId = doctor.state ? cityId(doctor.city, doctor.state) : undefined;
+  const cityIsCanonical = doctorCityId ? CITIES.some((c) => c.id === doctorCityId) : false;
+  const viewAllHref =
+    specialtyIsCanonical && cityIsCanonical ? `/specialties/${doctor.specialtyId}/${doctorCityId}` : null;
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col font-sans text-slate-800">
@@ -161,10 +172,13 @@ export default function DoctorDetailClient({ doctor, similarDoctors, canonicalSl
                           ~<b className="text-slate-800">{doctor.waitTimeMins} min</b> {t("doctorDetail.wait")}
                         </span>
                       )}
-                      <span className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-600">
+                      <Link
+                        href="/about#verification"
+                        className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-600 hover:text-brand-teal transition-colors"
+                      >
                         <ShieldCheck className="w-3.5 h-3.5 text-brand-teal" />
                         {t("doctorDetail.verifiedProfile")}
-                      </span>
+                      </Link>
                     </div>
 
                     {/* Languages */}
@@ -304,22 +318,28 @@ export default function DoctorDetailClient({ doctor, similarDoctors, canonicalSl
               <BookingPanel doctor={doctor} />
 
               {whatsAppQrCodeDataUrl && (
-                <div className="mt-4 rounded-2xl border border-slate-200 bg-white p-5 text-center shadow-sm">
-                  <p className="text-sm font-bold text-slate-900">{t("doctorDetail.whatsappQrTitle")}</p>
-                  <p className="mt-1 text-xs text-slate-500">
-                    {t("doctorDetail.whatsappQrSubtitle", { doctor: doctor.name })}
-                  </p>
-                  {/* Data URL, not a Next <Image> -- next/image requires a configured remote
-                      loader or local file for anything that isn't already a plain <img>-style
-                      src, and a base64 data URL doesn't benefit from its optimization pipeline
-                      anyway (already a small, final PNG). */}
-                  <img
-                    src={whatsAppQrCodeDataUrl}
-                    alt={t("doctorDetail.whatsappQrSubtitle", { doctor: doctor.name })}
-                    className="mx-auto mt-4 h-40 w-40 rounded-xl border border-slate-100"
-                    width={160}
-                    height={160}
-                  />
+                <div className="mt-4 rounded-3xl border border-slate-200/80 bg-white shadow-sm overflow-hidden">
+                  <div className="p-5 border-b border-slate-100 bg-gradient-to-r from-teal-50/60 to-white flex flex-col items-center text-center">
+                    <h3 className="text-base font-extrabold text-slate-900">
+                      {t("doctorDetail.whatsappQrTitle")}
+                    </h3>
+                    <p className="mt-0.5 text-[10px] sm:text-xs text-slate-500 whitespace-nowrap">
+                      {t("doctorDetail.whatsappQrSubtitle", { doctor: doctor.name })}
+                    </p>
+                  </div>
+                  <div className="flex justify-center p-6">
+                    {/* Data URL, not a Next <Image> -- next/image requires a configured remote
+                        loader or local file for anything that isn't already a plain <img>-style
+                        src, and a base64 data URL doesn't benefit from its optimization pipeline
+                        anyway (already a small, final PNG). */}
+                    <img
+                      src={whatsAppQrCodeDataUrl}
+                      alt={t("doctorDetail.whatsappQrSubtitle", { doctor: doctor.name })}
+                      className="h-40 w-40 rounded-xl border border-slate-100"
+                      width={160}
+                      height={160}
+                    />
+                  </div>
                 </div>
               )}
             </div>
@@ -337,14 +357,16 @@ export default function DoctorDetailClient({ doctor, similarDoctors, canonicalSl
                 <DoctorCard key={doc.id} doctor={doc} />
               ))}
             </div>
-            <div className="mt-8">
-              <Link
-                href={`/specialties/${doctor.specialtyId}/${doctor.city.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`}
-                className="inline-flex items-center text-brand-teal font-bold hover:underline"
-              >
-                {t("doctorDetail.viewAllIn", { specialty: doctor.specialty, city: doctor.city })} &rarr;
-              </Link>
-            </div>
+            {viewAllHref && (
+              <div className="mt-8">
+                <Link
+                  href={viewAllHref}
+                  className="inline-flex items-center text-brand-teal font-bold hover:underline"
+                >
+                  {t("doctorDetail.viewAllIn", { specialty: doctor.specialty, city: doctor.city })} &rarr;
+                </Link>
+              </div>
+            )}
           </div>
         )}
       </main>

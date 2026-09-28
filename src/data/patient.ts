@@ -163,6 +163,22 @@ export function cityLabel(c: Pick<CityOption, "name" | "state">): string {
   return `${c.name}, ${c.state}`;
 }
 
+// Resolves a /specialties|/conditions "{city}" URL segment to a real CityOption — first against
+// the curated CITIES list (nice canonical casing), then falling back to real doctor records so
+// a city with NO curated entry still works once a doctor from there is onboarded (e.g. a doctor
+// in Siliguri, West Bengal makes "siliguri-west-bengal" resolve here even though Siliguri isn't
+// in CITIES). Uses the doctor's own city/state strings (not a slug->title-case guess), so this
+// never mangles casing the way unslugify() would. Returns null only when NEITHER source has it.
+export function resolveCity(
+  cityIdParam: string,
+  doctors: Pick<Doctor, "city" | "state">[]
+): CityOption | null {
+  const curated = CITIES.find((c) => c.id === cityIdParam);
+  if (curated) return curated;
+  const match = doctors.find((d) => d.city && d.state && cityId(d.city, d.state) === cityIdParam);
+  return match ? { id: cityIdParam, name: match.city, state: match.state } : null;
+}
+
 function city(name: string, state: string): CityOption {
   return { id: cityId(name, state), name, state };
 }

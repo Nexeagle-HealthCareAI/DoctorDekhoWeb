@@ -1,46 +1,10 @@
 "use client";
 
 import { motion } from "framer-motion";
-import {
-  Stethoscope, Baby, HeartPulse, Sparkles, Bone, Flower2, Smile, Ear,
-  Eye, Brain, Droplets, Activity, Zap, Wind, Shield, Dumbbell, Apple,
-  Scissors, BrainCircuit, Wand2, GitBranch, Syringe, ScanLine, Microscope,
-  Siren, Armchair, Trophy,
-  type LucideIcon,
-} from "lucide-react";
 import { specialties } from "@/data/patient";
+import { getSpecialtyIcon } from "@/lib/specialtyIcons";
 import { useTranslation } from "@/lib/i18n/I18nContext";
 import { translateSpecialty } from "@/lib/i18n/specialties";
-
-const iconMap: Record<string, LucideIcon> = {
-  stethoscope: Stethoscope,
-  baby:        Baby,
-  heartPulse:  HeartPulse,
-  sparkles:    Sparkles,
-  bone:        Bone,
-  flower:      Flower2,
-  smile:       Smile,
-  ear:         Ear,
-  eye:         Eye,
-  brain:       Brain,
-  droplets:    Droplets,
-  activity:    Activity,
-  zap:         Zap,
-  wind:        Wind,
-  shield:      Shield,
-  dumbbell:    Dumbbell,
-  apple:       Apple,
-  scissors:      Scissors,
-  brainCircuit:  BrainCircuit,
-  wand2:         Wand2,
-  gitBranch:     GitBranch,
-  syringe:       Syringe,
-  scanLine:      ScanLine,
-  microscope:    Microscope,
-  siren:         Siren,
-  armchair:      Armchair,
-  trophy:        Trophy,
-};
 
 interface SpecialtyRailProps {
   selected: string;
@@ -74,7 +38,7 @@ export default function SpecialtyRail({ selected, onSelect }: SpecialtyRailProps
       {/* 4 cols → 5 → 10 — wraps to further rows as the specialty list grows past 20 */}
       <div className="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-10 gap-2 sm:gap-3">
         {specialties.map((spec, i) => {
-          const Icon = iconMap[spec.icon] ?? Stethoscope;
+          const Icon = getSpecialtyIcon(spec.icon);
           const isActive = selected === spec.id;
           return (
             <motion.button

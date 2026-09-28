@@ -4,6 +4,8 @@ import { CITIES } from "@/data/patient";
 import HomeClient from "@/app/home-client";
 import { getAllDoctors } from "@/lib/api/server";
 import { filterDoctorsByCondition, filterDoctorsByLocation } from "@/lib/filters/doctorLocation";
+import { SITE_URL } from "@/lib/site";
+import PageBreadcrumb from "@/components/patient/PageBreadcrumb";
 
 export const revalidate = 3600;
 
@@ -92,16 +94,38 @@ export default async function ConditionCityPage({ params }: PageProps) {
     ]
   };
 
+  // No /conditions/{condition} index route exists (only .../{city} and .../{city}/{area} are
+  // real pages) — so unlike the specialty breadcrumb, the condition segment here isn't a link,
+  // just a label, to avoid creating another 404'd breadcrumb entry.
+  const breadcrumbItems = [
+    { label: "Home", href: "/" },
+    { label: conditionName },
+    { label: city.name },
+  ];
+  const breadcrumbSchema = {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    "itemListElement": [
+      { "@type": "ListItem", "position": 1, "name": "Home", "item": SITE_URL },
+      { "@type": "ListItem", "position": 2, "name": city.name, "item": `${SITE_URL}/conditions/${params.condition}/${city.id}` },
+    ],
+  };
+
   return (
     <>
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(faqSchema) }}
       />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbSchema) }}
+      />
       <HomeClient
         initialQuery={conditionName}
         initialCityId={city.id}
         initialDoctors={initialDoctors}
+        breadcrumb={<PageBreadcrumb items={breadcrumbItems} />}
       />
     </>
   );
