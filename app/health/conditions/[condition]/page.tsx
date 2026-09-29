@@ -3,24 +3,22 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { ChevronRight, CheckCircle, Clock, ShieldCheck, Stethoscope, BookOpen } from "lucide-react";
-import { medicalArticles } from "@/data/wiki";
-import { doctors, CITIES, cityId } from "@/data/patient";
+import { getPublishedArticles } from "@/lib/wikiStore";
+import { getAllDoctors } from "@/lib/api/server";
+import { CITIES, cityId } from "@/data/patient";
 import PatientTopBar from "@/components/patient/PatientTopBar";
 import PatientFooter from "@/components/patient/PatientFooter";
 import Image from "next/image";
+
+export const dynamic = "force-dynamic";
 
 interface PageProps {
   params: { condition: string };
 }
 
-export async function generateStaticParams() {
-  return medicalArticles.map((article) => ({
-    condition: article.id,
-  }));
-}
-
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
-  const article = medicalArticles.find((a) => a.id === params.condition);
+  const articles = await getPublishedArticles();
+  const article = articles.find((a) => a.id === params.condition);
   if (!article) return { title: "Not Found" };
 
   return {
@@ -34,10 +32,15 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   };
 }
 
-export default function HealthArticlePage({ params }: PageProps) {
+export default async function HealthArticlePage({ params }: PageProps) {
+  const medicalArticles = await getPublishedArticles();
   const article = medicalArticles.find((a) => a.id === params.condition);
   if (!article) notFound();
 
+  // authorId/reviewerId are real EasyHMS doctor ids (picked from the live directory in the
+  // Health Wiki admin tool), not the static mock `doctors` array -- must look them up the same
+  // way the rest of the site resolves a doctor by id.
+  const { doctors } = await getAllDoctors();
   const author = doctors.find((d) => d.id === article.authorId);
   const reviewer = doctors.find((d) => d.id === article.reviewerId);
 

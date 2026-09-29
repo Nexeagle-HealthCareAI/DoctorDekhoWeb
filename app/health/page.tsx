@@ -2,9 +2,11 @@ import { SITE_URL } from "@/lib/site";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { ChevronRight, BookOpen, Clock } from "lucide-react";
-import { medicalArticles } from "@/data/wiki";
+import { getPublishedArticles } from "@/lib/wikiStore";
 import PatientTopBar from "@/components/patient/PatientTopBar";
 import PatientFooter from "@/components/patient/PatientFooter";
+
+export const dynamic = "force-dynamic";
 
 // Was a broken link on every /health/conditions/[condition] page's breadcrumb (that route
 // linked to "/health", which didn't exist as a page — see that page's own breadcrumb). This is
@@ -21,7 +23,8 @@ export const metadata: Metadata = {
   openGraph: { title: "Health Wiki", description: "Doctor-authored, medically reviewed health guides.", url: "/health", type: "website" },
 };
 
-export default function HealthWikiIndexPage() {
+export default async function HealthWikiIndexPage() {
+  const medicalArticles = await getPublishedArticles();
   const breadcrumbs = {
     "@context": "https://schema.org",
     "@type": "BreadcrumbList",

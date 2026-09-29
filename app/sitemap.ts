@@ -3,7 +3,7 @@ import type { MetadataRoute } from "next";
 import { getAllDoctors, getAllLabs } from "@/lib/api/server";
 import { doctorSlug, specialties, CITIES, AREAS_BY_CITY } from "@/data/patient";
 import { labSlug } from "@/data/labs";
-import { medicalArticles } from "@/data/wiki";
+import { getPublishedArticles } from "@/lib/wikiStore";
 
 // Must be dynamic. As a statically prerendered route (the old `revalidate = 3600`) the sitemap runs
 // at BUILD time, where the doctors fetch fails and the try/catch below swallows it, freezing a
@@ -119,7 +119,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       });
     }
 
-    // Generate Health Wiki paths
+    // Generate Health Wiki paths -- published articles only (drafts/in_review aren't public URLs).
+    const medicalArticles = await getPublishedArticles();
     for (const article of medicalArticles) {
       pseoEntries.push({
         url: `${BASE_URL}/health/conditions/${article.id}`,

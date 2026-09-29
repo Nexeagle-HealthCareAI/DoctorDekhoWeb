@@ -13,6 +13,7 @@ export default function robots(): MetadataRoute.Robots {
       {
         userAgent: '*',
         allow: '/',
+        disallow: '/admin',
       },
       // Explicit, named allow for AI crawlers/answer engines — matches the
       // wildcard rule above in effect, but states the intent plainly rather

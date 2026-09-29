@@ -1,0 +1,42 @@
+[
+  {
+    "id": "diabetes-type-2",
+    "title": "Understanding Type 2 Diabetes: Symptoms, Causes, and Management",
+    "description": "A comprehensive guide to Type 2 Diabetes, how it affects your body, and actionable steps to manage your blood sugar levels.",
+    "content": "\n## What is Type 2 Diabetes?\nType 2 diabetes is a chronic condition that affects the way your body metabolizes sugar (glucose) — an important source of fuel for your body.\n\nWith type 2 diabetes, your body either resists the effects of insulin — a hormone that regulates the movement of sugar into your cells — or doesn't produce enough insulin to maintain normal glucose levels.\n\n## Common Symptoms\nYou may have type 2 diabetes for years without knowing it. Look out for:\n* Increased thirst\n* Frequent urination\n* Increased hunger\n* Unintended weight loss\n* Fatigue\n* Blurred vision\n\n## When to see a doctor\nSee your doctor if you notice any type 2 diabetes symptoms. Early diagnosis is critical in preventing serious complications like heart disease, kidney damage, or nerve damage.\n    ",
+    "relatedConditionSlug": "diabetes",
+    "authorId": "1",
+    "reviewerId": "3",
+    "status": "published",
+    "createdAt": "2023-10-12T10:00:00Z",
+    "updatedAt": "2024-01-05T08:30:00Z",
+    "publishedAt": "2023-10-12T10:00:00Z"
+  },
+  {
+    "id": "heart-attack-symptoms",
+    "title": "Early Warning Signs of a Heart Attack",
+    "description": "Learn to recognize the early symptoms of a heart attack. Quick medical intervention can save your life.",
+    "content": "\n## Overview\nA heart attack occurs when the flow of blood to the heart is severely reduced or blocked. The blockage is usually due to a buildup of fat, cholesterol and other substances in the heart (coronary) arteries.\n\n## Major Warning Signs\n* **Chest pain or discomfort**: Most heart attacks involve discomfort in the center or left side of the chest that lasts for more than a few minutes or that goes away and comes back.\n* **Upper body discomfort**: Pain or discomfort in one or both arms, the back, neck, jaw or stomach.\n* **Shortness of breath**: This can occur with or without chest discomfort.\n* **Cold sweat, nausea, or lightheadedness**.\n\n## What to do\nIf you or someone else has these symptoms, call emergency medical help immediately. Do not drive yourself to the hospital unless there are no other options.\n    ",
+    "relatedConditionSlug": "chest-pain",
+    "authorId": "2",
+    "reviewerId": "2",
+    "status": "published",
+    "createdAt": "2023-11-20T14:15:00Z",
+    "updatedAt": "2024-02-18T09:20:00Z",
+    "publishedAt": "2023-11-20T14:15:00Z"
+  },
+  {
+    "id": "managing-seasonal-allergies",
+    "title": "Managing Seasonal Allergies",
+    "description": "Practical tips for identifying and managing seasonal allergy symptoms.",
+    "content": "## What causes seasonal allergies?\nPollen from trees, grass and weeds.\n\n* Sneezing\n* Itchy eyes\n* Runny nose",
+    "relatedConditionSlug": "seasonal-allergies",
+    "authorId": "a496cbcb-b45f-4df9-9649-6d2117ae1005",
+    "status": "published",
+    "createdAt": "2026-09-29T14:25:38.657Z",
+    "updatedAt": "2026-09-29T14:26:11.824Z",
+    "reviewerId": "2aa17049-ae93-45cc-ad46-7a34ad48abbf",
+    "reviewComments": "",
+    "publishedAt": "2026-09-29T14:26:11.824Z"
+  }
+]
