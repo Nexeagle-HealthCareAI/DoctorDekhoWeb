@@ -276,7 +276,10 @@ export default function PatientHero({
         see PatientTopBar) using svh (small-viewport-height, stable against mobile browser
         chrome showing/hiding) — so on first load only the hero is visible, and everything
         below it (TrustStrip, "Top Specialists") only comes into view on scroll, instead of
-        the doctor grid already peeking onto the initial screen. */}
+        the doctor grid already peeking onto the initial screen. items-center vertically
+        centers the search block within that full available height -- the earlier items-start
+        experiment pushed everything too close to the topbar; centered against the real
+        screen height (not just "near the top") is the correct anchor. */}
     <section className="relative overflow-hidden bg-white flex items-center min-h-[calc(100svh-4rem)] sm:min-h-[calc(100svh-5rem)]">
       {/* ── Background Mesh Gradient — slow organic drift, motion-safe so it respects a
           visitor's OS-level "reduce motion" preference without any extra JS check. ── */}
@@ -328,7 +331,12 @@ export default function PatientHero({
               (explicit specialty picking) and the AI smart-search fallback in
               DoctorDirectory.tsx (infers specialty from free text like "skin doctor" or a
               symptom when there's no literal match), so that slot was dropped. */}
-          <div className="flex-1 h-14 sm:h-16 rounded-full bg-white/80 backdrop-blur-2xl border border-white/60 shadow-[0_20px_60px_-15px_rgba(0,0,0,0.05),0_0_40px_-10px_rgba(20,184,166,0.1)] ring-1 ring-black/5 hover:bg-white/90 focus-within:bg-white transition-colors w-full group relative">
+          {/* sm:flex-1 (not bare flex-1) -- on mobile the row is flex-col, where flex-1's
+              flex-basis:0% overrides the explicit h-14 height (flex-basis wins over `height`
+              on the flex main axis), collapsing this capsule to ~28px instead of 56px while
+              the location button next to it (no flex-1) rendered at the correct height. Only
+              the sm:+ row layout needs this capsule to grow into the row's leftover width. */}
+          <div className="sm:flex-1 h-14 sm:h-16 rounded-full bg-white/80 backdrop-blur-2xl border border-white/60 shadow-[0_20px_60px_-15px_rgba(0,0,0,0.05),0_0_40px_-10px_rgba(20,184,166,0.1)] ring-1 ring-black/5 hover:bg-white/90 focus-within:bg-white transition-colors w-full group relative">
             <div className="absolute left-5 sm:left-6 top-1/2 -translate-y-1/2 pointer-events-none">
               <Search className="w-5 h-5 text-slate-400 group-focus-within:text-brand-teal transition-colors" />
             </div>
