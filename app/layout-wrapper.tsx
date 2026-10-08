@@ -7,9 +7,9 @@ import ChatWidget from "@/components/patient/ChatWidget";
 
 // Every route on this site is the patient portal, and each page renders its own PatientTopBar /
 // PatientFooter. The only pages that skip the app-style bottom nav + install banner are the
-// focused ones: the OTP login (nothing to navigate away to mid-flow) and the offline fallback
-// (its links can't work with no connection).
-const BARE_ROUTES = ["/login", "/offline"];
+// focused ones: the OTP login (nothing to navigate away to mid-flow), the offline fallback
+// (its links can't work with no connection), and the internal admin tool (not a patient page).
+const BARE_ROUTES = ["/login", "/offline", "/admin"];
 
 export default function LayoutWrapper({
   children,

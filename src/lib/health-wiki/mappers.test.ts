@@ -84,7 +84,7 @@ describe("mapArticles / mergeArticles", () => {
     expect(mapArticles(undefined)).toEqual([]);
   });
 
-  it("lets a live article replace a bundled one with the same slug, and keeps the other bundled ones", () => {
+  it("lets a live article replace an interim one with the same slug, and keeps the other interim ones", () => {
     const merged = mergeArticles([art("a", "2026-10-02T00:00:00Z", "live a")], [art("a", "2023-01-01T00:00:00Z", "old a"), art("b", "2024-01-01T00:00:00Z")]);
     expect(merged.map((m) => m.title)).toEqual(["live a", "b"]);
   });

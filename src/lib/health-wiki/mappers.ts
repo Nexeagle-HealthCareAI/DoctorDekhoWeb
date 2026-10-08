@@ -95,11 +95,11 @@ export function mapArticles(list: HealthArticleDto[] | undefined | null): Health
 export const byNewest = (a: HealthArticle, b: HealthArticle) => b.updatedAt.localeCompare(a.updatedAt);
 
 /**
- * Live articles win over bundled ones with the same slug. Bundled (legacy) articles whose slug is
- * not in the live list stay, so pages that search engines already know do not vanish before the
- * content is moved into the CMS.
+ * Live articles win over interim ones (from the admin tool) with the same slug. Interim articles
+ * whose slug is not in the live list stay, so pages that search engines already know do not vanish
+ * before the content is moved into the CMS.
  */
-export function mergeArticles(live: HealthArticle[], legacy: HealthArticle[]): HealthArticle[] {
+export function mergeArticles(live: HealthArticle[], interim: HealthArticle[]): HealthArticle[] {
   const liveSlugs = new Set(live.map((a) => a.slug));
-  return [...live, ...legacy.filter((a) => !liveSlugs.has(a.slug))].sort(byNewest);
+  return [...live, ...interim.filter((a) => !liveSlugs.has(a.slug))].sort(byNewest);
 }

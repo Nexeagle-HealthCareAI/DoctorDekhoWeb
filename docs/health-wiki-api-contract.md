@@ -55,9 +55,10 @@ for an unknown or unpublished id.
 
 ## When the endpoint is missing
 
-A `404` from the list is treated as "not deployed yet": the two articles bundled with the site
-(`src/data/wiki.ts`) keep being served. Once the content team has recreated them in the CMS with the
-same slugs, the live version replaces the bundled one, and the bundled files can be deleted.
+A `404` from the list is treated as "not deployed yet": the articles written in the interim admin tool
+(`src/data/wiki-articles.json`, see `src/lib/health-wiki/interim.ts`) keep being served. Once the content
+team has recreated them in the CMS with the same slugs, the live version replaces the interim one, and
+the interim files can be deleted.
 Any other failure (5xx, network) is an error: the last cached list keeps being served, and a cold build
 fails loudly, the same as for doctors.
 

@@ -88,10 +88,19 @@ export const metadata: Metadata = {
 
 // Installable PWA: standalone display + brand theme-color for the Android status
 // bar / splash screen.
+//
+// interactiveWidget: "resizes-visual" -- without this, Chrome on Android resizes the CSS
+// layout viewport itself when the on-screen keyboard opens (its default "resizes-content"
+// behavior), which shrinks every 100svh-based container site-wide (see PatientHero's hero
+// <section>) and squeezes the whole hero into whatever sliver of height is left the instant
+// the search input is focused. "resizes-visual" keeps the layout viewport fixed and only
+// shrinks the visual viewport behind the keyboard, matching iOS Safari's default and how a
+// native app would behave.
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   themeColor: "#1ea99b",
+  interactiveWidget: "resizes-visual",
 };
 
 // Sitewide entity schema (NEX-9) — every page shares one @id so Google/AI

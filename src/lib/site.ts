@@ -17,8 +17,7 @@ export const SITE_URL = stripTrailingSlash(process.env.NEXT_PUBLIC_SITE_URL || P
 export const BUSINESS_URL = stripTrailingSlash(process.env.NEXT_PUBLIC_BUSINESS_URL || "https://nexeagle.com");
 
 /** WhatsApp Business number (91-prefixed, digits only — the format wa.me deep-links require)
- * the chat widget hands off to (see src/components/patient/ChatWidget.tsx). Provisional —
- * user-provided during planning, not yet backend-confirmed as the exact DRBOOK/OTP number.
+ * the chat widget hands off to (see src/components/patient/ChatWidget.tsx). Confirmed.
  * One overridable constant so correcting it later is a one-line change, not a find-and-replace. */
 export const WHATSAPP_BUSINESS_NUMBER = process.env.NEXT_PUBLIC_WHATSAPP_BUSINESS_NUMBER || "919060112765";
 
