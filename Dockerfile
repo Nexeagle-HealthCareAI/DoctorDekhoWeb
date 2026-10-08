@@ -51,6 +51,9 @@ COPY --from=builder /app/package-lock.json ./package-lock.json
 COPY --from=builder /app/.next ./.next
 COPY --from=builder /app/public ./public
 COPY --from=builder /app/node_modules ./node_modules
+# The Health Wiki's interim article file (src/lib/wikiStore.ts) is read from disk at request time,
+# not only at build time. Without this the running container has no such file.
+COPY --from=builder /app/src/data ./src/data
 
 # Bind container port to 80 (deploy.yml maps a host port -> container 80)
 EXPOSE 80
