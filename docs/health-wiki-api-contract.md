@@ -69,12 +69,40 @@ object-store bucket. For production, set the build variable `HEALTH_WIKI_IMAGE_O
 origin(s) of the production bucket (space separated, `https://host` only), for example
 `HEALTH_WIKI_IMAGE_ORIGINS="https://cdn.example.com"`.
 
+## Contributor pages (`/contribute/*`)
+
+The contributor area is a set of pages inside this site: join, invitation link, WhatsApp OTP, register,
+My articles, review, write, topic requests. The browser calls this site's own paths under
+`/api/contributor/*` (`app/api/contributor/[...path]/route.ts`), and that route is the only place that
+talks to the backend. The session is an HttpOnly cookie (`hw_contributor`); no token reaches page scripts.
+
+| Switch | Where | Effect |
+|---|---|---|
+| `NEXT_PUBLIC_CONTRIBUTOR_ENABLED=true` | build argument | Shows the pages and the "Join as a contributor" box on `/health`. Off by default: `/contribute/*` then says "Coming soon". |
+| `CONTRIBUTOR_MOCK=true` | runtime env | Answers `/api/contributor/*` from an in-memory example backend (`src/lib/contributor/mockStore.ts`). Off by default: every call answers 503. |
+
+The backend has to provide these, which the route will proxy to once they exist (paths are proposals, see the
+developer note):
+
+| Call from the pages | Backend |
+|---|---|
+| `GET invite/{token}` | Validate a link; return inviter, role, article title and cover, masked mobile. 404 unknown, 410 used or expired. |
+| `POST enrol`, `POST otp/send` | Send a WhatsApp OTP. With `inviteToken`, only to the number the link was sent to (403 otherwise). |
+| `POST otp/verify` | Check the code, start a session, say whether registration is needed. |
+| `POST register`, `GET me` | Save and read the profile. Never return the full mobile number. |
+| `GET articles` | `{ pending, published, drafts }` for the contributor, with views and likes on published. |
+| `POST articles`, `PATCH articles/{slug}`, `POST articles/{slug}/submit` | Draft, edit and submit. Submit needs a VERIFIED profile; a cover image needs alt text. |
+| `POST articles/{slug}/review` | `{ decision: APPROVE }` or `{ decision: REQUEST_CHANGES, comment }`. Only the assigned, signed-in doctor; a comment of 10 or more characters is required to ask for changes. |
+| `POST images` | Multipart upload, JPG/PNG/WebP, 2 MB; returns `{ url }`. |
+| `GET/POST topics`, `PATCH topics/{id}` | Topic requests; at most 5 open; PATCH adds detail to a NEEDS_DETAIL request. |
+
+`robots.txt` disallows `/contribute`, and the pages send `noindex`.
+
 ## Not built yet (needs backend work first)
 
 - **Helpful button and view counts.** `POST /public/health-articles/{id}/like` and `/view` do not exist, and
   `track-event` only accepts the fixed event list in the backend. Page views are already counted by the
   existing page-view beacon (per path).
-- **Contributor pages** (invite link, WhatsApp OTP, register, review, write, topic requests, join).
 
 ## Local review without a backend
 

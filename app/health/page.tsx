@@ -7,6 +7,7 @@ import type { ArticleType } from "@/lib/health-wiki/types";
 import PatientTopBar from "@/components/patient/PatientTopBar";
 import PatientFooter from "@/components/patient/PatientFooter";
 import ArticleCard from "@/components/health-wiki/ArticleCard";
+import JoinCallout from "@/components/health-wiki/JoinCallout";
 import TypeFilter, { type TypeFilterValue } from "@/components/health-wiki/TypeFilter";
 
 // The root layout's title template appends "| Doctor Dekho"; do not repeat the brand here.
@@ -77,6 +78,8 @@ export default async function HealthWikiIndexPage({ searchParams }: { searchPara
               ))}
             </ul>
           )}
+
+          <JoinCallout />
         </div>
       </main>
 
