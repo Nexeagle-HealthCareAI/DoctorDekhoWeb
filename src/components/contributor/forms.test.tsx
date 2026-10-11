@@ -5,7 +5,7 @@ import userEvent from "@testing-library/user-event";
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn(), replace: vi.fn() }), usePathname: () => "/contribute", useSearchParams: () => new URLSearchParams() }));
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 const api = vi.hoisted(() => ({
-  sendOtp: vi.fn(), verifyOtp: vi.fn(), register: vi.fn(), uploadImage: vi.fn(),
+  sendOtp: vi.fn(), verifyOtp: vi.fn(), register: vi.fn(), uploadImage: vi.fn(), me: vi.fn(),
 }));
 vi.mock("@/lib/contributor/client", () => ({ contributorApi: api, ApiError: class extends Error {} }));
 
@@ -106,6 +106,21 @@ describe("OnboardingFlow", () => {
     expect(next).toBeEnabled();
     await userEvent.click(next);
     expect(await screen.findByText("Confirm it is you")).toBeInTheDocument();
+  });
+
+  it("asks for the details of the account the number already has, not the role that was just picked", async () => {
+    api.sendOtp.mockResolvedValue({ sent: true });
+    api.verifyOtp.mockResolvedValue({ signedIn: true, needsRegistration: true });
+    api.me.mockResolvedValue({ role: "INDEPENDENT_DOCTOR", fullName: "" });
+    render(<OnboardingFlow />);
+    await userEvent.click(screen.getByRole("radio", { name: /Writer/ }));
+    await userEvent.click(screen.getByRole("button", { name: "Continue" }));
+    await userEvent.type(screen.getByLabelText("WhatsApp number"), "9876543210");
+    await userEvent.click(screen.getByRole("button", { name: /Send code/ }));
+    await screen.findByText("Enter the code");
+    await userEvent.keyboard("123456");
+    expect(await screen.findByLabelText("Medical registration number")).toBeInTheDocument();
+    expect(screen.getByRole("status")).toHaveTextContent(/already set up as independent doctor/i);
   });
 
   it("skips the role step when an invitation already fixed it", () => {

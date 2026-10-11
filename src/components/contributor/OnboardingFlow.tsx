@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { CheckCircle2, ShieldCheck, Stethoscope, User as UserRound, Laptop } from "lucide-react";
+import { contributorApi } from "@/lib/contributor/client";
 import { ENROL_ROLE_LABEL, type EnrolRole } from "@/lib/contributor/types";
 import { cn } from "@/lib/utils";
 import OtpStep from "./OtpStep";
@@ -30,6 +31,21 @@ export default function OnboardingFlow({ inviteToken, fixedRole, defaultName }: 
   const router = useRouter();
   const [role, setRole] = useState<EnrolRole | null>(fixedRole ?? null);
   const [step, setStep] = useState<Step>(fixedRole ? "otp" : "role");
+  const [existingRole, setExistingRole] = useState<EnrolRole | null>(null);
+
+  // A number that already has an account keeps the role it was created with, whichever one was just picked. The profile form must
+  // follow the account (a doctor needs a registration number, a writer does not), so ask who this is once the code is confirmed.
+  const afterVerified = async (needsRegistration: boolean) => {
+    if (!needsRegistration) return router.replace("/contribute");
+    try {
+      const me = await contributorApi.me();
+      if (role && me.role !== role) setExistingRole(me.role);
+      setRole(me.role);
+    } catch {
+      /* keep the role picked; the server still checks the form */
+    }
+    setStep("register");
+  };
 
   const steps = fixedRole ? ["Confirm number", "Your profile"] : ["Your role", "Confirm number", "Your profile"];
   const index = fixedRole ? (step === "otp" ? 0 : 1) : step === "role" ? 0 : step === "otp" ? 1 : 2;
@@ -70,7 +86,13 @@ export default function OnboardingFlow({ inviteToken, fixedRole, defaultName }: 
       )}
 
       {step === "otp" && (
-        <OtpStep inviteToken={inviteToken} role={role} onVerified={(needs) => (needs ? setStep("register") : router.replace("/contribute"))} />
+        <OtpStep inviteToken={inviteToken} role={role} onVerified={afterVerified} />
+      )}
+
+      {step === "register" && existingRole && (
+        <p role="status" className="rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-sm p-3">
+          This number is already set up as {ENROL_ROLE_LABEL[existingRole].toLowerCase()}, so we are asking for those details.
+        </p>
       )}
 
       {step === "register" && role && <RegisterForm role={role} defaultName={defaultName} onDone={() => router.replace("/contribute")} />}
