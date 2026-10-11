@@ -156,6 +156,13 @@ jobs:
             PORT=84
             IMAGE_LC=$(printf '%s' "$IMAGE" | tr '[:upper:]' '[:lower:]')
             echo "$PULL_TOKEN" | docker login ghcr.io -u "$ACTOR" --password-stdin
+            # Free disk first: this VM filled up once ("failed to extract layer ... no space left").
+            # Only OUR OWN old image tags are removed (docker rmi refuses any image a container still uses),
+            # plus dangling layers. Other services' images on this shared VM are never touched.
+            REPO_LC=$(printf '%s' "$IMAGE" | tr '[:upper:]' '[:lower:]' | sed 's/:.*$//')
+            docker images "$REPO_LC" --format '{{.Repository}}:{{.Tag}}' | grep -vx "$(printf '%s' "$IMAGE" | tr '[:upper:]' '[:lower:]')" | xargs -r docker rmi 2>/dev/null || true
+            docker image prune -f || true
+            df -h / | tail -1
             docker pull "$IMAGE_LC"
             docker rm -f "$NAME" 2>/dev/null || true
 
@@ -297,6 +304,13 @@ jobs:
             PORT=8081
             IMAGE_LC=$(printf '%s' "$IMAGE" | tr '[:upper:]' '[:lower:]')
             echo "$PULL_TOKEN" | docker login ghcr.io -u "$ACTOR" --password-stdin
+            # Free disk first: this VM filled up once ("failed to extract layer ... no space left").
+            # Only OUR OWN old image tags are removed (docker rmi refuses any image a container still uses),
+            # plus dangling layers. Other services' images on this shared VM are never touched.
+            REPO_LC=$(printf '%s' "$IMAGE" | tr '[:upper:]' '[:lower:]' | sed 's/:.*$//')
+            docker images "$REPO_LC" --format '{{.Repository}}:{{.Tag}}' | grep -vx "$(printf '%s' "$IMAGE" | tr '[:upper:]' '[:lower:]')" | xargs -r docker rmi 2>/dev/null || true
+            docker image prune -f || true
+            df -h / | tail -1
             docker pull "$IMAGE_LC"
             docker rm -f "$NAME" 2>/dev/null || true
 
