@@ -161,7 +161,7 @@ export default function RegisterForm({ role, defaultName = "", onDone }: Props) 
       <div className="space-y-1">
         <label className="flex gap-3 items-start cursor-pointer text-sm text-slate-700">
           <input type="checkbox" className="mt-0.5 w-4 h-4 accent-[hsl(var(--brand-teal))]" checked={v.consent} onChange={(e) => set("consent", e.target.checked)} />
-          <span>I confirm these details are correct, and I allow NexEagle to show my {publicFields} on articles I {doctor ? "review or " : ""}write. My mobile number is never shown.</span>
+          <span>I confirm these details are correct, and I allow NexEagle to show my {publicFields} on articles I {doctor ? "review or " : ""}write. My mobile number is never shown. I agree that NexEagle may message me on WhatsApp about my profile and my articles (links, review requests and updates).</span>
         </label>
         {errors.consent && <p role="alert" className="text-xs font-medium text-red-600 pl-7">{errors.consent}</p>}
       </div>
