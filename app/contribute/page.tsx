@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Eye, Heart, Lightbulb, PenLine } from "lucide-react";
 import { contributorApi } from "@/lib/contributor/client";
 import { useContributor, useLoad } from "@/lib/contributor/hooks";
@@ -60,6 +60,13 @@ export default function ContributorHome() {
   const lists = useLoad<ArticleListResponse>(() => contributorApi.articles());
   const doctor = me ? isDoctorRole(me.role) : false;
   const [picked, setPicked] = useState<ArticleListTab | null>(null);
+
+  // /contribute?tab=drafts (after saving a draft) opens that tab. Read from the address in the browser, not with useSearchParams,
+  // which would force a Suspense boundary around this whole statically built page.
+  useEffect(() => {
+    const t = new URLSearchParams(window.location.search).get("tab");
+    if (t === "drafts" || t === "published" || t === "pending") setPicked(t);
+  }, []);
 
   if (meError) return <ErrorBox message={meError} />;
   if (!me || lists.loading) return <Loading />;

@@ -100,8 +100,9 @@ export default function ArticleForm({ me, existing }: Props) {
       const saved = existing ? await contributorApi.updateArticle(existing.slug, payload()) : await contributorApi.createArticle(payload());
       if (submit) await contributorApi.submitArticle(saved.slug);
       setDirty(false);
-      toast.success(submit ? (medical ? "Sent for review. The team will assign a reviewing doctor." : "Sent for approval.") : "Draft saved");
-      router.push(submit ? "/contribute" : `/contribute/write/${saved.slug}`);
+      toast.success(submit ? (medical ? "Sent for review. The team will assign a reviewing doctor." : "Sent for approval.") : "Draft saved. You can find it under My drafts.");
+      // A saved draft is not sent to anyone: it waits under "My drafts" until the writer chooses Submit for review.
+      router.push(submit ? "/contribute" : "/contribute?tab=drafts");
     } catch (err) {
       setErrors({ form: messageOf(err) });
     } finally {
