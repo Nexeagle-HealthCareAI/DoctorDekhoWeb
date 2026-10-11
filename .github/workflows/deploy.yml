@@ -133,6 +133,8 @@ jobs:
             NEXT_PUBLIC_BUSINESS_URL=https://nexeagle-dev.nexeagle.com
             EASYHMS_API_BASE_URL=https://1hms-dev-api.nexeagle.com
             NEXT_PUBLIC_MAPBOX_TOKEN=${{ secrets.MAPBOX_TOKEN }}
+            NEXT_PUBLIC_CONTRIBUTOR_ENABLED=true
+            HEALTH_WIKI_IMAGE_ORIGINS=${{ vars.DEV_HEALTHWIKI_IMAGE_ORIGIN || 'https://nexeagle-healthwiki-dev.in-south1-objectstore.e2enetworks.net' }}
 
       - name: Deploy to Dev VM
         uses: appleboy/ssh-action@v1.0.3

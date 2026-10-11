@@ -123,7 +123,7 @@ describe("review", () => {
 
   it("publishes on approval and starts the counts at zero", () => {
     const id = verified();
-    const a = s.reviewArticle(id, "thyroid-basics", { decision: "APPROVE" });
+    const a = s.reviewArticle(id, "thyroid-basics", { decision: "APPROVE", accuracyConfirmed: true });
     expect(a.status).toBe("PUBLISHED");
     expect(a.views).toBe(0);
     expect(a.awaitingVerification).toBe(false);
@@ -131,7 +131,7 @@ describe("review", () => {
   it("holds an approval from an unverified doctor until they are verified", () => {
     const id = s.contributorForSession(s.verifyOtp("9876544127", "123456", { inviteToken: "demo-review" }).sessionId);
     s.register(id, base);
-    expect(s.reviewArticle(id, "high-blood-pressure", { decision: "APPROVE" }).awaitingVerification).toBe(true);
+    expect(s.reviewArticle(id, "high-blood-pressure", { decision: "APPROVE", accuracyConfirmed: true }).awaitingVerification).toBe(true);
   });
   it("needs a real comment to ask for changes, and sends the article back", () => {
     const id = verified();
@@ -141,9 +141,9 @@ describe("review", () => {
   });
   it("only lets the assigned reviewer decide, and only once", () => {
     const id = verified();
-    expect(() => s.reviewArticle(id, "silent-heart-attack", { decision: "APPROVE" })).toThrowError(expect.objectContaining({ status: 409 }));
-    s.reviewArticle(id, "thyroid-basics", { decision: "APPROVE" });
-    expect(() => s.reviewArticle(id, "thyroid-basics", { decision: "APPROVE" })).toThrowError(expect.objectContaining({ status: 409 }));
+    expect(() => s.reviewArticle(id, "silent-heart-attack", { decision: "APPROVE", accuracyConfirmed: true })).toThrowError(expect.objectContaining({ status: 409 }));
+    s.reviewArticle(id, "thyroid-basics", { decision: "APPROVE", accuracyConfirmed: true });
+    expect(() => s.reviewArticle(id, "thyroid-basics", { decision: "APPROVE", accuracyConfirmed: true })).toThrowError(expect.objectContaining({ status: 409 }));
   });
 });
 

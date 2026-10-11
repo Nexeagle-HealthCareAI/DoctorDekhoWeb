@@ -5,14 +5,15 @@ import {
   isContributorMock,
 } from "@/lib/contributor/session";
 import * as store from "@/lib/contributor/mockStore";
+import { ALLOWED_SEGMENTS, callUpstream, isUpstreamConfigured } from "@/lib/contributor/upstream";
 import type { ArticleDraftInput, EnrolRole, RegisterInput, ReviewDecision, TopicInput } from "@/lib/contributor/types";
 
 export const dynamic = "force-dynamic";
 
-// Contributor backend-for-frontend. The pages call these paths; today they are answered by the
-// in-memory example store (CONTRIBUTOR_MOCK=true). When the EasyHMS /contributor/* endpoints exist,
-// replace the body of `handle` with a proxy to them (see docs/health-wiki-api-contract.md).
-// Without the flag every call answers 503, so a deployment that has not opted in exposes nothing.
+// Contributor backend-for-frontend. The pages call these paths and this route is the only place that talks
+// to the EasyHMS /contributor/* endpoints (see docs/health-wiki-api-contract.md). CONTRIBUTOR_MOCK=true answers
+// from the in-memory example store instead (local review). With neither the mock nor EASYHMS_API_BASE_URL
+// configured every call answers 503, so a deployment that has not opted in exposes nothing.
 
 const json = (body: unknown, status = 200) => NextResponse.json(body, { status });
 const fail = (e: unknown) =>
@@ -92,8 +93,67 @@ async function handle(req: NextRequest, segments: string[]): Promise<NextRespons
   return json({ message: "Not found." }, 404);
 }
 
+const GENERIC = "Something went wrong. Try again.";
+
+/** Forward one call to the EasyHMS contributor API. The session token is kept in the HttpOnly cookie. */
+async function proxy(req: NextRequest, segments: string[]): Promise<NextResponse> {
+  const [first] = segments;
+  if (!first || !(ALLOWED_SEGMENTS as readonly string[]).includes(first)) return json({ message: "Not found." }, 404);
+  const path = segments.map(encodeURIComponent).join("/");
+  const token = req.cookies.get(CONTRIBUTOR_SESSION_COOKIE)?.value ?? null;
+  const isImage = first === "images" && req.method === "POST";
+
+  let body: BodyInit | null = null;
+  if (isImage) body = await req.formData().catch(() => null);
+  else if (req.method !== "GET") body = JSON.stringify(await req.json().catch(() => ({})));
+  if (isImage && !body) return json({ message: "Choose an image." }, 400);
+
+  const up = await callUpstream(path, { method: req.method, body, json: !isImage, sessionToken: token, timeoutMs: isImage ? 60_000 : 20_000 });
+  if (up.status === 0) return json({ message: "The service is not reachable right now. Try again in a moment." }, 502);
+  const data = (up.data ?? {}) as Record<string, unknown>;
+
+  const out = (b: unknown, status: number) => {
+    const r = json(b, status);
+    if (up.retryAfter) r.headers.set("Retry-After", up.retryAfter);
+    return r;
+  };
+
+  if (up.status >= 400) {
+    const res = out({ message: typeof data.message === "string" && data.message ? data.message : GENERIC, ...(data.retryAfterSeconds ? { retryAfterSeconds: data.retryAfterSeconds } : {}) }, up.status);
+    // The session is no longer valid upstream: drop the cookie so the page sends the person to sign in again.
+    if (up.status === 401) res.cookies.delete(CONTRIBUTOR_SESSION_COOKIE);
+    return res;
+  }
+
+  // sign in: the token goes into the cookie and never to the page
+  if (first === "otp" && segments[1] === "verify") {
+    const expires = typeof data.sessionExpiresAt === "string" ? new Date(data.sessionExpiresAt) : null;
+    if (typeof data.sessionToken !== "string") return json({ message: GENERIC }, 502);
+    const res = json({ signedIn: true, needsRegistration: data.needsRegistration === true });
+    res.cookies.set(CONTRIBUTOR_SESSION_COOKIE, data.sessionToken, {
+      ...contributorSessionCookieOptions,
+      ...(expires && !Number.isNaN(expires.getTime()) ? { expires, maxAge: undefined } : {}),
+    });
+    return res;
+  }
+  if (first === "otp" || first === "enrol") return json({ sent: true });
+  if (first === "logout") {
+    const res = json({ ok: true });
+    res.cookies.delete(CONTRIBUTOR_SESSION_COOKIE);
+    return res;
+  }
+  return out(up.data, up.status);
+}
+
 async function route(req: NextRequest, { params }: { params: { path: string[] } }) {
-  if (!isContributorMock()) return json({ message: "The contributor pages are not available yet." }, 503);
+  if (!isContributorMock()) {
+    if (!isUpstreamConfigured()) return json({ message: "The contributor pages are not available yet." }, 503);
+    try {
+      return await proxy(req, params.path ?? []);
+    } catch {
+      return json({ message: GENERIC }, 500);
+    }
+  }
   try {
     return await handle(req, params.path ?? []);
   } catch (e) {

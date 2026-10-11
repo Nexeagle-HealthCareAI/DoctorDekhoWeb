@@ -12,6 +12,7 @@ import ArticleBody from "@/components/health-wiki/ArticleBody";
 import ArticleByline from "@/components/health-wiki/ArticleByline";
 import ArticleCover from "@/components/health-wiki/ArticleCover";
 import { Disclosure, ReferencesList, SectorNotice } from "@/components/health-wiki/ArticleNotices";
+import ArticleReactions from "@/components/health-wiki/ArticleReactions";
 import RelatedArticles from "@/components/health-wiki/RelatedArticles";
 import TypeBadge from "@/components/health-wiki/TypeBadge";
 
@@ -112,6 +113,7 @@ export default async function HealthArticlePage({ params }: PageProps) {
 
             <ArticleBody markdown={article.content} />
             <ReferencesList items={article.references} />
+            <ArticleReactions slug={article.slug} />
           </article>
 
           <aside className="space-y-6 min-w-0">

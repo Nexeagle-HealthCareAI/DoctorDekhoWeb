@@ -36,6 +36,13 @@ ENV EASYHMS_API_BASE_URL=$EASYHMS_API_BASE_URL
 ARG NEXT_PUBLIC_MAPBOX_TOKEN
 ENV NEXT_PUBLIC_MAPBOX_TOKEN=$NEXT_PUBLIC_MAPBOX_TOKEN
 
+# Health Wiki contributor pages. Both are build-time: the first is inlined into the client bundle, the second
+# is read by next.config.mjs for the Content-Security-Policy (the bucket the article images are served from).
+ARG NEXT_PUBLIC_CONTRIBUTOR_ENABLED
+ENV NEXT_PUBLIC_CONTRIBUTOR_ENABLED=$NEXT_PUBLIC_CONTRIBUTOR_ENABLED
+ARG HEALTH_WIKI_IMAGE_ORIGINS
+ENV HEALTH_WIKI_IMAGE_ORIGINS=$HEALTH_WIKI_IMAGE_ORIGINS
+
 RUN npm run build
 
 # ── Stage 2: Serve ────────────────────────────────────────────────────────────

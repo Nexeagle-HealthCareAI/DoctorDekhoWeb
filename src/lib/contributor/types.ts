@@ -148,7 +148,7 @@ export interface RegisterInput {
   consent: boolean;
 }
 
-export type ReviewDecision = { decision: "APPROVE" } | { decision: "REQUEST_CHANGES"; comment: string };
+export type ReviewDecision = { decision: "APPROVE"; accuracyConfirmed: true } | { decision: "REQUEST_CHANGES"; comment: string };
 
 export const ARTICLE_STATUS_LABEL: Record<ArticleStatus, string> = {
   DRAFT: "Draft",

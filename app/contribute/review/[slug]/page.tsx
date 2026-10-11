@@ -30,7 +30,7 @@ export default function ReviewPage({ params }: { params: { slug: string } }) {
   const approve = async () => {
     setBusy(true);
     try {
-      const done = await contributorApi.reviewArticle(a.slug, { decision: "APPROVE" });
+      const done = await contributorApi.reviewArticle(a.slug, { decision: "APPROVE", accuracyConfirmed: true });
       toast.success(done.awaitingVerification ? "Approved. It goes live once your registration is verified." : "Published on Doctor Dekho.");
       router.push("/contribute");
     } catch (e) {
