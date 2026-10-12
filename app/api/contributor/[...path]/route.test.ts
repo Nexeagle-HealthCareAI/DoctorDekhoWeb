@@ -36,6 +36,24 @@ describe("contributor proxy", () => {
     expect(cookie.toLowerCase()).toContain("httponly");
   });
 
+  it("signs a hospital doctor in from EasyHMS with the one-time code, keeping the token in the cookie", async () => {
+    callUpstream.mockResolvedValue({ status: 200, retryAfter: null, data: { success: true, sessionToken: "tok-sso", sessionExpiresAt: "2030-01-01T00:00:00Z", needsRegistration: false } });
+    const res = await POST(req("POST", "sso/exchange", { code: "one-time" }), ctx("sso/exchange"));
+    const body = await res.json();
+    expect(body).toEqual({ signedIn: true, needsRegistration: false });
+    expect(JSON.stringify(body)).not.toContain("tok-sso");
+    expect(res.headers.get("set-cookie") ?? "").toContain("hw_contributor=tok-sso");
+    expect(callUpstream).toHaveBeenCalledWith("sso/exchange", expect.objectContaining({ method: "POST" }));
+  });
+
+  it("answers a spent or expired code with the API's message and sets no cookie", async () => {
+    callUpstream.mockResolvedValue({ status: 401, retryAfter: null, data: { message: "This link has expired." } });
+    const res = await POST(req("POST", "sso/exchange", { code: "old" }), ctx("sso/exchange"));
+    expect(res.status).toBe(401);
+    expect(await res.json()).toEqual({ message: "This link has expired." });
+    expect(res.headers.get("set-cookie") ?? "").not.toContain("hw_contributor=old");
+  });
+
   it("sends the cookie upstream as the session and returns the data", async () => {
     callUpstream.mockResolvedValue({ status: 200, retryAfter: null, data: { id: "c1", fullName: "Dr A" } });
     const res = await GET(req("GET", "me", undefined, "tok-abc"), ctx("me"));

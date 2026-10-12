@@ -44,6 +44,8 @@ export const contributorApi = {
     call<{ sent: true; devCode?: string }>("otp/send", send("POST", { mobile, inviteToken })),
   verifyOtp: (mobile: string, code: string, opts: { inviteToken?: string | null; role?: EnrolRole | null }) =>
     call<{ signedIn: true; needsRegistration: boolean }>("otp/verify", send("POST", { mobile, code, ...opts })),
+  /** A hospital doctor arriving from EasyHMS: the one-time code in the address becomes a session. */
+  ssoExchange: (code: string) => call<{ signedIn: true; needsRegistration: boolean }>("sso/exchange", send("POST", { code })),
   register: (input: RegisterInput) => call<ContributorMe>("register", send("POST", input)),
   me: () => call<ContributorMe>("me"),
   logout: () => call<{ ok: true }>("logout", send("POST")),

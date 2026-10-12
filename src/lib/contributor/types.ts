@@ -8,19 +8,22 @@ export type { ArticleType };
 /** Roles a person can enrol as. Hospital doctors use the EasyHMS app, not these pages. */
 export type EnrolRole = "INDEPENDENT_DOCTOR" | "HEALTH_WORKER" | "WRITER";
 
+/** Every role a signed-in contributor can have. A hospital doctor arrives from EasyHMS and never joins here. */
+export type ContributorRole = EnrolRole | "HOSPITAL_DOCTOR";
+
 export const ENROL_ROLE_LABEL: Record<EnrolRole, string> = {
   INDEPENDENT_DOCTOR: "Independent doctor",
   HEALTH_WORKER: "Health worker",
   WRITER: "Writer / technologist",
 };
 
-export const isDoctorRole = (r: EnrolRole) => r === "INDEPENDENT_DOCTOR";
+export const isDoctorRole = (r: ContributorRole) => r === "INDEPENDENT_DOCTOR" || r === "HOSPITAL_DOCTOR";
 
 export type ContributorStatus = "INVITED" | "PENDING" | "VERIFIED" | "REJECTED";
 
 export interface ContributorMe {
   id: string;
-  role: EnrolRole;
+  role: ContributorRole;
   fullName: string;
   /** "+91 98••• ••127" */
   mobileMasked: string;
@@ -104,6 +107,8 @@ export interface TopicInput {
   whyItMatters: string;
   conditionSlug: string | null;
   references: string | null;
+  /** A doctor asks the team to have someone else write it; the doctor then reviews it. */
+  requestWriter?: boolean;
 }
 
 export interface TopicRequest extends TopicInput {

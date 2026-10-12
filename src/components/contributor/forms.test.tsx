@@ -185,3 +185,21 @@ describe("SubmitConsentDialog", () => {
     expect(onCancel).toHaveBeenCalled();
   });
 });
+
+describe("TopicForm: asking for a writer", () => {
+  it("lets a doctor ask for a writer, and sends that with the topic", async () => {
+    const onSubmit = vi.fn().mockResolvedValue(undefined);
+    render(<TopicForm sectorOnly={false} canAskWriter onSubmit={onSubmit} />);
+    await userEvent.type(screen.getByLabelText("Topic"), "Sleep and blood pressure");
+    await userEvent.type(screen.getByLabelText("What would you write about?"), "How poor sleep raises BP.");
+    await userEvent.type(screen.getByLabelText("Why does it matter?"), "Patients ask.");
+    await userEvent.click(screen.getByRole("checkbox", { name: /someone else to write it/i }));
+    await userEvent.click(screen.getByRole("button", { name: "Send to the team" }));
+    await waitFor(() => expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ title: "Sleep and blood pressure", requestWriter: true })));
+  });
+
+  it("does not offer it to a writer or health worker", () => {
+    render(<TopicForm sectorOnly onSubmit={vi.fn()} />);
+    expect(screen.queryByRole("checkbox")).toBeNull();
+  });
+});

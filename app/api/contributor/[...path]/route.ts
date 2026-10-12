@@ -125,8 +125,8 @@ async function proxy(req: NextRequest, segments: string[]): Promise<NextResponse
     return res;
   }
 
-  // sign in: the token goes into the cookie and never to the page
-  if (first === "otp" && segments[1] === "verify") {
+  // sign in: the token goes into the cookie and never to the page. A hospital doctor arriving from EasyHMS signs in the same way, with a one-time code.
+  if ((first === "otp" && segments[1] === "verify") || (first === "sso" && segments[1] === "exchange")) {
     const expires = typeof data.sessionExpiresAt === "string" ? new Date(data.sessionExpiresAt) : null;
     if (typeof data.sessionToken !== "string") return json({ message: GENERIC }, 502);
     const res = json({ signedIn: true, needsRegistration: data.needsRegistration === true });

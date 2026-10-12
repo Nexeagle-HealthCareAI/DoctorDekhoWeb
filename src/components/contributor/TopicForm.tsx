@@ -11,19 +11,22 @@ type Errors = Partial<Record<"title" | "outline" | "whyItMatters" | "form", stri
 interface Props {
   /** Writers can only suggest Sector updates. */
   sectorOnly: boolean;
+  /** Doctors may ask the team to have someone else write the article, with the doctor as its reviewer. */
+  canAskWriter?: boolean;
   submitLabel?: string;
   initial?: Partial<TopicInput>;
   onSubmit: (input: TopicInput) => Promise<void>;
   onCancel?: () => void;
 }
 
-export default function TopicForm({ sectorOnly, submitLabel = "Send to the team", initial, onSubmit, onCancel }: Props) {
+export default function TopicForm({ sectorOnly, canAskWriter = false, submitLabel = "Send to the team", initial, onSubmit, onCancel }: Props) {
   const [type, setType] = useState<ArticleType>(initial?.type ?? (sectorOnly ? "SECTOR_UPDATE" : "MEDICAL"));
   const [title, setTitle] = useState(initial?.title ?? "");
   const [outline, setOutline] = useState(initial?.outline ?? "");
   const [why, setWhy] = useState(initial?.whyItMatters ?? "");
   const [condition, setCondition] = useState<string | null>(initial?.conditionSlug ?? null);
   const [references, setReferences] = useState(initial?.references ?? "");
+  const [requestWriter, setRequestWriter] = useState(initial?.requestWriter ?? false);
   const [errors, setErrors] = useState<Errors>({});
   const [busy, setBusy] = useState(false);
 
@@ -37,7 +40,7 @@ export default function TopicForm({ sectorOnly, submitLabel = "Send to the team"
     if (Object.keys(e).length) return;
     setBusy(true);
     try {
-      await onSubmit({ title: title.trim(), type, outline: outline.trim(), whyItMatters: why.trim(), conditionSlug: type === "MEDICAL" ? condition : null, references: references.trim() || null });
+      await onSubmit({ title: title.trim(), type, outline: outline.trim(), whyItMatters: why.trim(), conditionSlug: type === "MEDICAL" ? condition : null, references: references.trim() || null, ...(canAskWriter ? { requestWriter } : {}) });
     } catch (err) {
       setErrors({ form: err instanceof Error ? err.message : "Something went wrong. Try again." });
     } finally {
@@ -72,6 +75,15 @@ export default function TopicForm({ sectorOnly, submitLabel = "Send to the team"
       <Field label="References" htmlFor="tf-refs" optional hint="Guidelines, studies or articles you would use.">
         <textarea id="tf-refs" rows={2} className={input} value={references} onChange={(e) => setReferences(e.target.value)} />
       </Field>
+      {canAskWriter && (
+        <label className="flex gap-3 items-start text-sm text-slate-700 cursor-pointer rounded-xl border border-slate-200 bg-slate-50 p-3">
+          <input type="checkbox" className="mt-0.5 w-4 h-4 accent-[hsl(var(--brand-teal))]" checked={requestWriter} disabled={!!initial?.requestWriter && !!initial?.title} onChange={(e) => setRequestWriter(e.target.checked)} />
+          <span>
+            <b className="text-slate-900">I would like someone else to write it.</b>{" "}
+            The NexEagle team picks a writer, and you review the article before it goes live. Leave this empty if you want to write it yourself.
+          </span>
+        </label>
+      )}
       {errors.form && <p role="alert" className="text-sm font-medium text-red-600">{errors.form}</p>}
       <div className="flex gap-3">
         <button type="submit" disabled={busy} className={primaryBtn}>{busy ? "Sending…" : submitLabel}</button>

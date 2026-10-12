@@ -39,6 +39,8 @@ export default function OnboardingFlow({ inviteToken, fixedRole, defaultName }: 
     if (!needsRegistration) return router.replace("/contribute");
     try {
       const me = await contributorApi.me();
+      // A hospital doctor never joins here: they come from EasyHMS.
+      if (me.role === "HOSPITAL_DOCTOR") return router.replace("/contribute");
       if (role && me.role !== role) setExistingRole(me.role);
       setRole(me.role);
     } catch {

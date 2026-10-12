@@ -12,7 +12,7 @@ const PROXY_SECRET = process.env.EASYHMS_TRUSTED_PROXY_SECRET ?? "";
 export const SESSION_HEADER = "X-Contributor-Session";
 
 /** First path segments the pages may call. Anything else is a 404 and is never forwarded. */
-export const ALLOWED_SEGMENTS = ["invite", "enrol", "otp", "logout", "register", "me", "articles", "images", "topics"] as const;
+export const ALLOWED_SEGMENTS = ["invite", "enrol", "otp", "logout", "register", "me", "articles", "images", "topics", "sso"] as const;
 
 export const isUpstreamConfigured = () => Boolean(BASE_URL);
 

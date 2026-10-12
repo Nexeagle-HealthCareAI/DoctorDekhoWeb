@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { PenLine, Plus } from "lucide-react";
 import { toast } from "sonner";
+import { isDoctorRole } from "@/lib/contributor/types";
 import TopicForm from "@/components/contributor/TopicForm";
 import { BackLink, Banner, Chip, ErrorBox, Loading, PageTitle, TopicStatusChip, card, primaryBtn } from "@/components/contributor/ui";
 import { contributorApi } from "@/lib/contributor/client";
@@ -45,7 +46,7 @@ export default function TopicsPage() {
                   <h2 className="font-display font-extrabold text-slate-900 leading-snug">{t.title}</h2>
                   <p className="text-xs text-slate-500 mt-1">Sent {formatDate(t.createdAt)}</p>
                 </div>
-                <div className="flex gap-2"><Chip tone="sky">{ARTICLE_TYPE_LABEL[t.type]}</Chip><TopicStatusChip status={t.status} /></div>
+                <div className="flex gap-2"><Chip tone="sky">{ARTICLE_TYPE_LABEL[t.type]}</Chip>{t.requestWriter && <Chip tone="amber">Writer requested</Chip>}<TopicStatusChip status={t.status} /></div>
               </div>
               <p className="text-sm text-slate-600">{t.outline}</p>
 
@@ -55,7 +56,7 @@ export default function TopicsPage() {
                   <Banner tone="info"><b>The team asks:</b> {t.decisionNote}</Banner>
                   {adding === t.id ? (
                     <TopicForm
-                      sectorOnly={me.role === "WRITER"} initial={t} submitLabel="Send the detail"
+                      sectorOnly={!isDoctorRole(me.role)} initial={t} submitLabel="Send the detail"
                       onSubmit={async (input) => { await contributorApi.addTopicDetail(t.id, input); setAdding(null); toast.success("Sent. The team will take another look."); topics.reload(); }}
                       onCancel={() => setAdding(null)}
                     />
@@ -64,7 +65,10 @@ export default function TopicsPage() {
                   )}
                 </>
               )}
-              {(t.status === "ACCEPTED" || t.status === "ARTICLE_STARTED") && (
+              {(t.status === "ACCEPTED" || t.status === "ARTICLE_STARTED") && t.requestWriter && (
+                <Banner tone="ok">The team accepted this and is arranging a writer. You will get a WhatsApp message when the article is ready for your review.</Banner>
+              )}
+              {(t.status === "ACCEPTED" || t.status === "ARTICLE_STARTED") && !t.requestWriter && (
                 <Banner tone="ok">
                   The team accepted this. A draft is waiting for you{t.articleSlug ? <> — <Link href={`/contribute/write/${t.articleSlug}`}><PenLine className="inline w-3.5 h-3.5 mr-1" aria-hidden="true" />open the draft</Link></> : "."}
                 </Banner>
