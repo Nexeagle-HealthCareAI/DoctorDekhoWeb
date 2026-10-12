@@ -52,7 +52,8 @@ export const contributorApi = {
   article: (slug: string) => call<MyArticle>(`articles/${encodeURIComponent(slug)}`),
   createArticle: (input: ArticleDraftInput) => call<MyArticle>("articles", send("POST", input)),
   updateArticle: (slug: string, input: ArticleDraftInput) => call<MyArticle>(`articles/${encodeURIComponent(slug)}`, send("PATCH", input)),
-  submitArticle: (slug: string) => call<MyArticle>(`articles/${encodeURIComponent(slug)}/submit`, send("POST")),
+  /** The author has agreed that the reviewer may publish it (the API refuses without it). */
+  submitArticle: (slug: string, consent: boolean) => call<MyArticle>(`articles/${encodeURIComponent(slug)}/submit`, send("POST", { consent })),
   reviewArticle: (slug: string, d: ReviewDecision) => call<MyArticle>(`articles/${encodeURIComponent(slug)}/review`, send("POST", d)),
   uploadImage: async (file: File) => {
     const form = new FormData();

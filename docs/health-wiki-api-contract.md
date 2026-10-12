@@ -91,7 +91,7 @@ developer note):
 | `POST otp/verify` | Check the code, start a session, say whether registration is needed. |
 | `POST register`, `GET me` | Save and read the profile. Never return the full mobile number. |
 | `GET articles` | `{ pending, published, drafts }` for the contributor, with views and likes on published. |
-| `POST articles`, `PATCH articles/{slug}`, `POST articles/{slug}/submit` | Draft, edit and submit. Submit needs a VERIFIED profile; a cover image needs alt text. |
+| `POST articles`, `PATCH articles/{slug}`, `POST articles/{slug}/submit` | Draft, edit and submit. Submit needs a filled-in profile that was not rejected and the body `{ "consent": true }` (the author agrees the reviewer may publish it); a cover image needs alt text. |
 | `POST articles/{slug}/review` | `{ decision: APPROVE }` or `{ decision: REQUEST_CHANGES, comment }`. Only the assigned, signed-in doctor; a comment of 10 or more characters is required to ask for changes. |
 | `POST images` | Multipart upload, JPG/PNG/WebP, 2 MB; returns `{ url }`. |
 | `GET/POST topics`, `PATCH topics/{id}` | Topic requests; at most 5 open; PATCH adds detail to a NEEDS_DETAIL request. |

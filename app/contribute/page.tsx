@@ -80,7 +80,6 @@ export default function ContributorHome() {
   ];
   const tab = picked && tabs.some((t) => t.key === picked) ? picked : tabs[0].key;
   const active = tabs.find((t) => t.key === tab)!;
-  const canSubmit = me.status === "VERIFIED";
 
   return (
     <div className="space-y-6">
@@ -95,9 +94,6 @@ export default function ContributorHome() {
         }
       />
       <VerificationBanner me={me} />
-      {!canSubmit && me.status !== "REJECTED" && data.drafts.some((d) => d.status === "DRAFT") && (
-        <Banner tone="info">Your drafts are saved. The Submit button turns on once the team has {doctor ? "verified your registration" : "approved your profile"}.</Banner>
-      )}
 
       <div role="tablist" aria-label="Your articles" className={cn("grid gap-3", tabs.length === 3 ? "sm:grid-cols-3" : "sm:grid-cols-2")}>
         {tabs.map((t) => (

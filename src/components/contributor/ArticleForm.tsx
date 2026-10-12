@@ -12,6 +12,7 @@ import { messageOf } from "@/lib/contributor/hooks";
 import { ARTICLE_TYPE_LABEL } from "@/lib/health-wiki/types";
 import { isDoctorRole, type ArticleDraftInput, type ArticleType, type ContributorMe, type MyArticle } from "@/lib/contributor/types";
 import { Banner, Field, card, input, primaryBtn, secondaryBtn } from "./ui";
+import SubmitConsentDialog from "./SubmitConsentDialog";
 
 // The editor needs the browser, so it is not rendered on the server.
 const RichTextEditor = dynamic(() => import("./RichTextEditor"), {
@@ -47,6 +48,7 @@ export default function ArticleForm({ me, existing }: Props) {
   const [errors, setErrors] = useState<Errors>({});
   const [busy, setBusy] = useState(false);
   const [dirty, setDirty] = useState(false);
+  const [asking, setAsking] = useState(false);
   const first = useRef(true);
 
   const snapshot = useMemo(() => JSON.stringify([type, title, description, content, coverUrl, coverAlt, condition, references, disclosure]), [type, title, description, content, coverUrl, coverAlt, condition, references, disclosure]);
@@ -63,7 +65,8 @@ export default function ArticleForm({ me, existing }: Props) {
   }, [dirty]);
 
   const medical = type === "MEDICAL";
-  const verified = me.status === "VERIFIED";
+  // A filled-in profile the team has not rejected may send an article for review; the reviewer decides whether it goes live.
+  const canSubmit = me.status !== "REJECTED" && me.status !== "INVITED";
 
   const payload = (): ArticleDraftInput => ({
     type, title: title.trim(), description: description.trim(), content,
@@ -98,16 +101,24 @@ export default function ArticleForm({ me, existing }: Props) {
     setBusy(true);
     try {
       const saved = existing ? await contributorApi.updateArticle(existing.slug, payload()) : await contributorApi.createArticle(payload());
-      if (submit) await contributorApi.submitArticle(saved.slug);
+      if (submit) await contributorApi.submitArticle(saved.slug, true);
       setDirty(false);
       toast.success(submit ? (medical ? "Sent for review. The team will assign a reviewing doctor." : "Sent for approval.") : "Draft saved. You can find it under My drafts.");
       // A saved draft is not sent to anyone: it waits under "My drafts" until the writer chooses Submit for review.
       router.push(submit ? "/contribute" : "/contribute?tab=drafts");
     } catch (err) {
       setErrors({ form: messageOf(err) });
+      setAsking(false);
     } finally {
       setBusy(false);
     }
+  };
+
+  // Submit for review first checks the article, then asks for the author's consent; only then is it saved and sent.
+  const askToSubmit = () => {
+    const e = validate(true);
+    setErrors(e);
+    if (Object.keys(e).length === 0) setAsking(true);
   };
 
   return (
@@ -178,19 +189,20 @@ export default function ArticleForm({ me, existing }: Props) {
 
       <Banner tone="info">
         {medical
-          ? "After you submit, the NexEagle team picks a reviewing doctor. You get a WhatsApp message when it is approved."
-          : "After you submit, a NexEagle editor approves it. Sector updates must not give medical advice."}
+          ? "After you submit, the NexEagle team assigns a reviewing doctor, who publishes it if it is right or tells you what to change. You get a WhatsApp message either way."
+          : "After you submit, a NexEagle editor publishes it if it is right or tells you what to change. Sector updates must not give medical advice."}
       </Banner>
-      {!verified && !locked && (
-        <Banner tone="warn">You can save drafts now. Submitting turns on once the team has {doctor ? "verified your registration" : "approved your profile"}.</Banner>
+      {!canSubmit && !locked && (
+        <Banner tone="warn">{me.status === "REJECTED" ? "Your profile was not accepted, so you cannot send articles. Contact the NexEagle team." : "Finish your profile to send articles for review."}</Banner>
       )}
 
       {errors.form && <p role="alert" className="text-sm font-medium text-red-600">{errors.form}</p>}
       <div className="flex flex-wrap gap-3">
         <button type="submit" disabled={busy || locked} className={secondaryBtn}>{busy ? "Saving…" : "Save draft"}</button>
-        <button type="button" disabled={busy || locked || !verified} onClick={() => void save(true)} className={primaryBtn}>Submit for review</button>
+        <button type="button" disabled={busy || locked || !canSubmit} onClick={askToSubmit} className={primaryBtn}>Submit for review</button>
         <Link href="/contribute" className="inline-flex items-center px-3 text-sm font-semibold text-slate-500 hover:text-brand-teal">Cancel</Link>
       </div>
+      <SubmitConsentDialog open={asking} medical={medical} busy={busy} onCancel={() => setAsking(false)} onConfirm={() => void save(true)} />
     </form>
   );
 }

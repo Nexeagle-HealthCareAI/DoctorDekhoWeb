@@ -83,8 +83,8 @@ export function VerificationBanner({ me }: { me: ContributorMe }) {
       <b>{doctor ? "Registration under verification" : "Profile waiting for approval"}</b>
       {doctor && me.registrationNumber ? ` (${me.registrationNumber}${me.registrationCouncil ? `, ${me.registrationCouncil}` : ""})` : ""}.{" "}
       {doctor
-        ? "You can read assigned articles and prepare drafts. Anything you approve goes live once the team has verified your registration, and you can submit articles then."
-        : "You can prepare drafts now. You can submit them once the team has approved your profile."}
+        ? "Anything you approve goes live once the team has verified your registration. You can write and send articles for review meanwhile."
+        : "You can write and send articles for review meanwhile."}
     </Banner>
   );
 }

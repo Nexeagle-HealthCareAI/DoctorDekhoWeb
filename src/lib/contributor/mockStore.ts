@@ -250,7 +250,6 @@ export function updateDraft(id: string, slug: string, input: ArticleDraftInput):
 export function submitArticle(id: string, slug: string): MyArticle {
   const p = me(id);
   mustBeApproved(p);
-  if (p.status !== "VERIFIED") throw new MockError(403, "You can submit articles after the team has checked your profile.");
   const a = findArticle(id, slug);
   if (a.myRole !== "AUTHOR" || a.status !== "DRAFT") throw new MockError(409, "Only a draft can be submitted.");
   if (!a.title.trim() || !a.content.trim()) throw new MockError(400, "Add a title and some content first.");

@@ -13,6 +13,7 @@ import OtpStep from "./OtpStep";
 import RegisterForm from "./RegisterForm";
 import TopicForm from "./TopicForm";
 import OnboardingFlow from "./OnboardingFlow";
+import SubmitConsentDialog from "./SubmitConsentDialog";
 
 beforeEach(() => vi.clearAllMocks());
 
@@ -155,5 +156,32 @@ describe("TopicForm", () => {
     await userEvent.type(screen.getByLabelText("Why does it matter?"), "Summer");
     await userEvent.click(screen.getByRole("button", { name: "Send to the team" }));
     await waitFor(() => expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ title: "Heat stroke", type: "MEDICAL", conditionSlug: null })));
+  });
+});
+
+describe("SubmitConsentDialog", () => {
+  it("explains what happens next and only sends once the author agrees", async () => {
+    const onConfirm = vi.fn();
+    render(<SubmitConsentDialog open medical busy={false} onCancel={vi.fn()} onConfirm={onConfirm} />);
+    expect(screen.getByText(/will publish it on Doctor Dekho/)).toBeInTheDocument();
+    expect(screen.getByText(/tell you what to fix/)).toBeInTheDocument();
+    const send = screen.getByRole("button", { name: "Send for review" });
+    expect(send).toBeDisabled();
+    await userEvent.click(screen.getByRole("checkbox"));
+    expect(send).toBeEnabled();
+    await userEvent.click(send);
+    expect(onConfirm).toHaveBeenCalledOnce();
+  });
+
+  it("names a NexEagle editor, not a doctor, for a sector update", () => {
+    render(<SubmitConsentDialog open medical={false} busy={false} onCancel={vi.fn()} onConfirm={vi.fn()} />);
+    expect(screen.getByText(/NexEagle editor may publish this article/)).toBeInTheDocument();
+  });
+
+  it("can be cancelled without agreeing", async () => {
+    const onCancel = vi.fn();
+    render(<SubmitConsentDialog open medical busy={false} onCancel={onCancel} onConfirm={vi.fn()} />);
+    await userEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(onCancel).toHaveBeenCalled();
   });
 });

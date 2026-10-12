@@ -96,10 +96,10 @@ describe("articles", () => {
     expect(s.submitArticle(id, a.slug).status).toBe("IN_REVIEW");
     expect(() => s.updateDraft(id, a.slug, draft)).toThrowError(expect.objectContaining({ status: 409 }));
   });
-  it("blocks submit until the profile is verified", () => {
+  it("lets an author whose profile is still waiting for approval send a draft for review", () => {
     const id = pending();
     const a = s.createDraft(id, draft);
-    expect(() => s.submitArticle(id, a.slug)).toThrowError(expect.objectContaining({ status: 403 }));
+    expect(s.submitArticle(id, a.slug).status).toBe("IN_REVIEW");
   });
   it("needs alt text on a cover image to submit", () => {
     const id = verified();
