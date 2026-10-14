@@ -114,7 +114,7 @@ export default function ContributorHome() {
           <p className="text-sm text-slate-500 mt-1">{EMPTY[active.key].text}</p>
         </div>
       ) : (
-        <ul className="space-y-3" role="tabpanel">{active.items.map((a) => <Row key={a.slug} a={a} tab={active.key} />)}</ul>
+        <ul className="grid grid-cols-1 xl:grid-cols-2 gap-3 items-start" role="tabpanel">{active.items.map((a) => <Row key={a.slug} a={a} tab={active.key} />)}</ul>
       )}
     </div>
   );

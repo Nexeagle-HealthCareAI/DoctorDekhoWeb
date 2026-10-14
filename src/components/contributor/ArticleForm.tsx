@@ -122,7 +122,7 @@ export default function ArticleForm({ me, existing }: Props) {
   };
 
   return (
-    <form className={`${card} p-5 sm:p-8 space-y-6`} noValidate onSubmit={(ev) => { ev.preventDefault(); void save(false); }}>
+    <form className={`${card} p-5 sm:p-8 space-y-6 max-w-5xl`} noValidate onSubmit={(ev) => { ev.preventDefault(); void save(false); }}>
       {existing?.returnedComment && <Banner tone="warn"><b>Changes requested:</b> {existing.returnedComment}</Banner>}
       {locked && <Banner tone="info">This article is {existing?.status === "IN_REVIEW" ? "in review" : "published"}, so it can no longer be edited here.</Banner>}
 

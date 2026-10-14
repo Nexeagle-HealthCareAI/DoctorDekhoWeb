@@ -7,11 +7,13 @@ import type { EnrolRole } from "@/lib/contributor/types";
 export interface ContributorTag {
   isContributor: boolean;
   role: EnrolRole | null;
-  /** PENDING (the team has not verified yet) or VERIFIED. */
-  status: "PENDING" | "VERIFIED" | null;
+  /** INVITED (the team invited them and the profile is not finished), PENDING (under review) or VERIFIED. */
+  status: "INVITED" | "PENDING" | "VERIFIED" | null;
+  /** The name on the contributor profile, when there is one. */
+  fullName: string | null;
 }
 
-const NONE: ContributorTag = { isContributor: false, role: null, status: null };
+const NONE: ContributorTag = { isContributor: false, role: null, status: null, fullName: null };
 
 /**
  * Whether the signed-in patient is also a Health Wiki contributor, found by the mobile number they proved when they signed in.
@@ -28,8 +30,8 @@ export function useContributorTag(enabled: boolean) {
       try {
         const res = await fetch("/api/contributor/profile-tag", { credentials: "same-origin" });
         if (!res.ok) return NONE;
-        const d = (await res.json()) as { isContributor?: boolean; role?: EnrolRole; status?: "PENDING" | "VERIFIED" };
-        return d.isContributor ? { isContributor: true, role: d.role ?? null, status: d.status ?? null } : NONE;
+        const d = (await res.json()) as { isContributor?: boolean; role?: EnrolRole; status?: ContributorTag["status"]; fullName?: string | null };
+        return d.isContributor ? { isContributor: true, role: d.role ?? null, status: d.status ?? null, fullName: d.fullName?.trim() || null } : NONE;
       } catch {
         return NONE;
       }

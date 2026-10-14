@@ -1,6 +1,7 @@
 "use client";
 
 import PatientTopBar from "@/components/patient/PatientTopBar";
+import ProfileShell from "@/components/patient/ProfileShell";
 import { usePatientAuth } from "@/hooks/usePatientAuth";
 import { usePatientProfile } from "@/hooks/usePatientProfile";
 import { User, Mail, Users, Cake, LogIn } from "lucide-react";
@@ -27,7 +28,7 @@ export default function PersonalInformationClient() {
   if (authLoading) {
     return (
       <main className="min-h-screen bg-slate-50 flex flex-col pb-24 md:pb-0">
-        <PatientTopBar showBackButton={true} />
+        <PatientTopBar showBackButton={true} wide />
         <div className="flex-1 w-full max-w-3xl mx-auto px-4 py-10 flex items-center justify-center">
           <div className="w-8 h-8 border-4 border-brand-teal/20 border-t-brand-teal rounded-full animate-spin" />
         </div>
@@ -38,7 +39,7 @@ export default function PersonalInformationClient() {
   if (!isLoggedIn) {
     return (
       <main className="min-h-screen bg-slate-50 flex flex-col pb-24 md:pb-0">
-        <PatientTopBar showBackButton={true} />
+        <PatientTopBar showBackButton={true} wide />
         <div className="flex-1 w-full max-w-3xl mx-auto px-4 sm:px-6 py-6 md:py-10">
           <div className="flex flex-col items-center justify-center text-center py-16 bg-white rounded-[2rem] border border-dashed border-slate-200 shadow-sm px-6">
             <div className="w-16 h-16 rounded-2xl bg-teal-50 text-brand-teal flex items-center justify-center mb-4 border border-teal-100">
@@ -63,10 +64,7 @@ export default function PersonalInformationClient() {
     .join(" · ");
 
   return (
-    <main className="min-h-screen bg-slate-50 flex flex-col pb-24 md:pb-0">
-      <PatientTopBar showBackButton={true} />
-
-      <div className="flex-1 w-full max-w-3xl mx-auto px-4 sm:px-6 py-6 md:py-10">
+    <ProfileShell>
         <h1 className="text-2xl font-display font-extrabold text-slate-900 tracking-tight mb-1">Personal Information</h1>
         <p className="text-sm text-slate-500 mb-6">This is what we have on file from your bookings.</p>
 
@@ -98,10 +96,9 @@ export default function PersonalInformationClient() {
         )}
 
         <p className="text-xs text-slate-400 mt-6 text-center max-w-sm mx-auto">
-          Spotted something wrong? Let the hospital's front desk know at your next visit — these
-          details come from your bookings, so they're best corrected there.
+          Spotted something wrong? Let the hospital&apos;s front desk know at your next visit — these
+          details come from your bookings, so they&apos;re best corrected there.
         </p>
-      </div>
-    </main>
+    </ProfileShell>
   );
 }

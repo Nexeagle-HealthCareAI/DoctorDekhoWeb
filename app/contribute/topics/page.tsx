@@ -38,7 +38,7 @@ export default function TopicsPage() {
           <p className="text-sm text-slate-500 mt-1">Suggest a topic and the team will let you know on WhatsApp.</p>
         </div>
       ) : (
-        <ul className="space-y-3">
+        <ul className="grid grid-cols-1 xl:grid-cols-2 gap-3 items-start">
           {list.map((t) => (
             <li key={t.id} className={`${card} p-5 space-y-3`}>
               <div className="flex flex-wrap items-start justify-between gap-3">

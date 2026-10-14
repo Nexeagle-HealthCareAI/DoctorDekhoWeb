@@ -24,7 +24,7 @@ export default function ContributeLayout({ children }: { children: React.ReactNo
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col font-sans text-slate-800">
       <ContributorHeader />
-      <main className="flex-1 w-full max-w-5xl mx-auto px-4 sm:px-6 py-8 sm:py-10 pb-24">{children}</main>
+      <main className="flex-1 w-full max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-10 pb-24">{children}</main>
     </div>
   );
 }

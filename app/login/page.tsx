@@ -79,9 +79,9 @@ export default function LoginPage() {
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col font-sans text-slate-800">
-      <PatientTopBar />
+      <PatientTopBar wide />
 
-      <main className="flex-1 w-full max-w-screen-xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12 grid gap-8 lg:gap-12 lg:grid-cols-[minmax(0,1fr)_minmax(0,26rem)] items-center">
+      <main className="flex-1 w-full max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12 grid gap-8 lg:gap-12 lg:grid-cols-[minmax(0,1fr)_minmax(0,26rem)] items-center">
         {/* Why log in: the same teal card used across the site, shown beside the form on large screens */}
         <section className="hidden lg:block bg-gradient-to-br from-brand-teal to-emerald-600 rounded-3xl p-10 text-white shadow-xl">
           <h1 className="font-display text-4xl font-extrabold leading-tight mb-4 !text-white">Your health, in one place.</h1>

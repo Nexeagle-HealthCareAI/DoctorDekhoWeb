@@ -28,7 +28,7 @@ export default function ContributorHeader() {
 
   return (
     <header className="bg-white border-b border-slate-200">
-      <div className="max-w-5xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-3">
+      <div className="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-3">
         <Link href={me ? "/contribute" : "/health"} className="flex items-center gap-3 shrink-0" aria-label="Health Wiki contributors home">
           <span className="sm:hidden"><Logo iconOnly iconClassName="w-11 h-11" /></span>
           <span className="hidden sm:inline-flex"><Logo textSize="text-lg" /></span>
