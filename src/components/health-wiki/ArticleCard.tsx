@@ -11,7 +11,7 @@ export default function ArticleCard({ article, priority = false }: { article: He
   return (
     <Link
       href={articlePath(article.slug)}
-      className="group flex flex-col bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden hover:shadow-md hover:border-brand-teal/30 transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand-teal"
+      className="group flex flex-col w-full bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden hover:shadow-md hover:border-brand-teal/30 transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand-teal"
     >
       {article.coverImageUrl ? (
         <ArticleCover src={article.coverImageUrl} alt="" priority={priority} />

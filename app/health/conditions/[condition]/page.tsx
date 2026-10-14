@@ -82,11 +82,11 @@ export default async function HealthArticlePage({ params }: PageProps) {
     <div className="min-h-screen bg-slate-50 flex flex-col font-sans text-slate-800">
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLdString(buildArticleJsonLd(article)) }} />
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLdString(breadcrumbs) }} />
-      <PatientTopBar />
+      <PatientTopBar wide />
 
       <main className="flex-1 pb-24">
         <div className="bg-white border-b border-slate-200">
-          <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+          <div className="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
             <nav aria-label="Breadcrumb" className="flex items-center gap-2 text-xs font-medium text-slate-500">
               <Link href="/" className="hover:text-brand-teal shrink-0">Home</Link>
               <ChevronRight className="w-3.5 h-3.5" aria-hidden="true" />
@@ -97,23 +97,26 @@ export default async function HealthArticlePage({ params }: PageProps) {
           </div>
         </div>
 
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-10 grid grid-cols-1 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)] gap-8 lg:gap-12">
+        <div className="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-10 grid grid-cols-1 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)] xl:grid-cols-[minmax(0,1fr)_22rem] gap-8 lg:gap-12">
           <article className="min-w-0 bg-white rounded-3xl p-5 sm:p-10 border border-slate-200/80 shadow-sm">
             <div className="mb-4"><TypeBadge type={article.type} /></div>
             <h1 className="font-display text-3xl sm:text-4xl font-extrabold text-slate-900 leading-tight mb-5 break-words">{article.title}</h1>
-            {article.description && <p className="text-lg text-slate-600 mb-8 leading-relaxed">{article.description}</p>}
+            {article.description && <p className="text-lg text-slate-600 mb-8 leading-relaxed max-w-3xl">{article.description}</p>}
 
             {article.coverImageUrl && (
               <ArticleCover src={article.coverImageUrl} alt={article.coverImageAlt ?? ""} priority className="rounded-2xl border border-slate-100 mb-8" />
             )}
 
             <ArticleByline article={article} />
-            {article.type === "SECTOR_UPDATE" && <SectorNotice />}
-            {article.disclosure && <Disclosure text={article.disclosure} />}
+            {/* The page is wide, but running text stays at a comfortable line length. */}
+            <div className="max-w-3xl">
+              {article.type === "SECTOR_UPDATE" && <SectorNotice />}
+              {article.disclosure && <Disclosure text={article.disclosure} />}
 
-            <ArticleBody markdown={article.content} />
-            <ReferencesList items={article.references} />
-            <ArticleReactions slug={article.slug} />
+              <ArticleBody markdown={article.content} />
+              <ReferencesList items={article.references} />
+              <ArticleReactions slug={article.slug} />
+            </div>
           </article>
 
           <aside className="space-y-6 min-w-0">

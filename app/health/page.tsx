@@ -41,11 +41,11 @@ export default async function HealthWikiIndexPage({ searchParams }: { searchPara
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col font-sans text-slate-800">
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLdString(breadcrumbs) }} />
-      <PatientTopBar />
+      <PatientTopBar wide />
 
       <main className="flex-1 pb-24">
         <div className="bg-white border-b border-slate-200">
-          <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+          <div className="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
             <nav aria-label="Breadcrumb" className="flex items-center gap-2 text-xs font-medium text-slate-500">
               <Link href="/" className="hover:text-brand-teal">Home</Link>
               <ChevronRight className="w-3.5 h-3.5" aria-hidden="true" />
@@ -54,7 +54,7 @@ export default async function HealthWikiIndexPage({ searchParams }: { searchPara
           </div>
         </div>
 
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+        <div className="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
           <h1 className="font-display text-3xl sm:text-4xl font-extrabold text-slate-900 mb-3">Health Wiki</h1>
           <p className="text-lg text-slate-600 mb-8 max-w-3xl leading-relaxed">
             Medically reviewed guides on common conditions and symptoms, written with verified doctors
@@ -70,7 +70,7 @@ export default async function HealthWikiIndexPage({ searchParams }: { searchPara
               {filter !== "all" && <Link href="/health" className="text-sm font-bold text-brand-teal hover:underline">See all articles</Link>}
             </div>
           ) : (
-            <ul className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 list-none p-0">
+            <ul className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 list-none p-0">
               {articles.map((article, i) => (
                 <li key={article.slug} className="flex">
                   <div className="flex w-full"><ArticleCard article={article} priority={i < 3} /></div>

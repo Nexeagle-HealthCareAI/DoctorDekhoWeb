@@ -15,10 +15,13 @@ import ShareButton from "./ShareButton";
 interface PatientTopBarProps {
   /** Whether to show a native-style back button instead of the logo on mobile */
   showBackButton?: boolean;
+  /** Use the wider page width (up to 1536 px), for pages that fill a large screen such as the Health Wiki. */
+  wide?: boolean;
 }
 
 export default function PatientTopBar({
   showBackButton = false,
+  wide = false,
 }: PatientTopBarProps) {
   const { t } = useTranslation();
   const router = useRouter();
@@ -39,7 +42,7 @@ export default function PatientTopBar({
 
   return (
       <header className="sticky top-0 z-50 w-full bg-white/70 backdrop-blur-xl border-b border-white/20 shadow-sm transition-all duration-300">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 sm:h-20 flex items-center justify-between gap-3">
+        <div className={`${wide ? "max-w-screen-2xl" : "max-w-7xl"} mx-auto px-4 sm:px-6 lg:px-8 h-16 sm:h-20 flex items-center justify-between gap-3`}>
           {/* ── Left: Logo + Brand Title or Back Button ── */}
           {showBackButton ? (
             <button
