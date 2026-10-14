@@ -48,19 +48,15 @@ export default function ProfileNav({ className = "" }: { className?: string }) {
     { key: "info", label: "Personal Information", icon: <User className="w-5 h-5" />, href: "/profile/personal-information" },
     { key: "appointments", label: "My Appointments", icon: <Calendar className="w-5 h-5" />, href: "/appointments" },
     { key: "locker", label: "Health Locker", icon: <FolderHeart className="w-5 h-5" />, href: "/profile/health-locker" },
-    { key: "wiki", label: "Health Wiki", hint: "Doctor-reviewed health guides", icon: <BookOpen className="w-5 h-5" />, href: "/health" },
   ];
-  if (CONTRIBUTOR_ENABLED) {
-    if (tag?.isContributor && tag.status !== "INVITED") {
-      rows.push({ key: "mine", label: opening ? "Opening…" : "My Health Wiki articles", hint: "Write, review and track your articles and topics", icon: <PenLine className="w-5 h-5" />, onClick: openArea, busy: opening, tone: "teal" });
+  // Health Wiki is in this menu only for contributors. A patient who is not one sees nothing about it here (the Health Wiki itself is open to
+  // everyone from the top bar menu and the footer, and they can still join from there).
+  if (CONTRIBUTOR_ENABLED && tag?.isContributor) {
+    if (tag.status === "INVITED") {
+      // Invited by the team but the profile is not finished
+      rows.push({ key: "finish", label: "Complete your Health Wiki profile", hint: "The team invited you. Finish your details to start writing", icon: <PenLine className="w-5 h-5" />, href: "/contribute/register" });
     } else {
-      rows.push({
-        key: "join",
-        label: tag?.isContributor ? "Complete your Health Wiki profile" : "Write for the Health Wiki",
-        hint: tag?.isContributor ? "The team invited you. Finish your details to start writing" : "Join as a doctor, health worker or writer",
-        icon: <PenLine className="w-5 h-5" />,
-        href: tag?.isContributor ? "/contribute/register" : "/contribute/join",
-      });
+      rows.push({ key: "mine", label: opening ? "Opening…" : "My Health Wiki articles", hint: "Write, review and track your articles and topics", icon: <BookOpen className="w-5 h-5" />, onClick: openArea, busy: opening, tone: "teal" });
     }
   }
   rows.push({ key: "help", label: "Help & Support", icon: <HelpCircle className="w-5 h-5" />, href: "mailto:info@nexeagle.com" });
