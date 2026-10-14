@@ -71,8 +71,15 @@ describe("Profile: who is signed in", () => {
     renderPage();
     expect((await screen.findAllByText(/Independent doctor · Profile not completed/)).length).toBeGreaterThan(0);
     expect(screen.getAllByRole("heading", { name: "Aquib (test)" }).length).toBeGreaterThan(0);
-    expect(screen.getByRole("link", { name: /Complete your Health Wiki profile/ })).toHaveAttribute("href", "/contribute/join");
+    expect(screen.getAllByRole("link", { name: /Complete your Health Wiki profile/ })[0]).toHaveAttribute("href", "/contribute/join");
     expect(screen.queryByText("My Health Wiki articles")).toBeNull();
+  });
+
+  it("has no Sign out here: that is only in the top bar menu", async () => {
+    tagIs({ isContributor: false });
+    renderPage();
+    await screen.findAllByText("Write for the Health Wiki");
+    expect(screen.queryByText(/sign out/i)).toBeNull();
   });
 });
 
@@ -80,9 +87,9 @@ describe("Profile: Health Wiki", () => {
   it("shows the way into the contributor area for a contributor", async () => {
     tagIs({ isContributor: true, role: "INDEPENDENT_DOCTOR", status: "VERIFIED", fullName: "Dr. Asha Rao" });
     renderPage();
-    expect(await screen.findByText("My Health Wiki articles")).toBeInTheDocument();
+    expect((await screen.findAllByText("My Health Wiki articles")).length).toBeGreaterThan(0);
     expect(screen.queryByText("Write for the Health Wiki")).toBeNull();
-    expect(screen.getByRole("link", { name: /Doctor-reviewed health guides/ })).toHaveAttribute("href", "/health");
+    expect(screen.getAllByRole("link", { name: /Doctor-reviewed health guides/ })[0]).toHaveAttribute("href", "/health");
   });
 
   it("says the profile is under review for a contributor who is not verified yet", async () => {
@@ -94,16 +101,16 @@ describe("Profile: Health Wiki", () => {
   it("offers joining to someone who is not a contributor, and shows no tag", async () => {
     tagIs({ isContributor: false });
     renderPage();
-    expect(await screen.findByText("Write for the Health Wiki")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /Write for the Health Wiki/ })).toHaveAttribute("href", "/contribute/join");
+    expect((await screen.findAllByText("Write for the Health Wiki")).length).toBeGreaterThan(0);
+    expect(screen.getAllByRole("link", { name: /Write for the Health Wiki/ })[0]).toHaveAttribute("href", "/contribute/join");
     expect(screen.queryByText("Health Wiki contributor")).toBeNull();
   });
 
   it("works the same when the tag cannot be read", async () => {
     fetchMock.mockRejectedValue(new Error("offline"));
     renderPage();
-    expect(await screen.findByText("Write for the Health Wiki")).toBeInTheDocument();
-    expect(screen.getByText("Personal Information")).toBeInTheDocument();
+    expect((await screen.findAllByText("Write for the Health Wiki")).length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Personal Information").length).toBeGreaterThan(0);
   });
 
   it("opens the contributor area without a second code", async () => {
@@ -112,7 +119,7 @@ describe("Profile: Health Wiki", () => {
         ? { ok: true, json: async () => ({ isContributor: true, role: "WRITER", status: "VERIFIED", fullName: "Rohan" }) }
         : { ok: true, json: async () => ({ signedIn: true, needsRegistration: false }) });
     renderPage();
-    await userEvent.click(await screen.findByText("My Health Wiki articles"));
+    await userEvent.click((await screen.findAllByText("My Health Wiki articles"))[0]);
     await waitFor(() => expect(push).toHaveBeenCalledWith("/contribute"));
     expect(fetchMock).toHaveBeenCalledWith("/api/contributor/session-from-patient", expect.objectContaining({ method: "POST" }));
   });
