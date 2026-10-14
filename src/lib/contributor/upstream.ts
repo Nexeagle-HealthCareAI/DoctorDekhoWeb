@@ -12,7 +12,7 @@ const PROXY_SECRET = process.env.EASYHMS_TRUSTED_PROXY_SECRET ?? "";
 export const SESSION_HEADER = "X-Contributor-Session";
 
 /** First path segments the pages may call. Anything else is a 404 and is never forwarded. */
-export const ALLOWED_SEGMENTS = ["invite", "enrol", "otp", "logout", "register", "me", "articles", "images", "topics", "sso"] as const;
+export const ALLOWED_SEGMENTS = ["invite", "enrol", "otp", "logout", "register", "me", "articles", "images", "topics", "sso", "profile-tag", "session-from-patient"] as const;
 
 export const isUpstreamConfigured = () => Boolean(BASE_URL);
 
@@ -36,7 +36,7 @@ function visitorIp(): string | null {
 
 export async function callUpstream(
   path: string,
-  opts: { method: string; body?: BodyInit | null; json?: boolean; sessionToken?: string | null; timeoutMs?: number }
+  opts: { method: string; body?: BodyInit | null; json?: boolean; sessionToken?: string | null; patientToken?: string | null; timeoutMs?: number }
 ): Promise<Upstream> {
   const ip = PROXY_SECRET ? visitorIp() : null;
   const controller = new AbortController();
@@ -53,6 +53,8 @@ export async function callUpstream(
         ...(API_KEY ? { [KEY_HEADER]: API_KEY } : {}),
         ...(PROXY_SECRET && ip ? { "X-Internal-Proxy-Secret": PROXY_SECRET, "X-Forwarded-Client-Ip": ip } : {}),
         ...(opts.sessionToken ? { [SESSION_HEADER]: opts.sessionToken } : {}),
+        // The patient's own login (a WhatsApp-verified mobile), for the profile page's contributor tag.
+        ...(opts.patientToken ? { Authorization: `Bearer ${opts.patientToken}` } : {}),
       },
     });
     const data = await res.json().catch(() => null);

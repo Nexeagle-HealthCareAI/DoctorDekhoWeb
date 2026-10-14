@@ -4,7 +4,7 @@ import { NextRequest } from "next/server";
 
 const callUpstream = vi.fn();
 vi.mock("@/lib/contributor/upstream", async () => ({
-  ALLOWED_SEGMENTS: ["invite", "enrol", "otp", "logout", "register", "me", "articles", "images", "topics"],
+  ALLOWED_SEGMENTS: ["invite", "enrol", "otp", "logout", "register", "me", "articles", "images", "topics", "sso", "profile-tag", "session-from-patient"],
   isUpstreamConfigured: () => true,
   callUpstream: (...a: unknown[]) => callUpstream(...a),
 }));
@@ -102,5 +102,39 @@ describe("contributor proxy", () => {
     const res = await POST(req("POST", "logout", undefined, "t"), ctx("logout"));
     expect(await res.json()).toEqual({ ok: true });
     expect(res.headers.get("set-cookie") ?? "").toContain("hw_contributor=;");
+  });
+});
+
+describe("contributor proxy: the patient's profile page", () => {
+  const withPatient = (method: string, path: string) =>
+    new NextRequest(`http://localhost/api/contributor/${path}`, { method, headers: { cookie: "nexeagle_patient_session=pat-jwt" } });
+
+  it("asks as the signed-in patient and returns the tag", async () => {
+    callUpstream.mockResolvedValue({ status: 200, retryAfter: null, data: { isContributor: true, role: "WRITER", status: "PENDING", fullName: "Rohan" } });
+    const res = await GET(withPatient("GET", "profile-tag"), ctx("profile-tag"));
+    expect((await res.json()).isContributor).toBe(true);
+    expect(callUpstream).toHaveBeenCalledWith("profile-tag", expect.objectContaining({ patientToken: "pat-jwt" }));
+  });
+
+  it("answers 401 without a patient login and never calls the API", async () => {
+    const res = await GET(req("GET", "profile-tag"), ctx("profile-tag"));
+    expect(res.status).toBe(401);
+    expect(callUpstream).not.toHaveBeenCalled();
+  });
+
+  it("opens the contributor area: token goes in the cookie, not the page", async () => {
+    callUpstream.mockResolvedValue({ status: 200, retryAfter: null, data: { success: true, sessionToken: "tok-prof", sessionExpiresAt: "2030-01-01T00:00:00Z", needsRegistration: false } });
+    const res = await POST(withPatient("POST", "session-from-patient"), ctx("session-from-patient"));
+    const body = await res.json();
+    expect(body).toEqual({ signedIn: true, needsRegistration: false });
+    expect(JSON.stringify(body)).not.toContain("tok-prof");
+    expect(res.headers.get("set-cookie") ?? "").toContain("hw_contributor=tok-prof");
+  });
+
+  it("does not drop the contributor cookie when the patient login is what failed", async () => {
+    callUpstream.mockResolvedValue({ status: 401, retryAfter: null, data: { message: "Please log in again." } });
+    const res = await GET(withPatient("GET", "profile-tag"), ctx("profile-tag"));
+    expect(res.status).toBe(401);
+    expect(res.headers.get("set-cookie") ?? "").not.toContain("hw_contributor");
   });
 });

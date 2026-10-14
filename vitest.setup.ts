@@ -13,6 +13,7 @@ class ResizeObserverStub {
 if (typeof globalThis.ResizeObserver === "undefined") {
   (globalThis as unknown as { ResizeObserver: typeof ResizeObserverStub }).ResizeObserver = ResizeObserverStub;
 }
-if (typeof document.elementFromPoint !== "function") {
+// (a test that runs in the node environment, such as a route handler test, has no document)
+if (typeof document !== "undefined" && typeof document.elementFromPoint !== "function") {
   document.elementFromPoint = () => null;
 }

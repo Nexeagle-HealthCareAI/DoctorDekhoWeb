@@ -2,12 +2,32 @@
 
 import { useState } from "react";
 import PatientTopBar from "@/components/patient/PatientTopBar";
-import { User, Shield, HelpCircle, LogOut, ChevronRight, LogIn, FolderHeart } from "lucide-react";
+import { User, Shield, HelpCircle, LogOut, ChevronRight, LogIn, FolderHeart, BookOpen, PenLine, BadgeCheck } from "lucide-react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import { usePatientAuth } from "@/hooks/usePatientAuth";
+import { openContributorArea, useContributorTag } from "@/hooks/useContributorTag";
+import { CONTRIBUTOR_ENABLED } from "@/lib/contributor/session";
+import { ENROL_ROLE_LABEL } from "@/lib/contributor/types";
 
 export default function ProfileClient() {
   const { isLoggedIn, mobile, isLoading, logout } = usePatientAuth();
+  const router = useRouter();
+  const tag = useContributorTag(isLoggedIn).data;
+  const [opening, setOpening] = useState(false);
+
+  // A person who is a contributor goes straight in (their number was just proven by this login); others are taken to join.
+  const openArea = async () => {
+    setOpening(true);
+    const r = await openContributorArea();
+    if (r.ok) {
+      router.push("/contribute");
+      return;
+    }
+    toast.error(r.message ?? "Could not open your Health Wiki area. Try again.");
+    setOpening(false);
+  };
 
   if (isLoading) {
     return (
@@ -53,6 +73,17 @@ export default function ProfileClient() {
                 <p className="text-sm text-slate-500 font-medium mt-0.5">
                   {mobile ? `+91 ${mobile}` : "Logged in"}
                 </p>
+                {tag?.isContributor && tag.role && (
+                  <p className="mt-2 flex flex-wrap items-center gap-2">
+                    <span className="inline-flex items-center gap-1.5 rounded-full bg-teal-50 border border-teal-100 px-2.5 py-1 text-xs font-bold text-brand-teal">
+                      <BookOpen className="w-3.5 h-3.5" aria-hidden="true" /> Health Wiki contributor
+                    </span>
+                    <span className="inline-flex items-center gap-1 rounded-full bg-slate-50 border border-slate-200 px-2.5 py-1 text-xs font-semibold text-slate-600">
+                      {tag.status === "VERIFIED" && <BadgeCheck className="w-3.5 h-3.5 text-emerald-600" aria-hidden="true" />}
+                      {ENROL_ROLE_LABEL[tag.role]}{tag.status === "VERIFIED" ? " · Verified" : " · Under review"}
+                    </span>
+                  </p>
+                )}
               </div>
             </div>
 
@@ -87,6 +118,41 @@ export default function ProfileClient() {
                 </div>
                 <ChevronRight className="w-4 h-4 text-slate-300" />
               </Link>
+
+              <Link href="/health" className="flex items-center gap-4 p-5 hover:bg-slate-50 transition-colors border-b border-slate-100 active:bg-slate-100">
+                <div className="w-10 h-10 rounded-xl bg-slate-50 flex items-center justify-center text-slate-400">
+                  <BookOpen className="w-5 h-5" />
+                </div>
+                <div className="flex-1">
+                  <span className="block font-semibold text-slate-900 text-sm">Health Wiki</span>
+                  <span className="block text-xs text-slate-400 mt-0.5">Doctor-reviewed health guides</span>
+                </div>
+                <ChevronRight className="w-4 h-4 text-slate-300" />
+              </Link>
+
+              {CONTRIBUTOR_ENABLED && (tag?.isContributor ? (
+                <button type="button" onClick={openArea} disabled={opening} className="w-full text-left flex items-center gap-4 p-5 hover:bg-slate-50 transition-colors border-b border-slate-100 active:bg-slate-100 disabled:opacity-60">
+                  <div className="w-10 h-10 rounded-xl bg-teal-50 flex items-center justify-center text-brand-teal">
+                    <PenLine className="w-5 h-5" />
+                  </div>
+                  <div className="flex-1">
+                    <span className="block font-semibold text-slate-900 text-sm">{opening ? "Opening…" : "My Health Wiki articles"}</span>
+                    <span className="block text-xs text-slate-400 mt-0.5">Write, review and track your articles and topics</span>
+                  </div>
+                  <ChevronRight className="w-4 h-4 text-slate-300" />
+                </button>
+              ) : (
+                <Link href="/contribute/join" className="flex items-center gap-4 p-5 hover:bg-slate-50 transition-colors border-b border-slate-100 active:bg-slate-100">
+                  <div className="w-10 h-10 rounded-xl bg-slate-50 flex items-center justify-center text-slate-400">
+                    <PenLine className="w-5 h-5" />
+                  </div>
+                  <div className="flex-1">
+                    <span className="block font-semibold text-slate-900 text-sm">Write for the Health Wiki</span>
+                    <span className="block text-xs text-slate-400 mt-0.5">Join as a doctor, health worker or writer</span>
+                  </div>
+                  <ChevronRight className="w-4 h-4 text-slate-300" />
+                </Link>
+              ))}
 
               <a href="mailto:info@nexeagle.com" className="flex items-center gap-4 p-5 hover:bg-slate-50 transition-colors active:bg-slate-100">
                 <div className="w-10 h-10 rounded-xl bg-slate-50 flex items-center justify-center text-slate-400">

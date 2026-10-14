@@ -4,7 +4,7 @@ import { SITE_URL, BUSINESS_URL } from "@/lib/site";
 import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ChevronDown, ArrowRight, ArrowLeft, Calendar, User, LogIn, ShieldCheck } from "lucide-react";
+import { ChevronDown, ArrowRight, ArrowLeft, Calendar, User, LogIn, ShieldCheck, BookOpen } from "lucide-react";
 import { Logo } from "@/components/Logo";
 import { cn } from "@/lib/utils";
 import { useTranslation } from "@/lib/i18n/I18nContext";
@@ -149,6 +149,19 @@ export default function PatientTopBar({
                       <div>
                         <p className="leading-tight">Profile</p>
                         <p className="text-[11px] text-slate-400 font-medium leading-tight">Your details</p>
+                      </div>
+                    </Link>
+                    <Link
+                      href="/health"
+                      onClick={() => setShowProfileMenu(false)}
+                      className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold text-slate-700 hover:text-brand-teal hover:bg-teal-50 transition-all duration-150 group"
+                    >
+                      <span className="flex items-center justify-center w-8 h-8 rounded-xl bg-slate-50 group-hover:bg-white border border-slate-200/60 group-hover:border-teal-200 transition-all shadow-sm">
+                        <BookOpen className="w-4 h-4 text-slate-500 group-hover:text-brand-teal transition-colors" />
+                      </span>
+                      <div>
+                        <p className="leading-tight">Health Wiki</p>
+                        <p className="text-[11px] text-slate-400 font-medium leading-tight">Read &amp; contribute</p>
                       </div>
                     </Link>
                     <Link

@@ -6,6 +6,7 @@ import {
 } from "@/lib/contributor/session";
 import * as store from "@/lib/contributor/mockStore";
 import { ALLOWED_SEGMENTS, callUpstream, isUpstreamConfigured } from "@/lib/contributor/upstream";
+import { PATIENT_SESSION_COOKIE } from "@/lib/api/patientSession";
 import type { ArticleDraftInput, EnrolRole, RegisterInput, ReviewDecision, TopicInput } from "@/lib/contributor/types";
 
 export const dynamic = "force-dynamic";
@@ -102,13 +103,17 @@ async function proxy(req: NextRequest, segments: string[]): Promise<NextResponse
   const path = segments.map(encodeURIComponent).join("/");
   const token = req.cookies.get(CONTRIBUTOR_SESSION_COOKIE)?.value ?? null;
   const isImage = first === "images" && req.method === "POST";
+  // The profile page asks as the signed-in patient: their login cookie goes upstream as the bearer token, and without it there is nothing to answer.
+  const asPatient = first === "profile-tag" || first === "session-from-patient";
+  const patientToken = asPatient ? req.cookies.get(PATIENT_SESSION_COOKIE)?.value ?? null : null;
+  if (asPatient && !patientToken) return json({ message: "Please log in again." }, 401);
 
   let body: BodyInit | null = null;
   if (isImage) body = await req.formData().catch(() => null);
   else if (req.method !== "GET") body = JSON.stringify(await req.json().catch(() => ({})));
   if (isImage && !body) return json({ message: "Choose an image." }, 400);
 
-  const up = await callUpstream(path, { method: req.method, body, json: !isImage, sessionToken: token, timeoutMs: isImage ? 60_000 : 20_000 });
+  const up = await callUpstream(path, { method: req.method, body, json: !isImage, sessionToken: token, patientToken, timeoutMs: isImage ? 60_000 : 20_000 });
   if (up.status === 0) return json({ message: "The service is not reachable right now. Try again in a moment." }, 502);
   const data = (up.data ?? {}) as Record<string, unknown>;
 
@@ -121,12 +126,12 @@ async function proxy(req: NextRequest, segments: string[]): Promise<NextResponse
   if (up.status >= 400) {
     const res = out({ message: typeof data.message === "string" && data.message ? data.message : GENERIC, ...(data.retryAfterSeconds ? { retryAfterSeconds: data.retryAfterSeconds } : {}) }, up.status);
     // The session is no longer valid upstream: drop the cookie so the page sends the person to sign in again.
-    if (up.status === 401) res.cookies.delete(CONTRIBUTOR_SESSION_COOKIE);
+    if (up.status === 401 && !asPatient) res.cookies.delete(CONTRIBUTOR_SESSION_COOKIE);
     return res;
   }
 
   // sign in: the token goes into the cookie and never to the page. A hospital doctor arriving from EasyHMS signs in the same way, with a one-time code.
-  if ((first === "otp" && segments[1] === "verify") || (first === "sso" && segments[1] === "exchange")) {
+  if ((first === "otp" && segments[1] === "verify") || (first === "sso" && segments[1] === "exchange") || first === "session-from-patient") {
     const expires = typeof data.sessionExpiresAt === "string" ? new Date(data.sessionExpiresAt) : null;
     if (typeof data.sessionToken !== "string") return json({ message: GENERIC }, 502);
     const res = json({ signedIn: true, needsRegistration: data.needsRegistration === true });
