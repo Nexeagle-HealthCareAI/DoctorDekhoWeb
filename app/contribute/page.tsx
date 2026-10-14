@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Eye, Heart, Lightbulb, PenLine } from "lucide-react";
 import { contributorApi } from "@/lib/contributor/client";
 import { useContributor, useLoad } from "@/lib/contributor/hooks";
@@ -59,14 +59,10 @@ export default function ContributorHome() {
   const { me, error: meError } = useContributor();
   const lists = useLoad<ArticleListResponse>(() => contributorApi.articles());
   const doctor = me ? isDoctorRole(me.role) : false;
-  const [picked, setPicked] = useState<ArticleListTab | null>(null);
-
-  // /contribute?tab=drafts (after saving a draft) opens that tab. Read from the address in the browser, not with useSearchParams,
-  // which would force a Suspense boundary around this whole statically built page.
-  useEffect(() => {
-    const t = new URLSearchParams(window.location.search).get("tab");
-    if (t === "drafts" || t === "published" || t === "pending") setPicked(t);
-  }, []);
+  const router = useRouter();
+  // The tab is in the address (?tab=drafts), so the menu at the left, the tabs on a phone and "Save draft" all open the same place.
+  const tabParam = useSearchParams().get("tab");
+  const picked: ArticleListTab | null = tabParam === "drafts" || tabParam === "published" || tabParam === "pending" ? tabParam : null;
 
   if (meError) return <ErrorBox message={meError} />;
   if (!me || lists.loading) return <Loading />;
@@ -87,7 +83,7 @@ export default function ContributorHome() {
         title={`Hello, ${me.fullName || "there"}`}
         sub="Your Health Wiki work in one place."
         action={
-          <div className="flex flex-wrap gap-3">
+          <div className="flex flex-wrap gap-3 lg:hidden">
             <Link href="/contribute/topics" className={secondaryBtn}><Lightbulb className="w-4 h-4" aria-hidden="true" /> Topic requests</Link>
             <Link href="/contribute/write" className={primaryBtn}><PenLine className="w-4 h-4" aria-hidden="true" /> Write an article</Link>
           </div>
@@ -95,9 +91,9 @@ export default function ContributorHome() {
       />
       <VerificationBanner me={me} />
 
-      <div role="tablist" aria-label="Your articles" className={cn("grid gap-3", tabs.length === 3 ? "sm:grid-cols-3" : "sm:grid-cols-2")}>
+      <div role="tablist" aria-label="Your articles" className={cn("grid gap-3 lg:hidden", tabs.length === 3 ? "sm:grid-cols-3" : "sm:grid-cols-2")}>
         {tabs.map((t) => (
-          <button key={t.key} type="button" role="tab" aria-selected={t.key === tab} onClick={() => setPicked(t.key)}
+          <button key={t.key} type="button" role="tab" aria-selected={t.key === tab} onClick={() => router.replace(`/contribute?tab=${t.key}`)}
             className={cn("text-left rounded-2xl border-[1.5px] p-4 flex items-center gap-4 transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand-teal", t.key === tab ? "border-brand-teal bg-teal-50/60" : "border-slate-200 bg-white hover:border-brand-teal/40")}>
             <span className={cn("font-display text-3xl font-extrabold tabular-nums min-w-[2ch]", t.key === "pending" ? "text-amber-600" : t.key === "published" ? "text-emerald-600" : "text-slate-800")}>{t.items.length}</span>
             <span>
@@ -106,6 +102,12 @@ export default function ContributorHome() {
             </span>
           </button>
         ))}
+      </div>
+
+      {/* Large screens: the menu at the left names the section, so its title and numbers are shown here instead of the tab cards */}
+      <div className="hidden lg:block">
+        <h2 className="font-display text-xl font-extrabold text-slate-900">{active.label}</h2>
+        <p className="text-sm text-slate-500">{active.sub}</p>
       </div>
 
       {active.items.length === 0 ? (
