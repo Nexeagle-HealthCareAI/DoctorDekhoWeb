@@ -54,6 +54,15 @@ describe("contributor proxy", () => {
     expect(res.headers.get("set-cookie") ?? "").not.toContain("hw_contributor=old");
   });
 
+  it("passes the code on when the development API returns it, and never invents one", async () => {
+    callUpstream.mockResolvedValue({ status: 200, retryAfter: null, data: { success: true, sent: true, devCode: "482913" } });
+    const withCode = await POST(req("POST", "otp/send", { mobile: "9876543210" }), ctx("otp/send"));
+    expect(await withCode.json()).toEqual({ sent: true, devCode: "482913" });
+    callUpstream.mockResolvedValue({ status: 200, retryAfter: null, data: { success: true, sent: true, devCode: null } });
+    const without = await POST(req("POST", "otp/send", { mobile: "9876543210" }), ctx("otp/send"));
+    expect(await without.json()).toEqual({ sent: true });
+  });
+
   it("sends the cookie upstream as the session and returns the data", async () => {
     callUpstream.mockResolvedValue({ status: 200, retryAfter: null, data: { id: "c1", fullName: "Dr A" } });
     const res = await GET(req("GET", "me", undefined, "tok-abc"), ctx("me"));

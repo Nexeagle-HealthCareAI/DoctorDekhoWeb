@@ -105,7 +105,7 @@ export default function OtpStep({ inviteToken, role, title = "Confirm it is you"
             <h2 className="text-xl font-display font-bold text-slate-900">Enter the code</h2>
             <p className="text-sm text-slate-500">Sent on WhatsApp to <b className="text-slate-700">+91 {mobile}</b>. It works for 10 minutes.</p>
           </div>
-          {demoCode && <p className="text-center text-xs rounded-lg bg-amber-50 text-amber-800 border border-amber-200 py-2">Demo only: your code is <b>{demoCode}</b></p>}
+          {demoCode && <p className="text-center text-xs rounded-lg bg-amber-50 text-amber-800 border border-amber-200 py-2">Test server only: your code is <b>{demoCode}</b></p>}
           <div className="flex justify-center">
             <InputOTP maxLength={6} value={code} onChange={verify} disabled={busy} autoFocus aria-label="6-digit code">
               <InputOTPGroup>{[0, 1, 2, 3, 4, 5].map((i) => <InputOTPSlot key={i} index={i} />)}</InputOTPGroup>

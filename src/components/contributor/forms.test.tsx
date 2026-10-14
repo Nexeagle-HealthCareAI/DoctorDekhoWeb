@@ -72,7 +72,7 @@ describe("OtpStep", () => {
     await userEvent.type(screen.getByLabelText("WhatsApp number"), "9876543210");
     await userEvent.click(screen.getByRole("button", { name: /Send code/ }));
     expect(await screen.findByText("Enter the code")).toBeInTheDocument();
-    expect(screen.getByText(/Demo only/)).toHaveTextContent("123456");
+    expect(screen.getByText(/Test server only/)).toHaveTextContent("123456");
     expect(api.sendOtp).toHaveBeenCalledWith("9876543210", "demo");
   });
 

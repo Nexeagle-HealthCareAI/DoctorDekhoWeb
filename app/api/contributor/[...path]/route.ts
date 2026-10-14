@@ -136,7 +136,8 @@ async function proxy(req: NextRequest, segments: string[]): Promise<NextResponse
     });
     return res;
   }
-  if (first === "otp" || first === "enrol") return json({ sent: true });
+  // On a development server the API also returns the code so it can be shown on the page; production never does.
+  if (first === "otp" || first === "enrol") return json({ sent: true, ...(typeof data.devCode === "string" ? { devCode: data.devCode } : {}) });
   if (first === "logout") {
     const res = json({ ok: true });
     res.cookies.delete(CONTRIBUTOR_SESSION_COOKIE);
