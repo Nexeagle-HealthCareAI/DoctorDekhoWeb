@@ -1,10 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { Suspense } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import OtpStep from "@/components/contributor/OtpStep";
-import { PageTitle } from "@/components/contributor/ui";
+import { PageTitle, Loading } from "@/components/contributor/ui";
+import { contributorApi } from "@/lib/contributor/client";
 
 function safeNext(next: string | null) {
   // Only paths inside the contributor area, never an outside address.
@@ -14,6 +15,16 @@ function safeNext(next: string | null) {
 function LoginInner() {
   const router = useRouter();
   const next = safeNext(useSearchParams().get("next"));
+  // Signed in on Doctor Dekho already: no second code. A patient who is not a contributor yet is taken to join.
+  const [checking, setChecking] = useState(true);
+  useEffect(() => {
+    let alive = true;
+    contributorApi.sessionFromPatient()
+      .then((r) => { if (alive) router.replace(r.needsRegistration ? "/contribute/register" : next); })
+      .catch(() => { if (alive) setChecking(false); });
+    return () => { alive = false; };
+  }, [router, next]);
+  if (checking) return <Loading label="Signing you in…" />;
   return (
     <div>
       <PageTitle title="Sign in" sub="Use the mobile number you registered with." />

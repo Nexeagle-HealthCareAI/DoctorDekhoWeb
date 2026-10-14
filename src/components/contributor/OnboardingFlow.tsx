@@ -3,7 +3,8 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { CheckCircle2, ShieldCheck, Stethoscope, User as UserRound, Laptop } from "lucide-react";
-import { contributorApi } from "@/lib/contributor/client";
+import { ApiError, contributorApi } from "@/lib/contributor/client";
+import { usePatientAuth } from "@/hooks/usePatientAuth";
 import { ENROL_ROLE_LABEL, type EnrolRole } from "@/lib/contributor/types";
 import { cn } from "@/lib/utils";
 import OtpStep from "./OtpStep";
@@ -32,6 +33,26 @@ export default function OnboardingFlow({ inviteToken, fixedRole, defaultName }: 
   const [role, setRole] = useState<EnrolRole | null>(fixedRole ?? null);
   const [step, setStep] = useState<Step>(fixedRole ? "otp" : "role");
   const [existingRole, setExistingRole] = useState<EnrolRole | null>(null);
+  // Signed in on Doctor Dekho already (the number was proven with a WhatsApp code), so the Health Wiki does not ask for another one.
+  const { isLoggedIn } = usePatientAuth();
+  const [joining, setJoining] = useState(false);
+  const [joinError, setJoinError] = useState<string | null>(null);
+
+  const continueFromRole = async () => {
+    if (!role) return;
+    if (!isLoggedIn || inviteToken) return setStep("otp");
+    setJoining(true);
+    setJoinError(null);
+    try {
+      const r = await contributorApi.sessionFromPatient(role);
+      router.replace(r.needsRegistration ? "/contribute/register" : "/contribute");
+    } catch (e) {
+      // No usable patient login after all: fall back to the code.
+      if (e instanceof ApiError && e.status === 401) setStep("otp");
+      else setJoinError(e instanceof Error ? e.message : "Something went wrong. Try again.");
+      setJoining(false);
+    }
+  };
 
   // A number that already has an account keeps the role it was created with, whichever one was just picked. The profile form must
   // follow the account (a doctor needs a registration number, a writer does not), so ask who this is once the code is confirmed.
@@ -83,7 +104,8 @@ export default function OnboardingFlow({ inviteToken, fixedRole, defaultName }: 
             ))}
           </div>
           <p className="flex gap-2 items-start text-xs text-slate-500 mt-5"><ShieldCheck className="w-4 h-4 shrink-0 text-emerald-600" aria-hidden="true" /> Your name, photo and profession can appear on articles. Your mobile number never does.</p>
-          <button type="button" disabled={!role} onClick={() => setStep("otp")} className={`${primaryBtn} w-full mt-5`}>Continue</button>
+          {joinError && <p role="alert" className="text-sm font-medium text-red-600 mt-4">{joinError}</p>}
+          <button type="button" disabled={!role || joining} onClick={() => void continueFromRole()} className={`${primaryBtn} w-full mt-5`}>{joining ? "Please wait…" : "Continue"}</button>
         </div>
       )}
 

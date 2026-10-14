@@ -10,7 +10,7 @@ import type { ContributorMe } from "./types";
  * not kept in the shared React Query cache: that cache is persisted in the browser, and these
  * pages hold personal details and unpublished drafts.
  */
-export function useContributor() {
+export function useContributor(opts: { allowUnregistered?: boolean } = {}) {
   const router = useRouter();
   const [me, setMe] = useState<ContributorMe | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -19,14 +19,19 @@ export function useContributor() {
     let alive = true;
     contributorApi
       .me()
-      .then((m) => { if (alive) setMe(m); })
+      .then((m) => {
+        if (!alive) return;
+        // Someone the team invited, or who has just joined, finishes their profile first.
+        if (m.status === "INVITED" && !opts.allowUnregistered) router.replace("/contribute/register");
+        setMe(m);
+      })
       .catch((e: unknown) => {
         if (!alive) return;
         if (e instanceof ApiError && e.status === 401) router.replace(`/contribute/login?next=${encodeURIComponent(window.location.pathname)}`);
         else setError(e instanceof Error ? e.message : "Could not load your profile.");
       });
     return () => { alive = false; };
-  }, [router]);
+  }, [router, opts.allowUnregistered]);
 
   return { me, error };
 }

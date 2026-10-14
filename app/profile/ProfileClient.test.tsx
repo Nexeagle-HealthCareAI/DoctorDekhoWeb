@@ -71,7 +71,7 @@ describe("Profile: who is signed in", () => {
     renderPage();
     expect((await screen.findAllByText(/Independent doctor · Profile not completed/)).length).toBeGreaterThan(0);
     expect(screen.getAllByRole("heading", { name: "Aquib (test)" }).length).toBeGreaterThan(0);
-    expect(screen.getAllByRole("link", { name: /Complete your Health Wiki profile/ })[0]).toHaveAttribute("href", "/contribute/join");
+    expect(screen.getAllByRole("link", { name: /Complete your Health Wiki profile/ })[0]).toHaveAttribute("href", "/contribute/register");
     expect(screen.queryByText("My Health Wiki articles")).toBeNull();
   });
 

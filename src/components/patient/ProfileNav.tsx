@@ -59,7 +59,7 @@ export default function ProfileNav({ className = "" }: { className?: string }) {
         label: tag?.isContributor ? "Complete your Health Wiki profile" : "Write for the Health Wiki",
         hint: tag?.isContributor ? "The team invited you. Finish your details to start writing" : "Join as a doctor, health worker or writer",
         icon: <PenLine className="w-5 h-5" />,
-        href: "/contribute/join",
+        href: tag?.isContributor ? "/contribute/register" : "/contribute/join",
       });
     }
   }

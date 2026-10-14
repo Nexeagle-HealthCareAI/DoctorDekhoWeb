@@ -35,6 +35,8 @@ export default function AccountMenu() {
 
   const signOut = async () => {
     setOpen(false);
+    // The Health Wiki session (if any) ends with the login: one place to sign out.
+    await fetch("/api/contributor/logout", { method: "POST", credentials: "same-origin" }).catch(() => undefined);
     await logout.mutateAsync();
     router.push("/");
   };

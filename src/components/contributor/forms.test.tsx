@@ -2,12 +2,15 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
-vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn(), replace: vi.fn() }), usePathname: () => "/contribute", useSearchParams: () => new URLSearchParams() }));
+const replace = vi.hoisted(() => vi.fn());
+vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn(), replace }), usePathname: () => "/contribute", useSearchParams: () => new URLSearchParams() }));
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
+const patient = vi.hoisted(() => ({ loggedIn: false }));
+vi.mock("@/hooks/usePatientAuth", () => ({ usePatientAuth: () => ({ isLoggedIn: patient.loggedIn, isLoading: false, mobile: patient.loggedIn ? "9876543210" : null }) }));
 const api = vi.hoisted(() => ({
-  sendOtp: vi.fn(), verifyOtp: vi.fn(), register: vi.fn(), uploadImage: vi.fn(), me: vi.fn(),
+  sendOtp: vi.fn(), verifyOtp: vi.fn(), register: vi.fn(), uploadImage: vi.fn(), me: vi.fn(), sessionFromPatient: vi.fn(),
 }));
-vi.mock("@/lib/contributor/client", () => ({ contributorApi: api, ApiError: class extends Error {} }));
+vi.mock("@/lib/contributor/client", () => ({ contributorApi: api, ApiError: class extends Error { constructor(public status: number, message?: string) { super(message); } } }));
 
 import OtpStep from "./OtpStep";
 import RegisterForm from "./RegisterForm";
@@ -15,7 +18,7 @@ import TopicForm from "./TopicForm";
 import OnboardingFlow from "./OnboardingFlow";
 import SubmitConsentDialog from "./SubmitConsentDialog";
 
-beforeEach(() => vi.clearAllMocks());
+beforeEach(() => { vi.clearAllMocks(); patient.loggedIn = false; });
 
 describe("RegisterForm", () => {
   it("asks a doctor for registration number, council and consent", async () => {
@@ -95,6 +98,45 @@ describe("OtpStep", () => {
     await userEvent.keyboard("123456");
     await waitFor(() => expect(verified).toHaveBeenCalledWith(true));
     expect(api.verifyOtp).toHaveBeenCalledWith("9876543210", "123456", { inviteToken: undefined, role: "WRITER" });
+  });
+});
+
+describe("OnboardingFlow: already signed in on Doctor Dekho", () => {
+  it("does not ask for a code again: after the role it opens the Health Wiki area and goes to the profile step", async () => {
+    patient.loggedIn = true;
+    api.sessionFromPatient.mockResolvedValue({ signedIn: true, needsRegistration: true });
+    render(<OnboardingFlow />);
+    await userEvent.click(screen.getByRole("radio", { name: /Writer/ }));
+    await userEvent.click(screen.getByRole("button", { name: "Continue" }));
+    await waitFor(() => expect(api.sessionFromPatient).toHaveBeenCalledWith("WRITER"));
+    await waitFor(() => expect(replace).toHaveBeenCalledWith("/contribute/register"));
+    expect(screen.queryByText("Confirm it is you")).toBeNull();
+  });
+
+  it("goes straight to the articles when there is no profile left to fill in", async () => {
+    patient.loggedIn = true;
+    api.sessionFromPatient.mockResolvedValue({ signedIn: true, needsRegistration: false });
+    render(<OnboardingFlow />);
+    await userEvent.click(screen.getByRole("radio", { name: /Health worker/ }));
+    await userEvent.click(screen.getByRole("button", { name: "Continue" }));
+    await waitFor(() => expect(replace).toHaveBeenCalledWith("/contribute"));
+  });
+
+  it("falls back to the code when the login turns out not to be usable", async () => {
+    patient.loggedIn = true;
+    const { ApiError } = await import("@/lib/contributor/client");
+    api.sessionFromPatient.mockRejectedValue(new ApiError(401, "Please log in again."));
+    render(<OnboardingFlow />);
+    await userEvent.click(screen.getByRole("radio", { name: /Writer/ }));
+    await userEvent.click(screen.getByRole("button", { name: "Continue" }));
+    expect(await screen.findByText("Confirm it is you")).toBeInTheDocument();
+  });
+
+  it("an invitation link still checks the number with a code", async () => {
+    patient.loggedIn = true;
+    render(<OnboardingFlow inviteToken="demo" fixedRole="INDEPENDENT_DOCTOR" />);
+    expect(screen.getByText("Confirm it is you")).toBeInTheDocument();
+    expect(api.sessionFromPatient).not.toHaveBeenCalled();
   });
 });
 

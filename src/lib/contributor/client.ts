@@ -20,7 +20,25 @@ export class ApiError extends Error {
   }
 }
 
-async function call<T>(path: string, init?: RequestInit): Promise<T> {
+// Calls that are themselves about signing in or out never trigger the automatic sign-in below.
+const AUTH_PATHS = /^(otp\/|enrol|sso\/|session-from-patient|profile-tag|logout|invite\/)/;
+
+let patientSignIn: Promise<boolean> | null = null;
+
+/**
+ * A person who is signed in on Doctor Dekho (their number was proven by the WhatsApp code) should not be asked for another code to use the
+ * Health Wiki. When a contributor call answers "sign in", the patient login is tried once (the server turns it into a contributor session).
+ * Several calls failing at once share one attempt.
+ */
+function signInFromPatientLogin(): Promise<boolean> {
+  patientSignIn ??= fetch("/api/contributor/session-from-patient", { method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json" }, body: "{}" })
+    .then((r) => r.ok)
+    .catch(() => false)
+    .finally(() => { setTimeout(() => { patientSignIn = null; }, 2000); });
+  return patientSignIn;
+}
+
+async function call<T>(path: string, init?: RequestInit, retried = false): Promise<T> {
   let res: Response;
   try {
     res = await fetch(`/api/contributor/${path}`, {
@@ -31,6 +49,7 @@ async function call<T>(path: string, init?: RequestInit): Promise<T> {
   } catch {
     throw new ApiError(0, "No connection. Check your internet and try again.");
   }
+  if (res.status === 401 && !retried && !AUTH_PATHS.test(path) && (await signInFromPatientLogin())) return call<T>(path, init, true);
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new ApiError(res.status, (data as { message?: string }).message || "Something went wrong. Try again.");
   return data as T;
@@ -44,6 +63,12 @@ export const contributorApi = {
     call<{ sent: true; devCode?: string }>("otp/send", send("POST", { mobile, inviteToken })),
   verifyOtp: (mobile: string, code: string, opts: { inviteToken?: string | null; role?: EnrolRole | null }) =>
     call<{ signedIn: true; needsRegistration: boolean }>("otp/verify", send("POST", { mobile, code, ...opts })),
+  /**
+   * Opens the contributor area for the signed-in patient with no second code. With a role, a patient who is not a contributor yet joins as that
+   * role. Rejects when there is no patient login, or the person is not a contributor and gave no role.
+   */
+  sessionFromPatient: (role?: EnrolRole | null) =>
+    call<{ signedIn: true; needsRegistration: boolean }>("session-from-patient", send("POST", role ? { role } : {})),
   /** A hospital doctor arriving from EasyHMS: the one-time code in the address becomes a session. */
   ssoExchange: (code: string) => call<{ signedIn: true; needsRegistration: boolean }>("sso/exchange", send("POST", { code })),
   register: (input: RegisterInput) => call<ContributorMe>("register", send("POST", input)),

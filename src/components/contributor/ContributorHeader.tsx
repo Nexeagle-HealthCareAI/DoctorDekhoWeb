@@ -7,11 +7,14 @@ import { LogOut } from "lucide-react";
 import { Logo } from "@/components/Logo";
 import { contributorApi } from "@/lib/contributor/client";
 import type { ContributorMe } from "@/lib/contributor/types";
+import { usePatientAuth } from "@/hooks/usePatientAuth";
+import AccountMenu from "@/components/patient/AccountMenu";
 
 export default function ContributorHeader() {
   const router = useRouter();
   const pathname = usePathname();
   const [me, setMe] = useState<ContributorMe | null>(null);
+  const { isLoggedIn } = usePatientAuth();
 
   useEffect(() => {
     let alive = true;
@@ -34,7 +37,8 @@ export default function ContributorHeader() {
           <span className="hidden sm:inline-flex"><Logo textSize="text-lg" /></span>
           <span className="hidden md:inline text-xs font-bold uppercase tracking-widest text-slate-400 border-l border-slate-200 pl-3">Health Wiki contributors</span>
         </Link>
-        {me && (
+        {/* Signed in on Doctor Dekho: the same account menu as everywhere (Sign out is there). Joined only through the Health Wiki: its own sign out. */}
+        {isLoggedIn ? <AccountMenu /> : me && (
           <div className="flex items-center gap-3 min-w-0">
             <span className="text-sm font-semibold text-slate-700 truncate max-w-[10rem]">{me.fullName || "Your profile"}</span>
             <button type="button" onClick={signOut} aria-label="Sign out" className="inline-flex items-center gap-1.5 text-sm font-semibold text-slate-500 hover:text-brand-teal rounded-lg px-2 py-1.5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand-teal">
