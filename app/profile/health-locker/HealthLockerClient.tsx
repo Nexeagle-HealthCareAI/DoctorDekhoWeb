@@ -8,6 +8,8 @@ import { usePatientAuth } from "@/hooks/usePatientAuth";
 import { useHealthLocker } from "@/hooks/useHealthLocker";
 import { FileText, Upload, Trash2, LogIn, ShieldCheck } from "lucide-react";
 import Link from "next/link";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useFamilyMembers } from "@/hooks/useFamilyMembers";
 
 const DOCUMENT_TYPES = ["Prescription", "Lab Report", "X-ray / Scan", "Discharge Summary", "Vaccination Record", "Other"];
 
@@ -16,7 +18,14 @@ const formatDate = (iso: string) =>
 
 export default function HealthLockerClient() {
   const { isLoggedIn, isLoading: authLoading } = usePatientAuth();
-  const { documents, isLoading, upload, remove } = useHealthLocker(isLoggedIn);
+  const router = useRouter();
+  const pathname = usePathname();
+  const { members } = useFamilyMembers(isLoggedIn);
+  // Whose records: ?member=<id> for a family member of this account, nothing for the person's own.
+  const requested = useSearchParams().get("member");
+  const memberId = requested && members.some((m) => m.memberId === requested) ? requested : null;
+  const who = members.find((m) => m.memberId === memberId);
+  const { documents, isLoading, upload, remove } = useHealthLocker(isLoggedIn, memberId);
 
   const [documentType, setDocumentType] = useState(DOCUMENT_TYPES[0]);
   const [notes, setNotes] = useState("");
@@ -64,7 +73,7 @@ export default function HealthLockerClient() {
     }
     const result = await upload.mutateAsync({ file: selectedFile, documentType, notes: notes || undefined });
     if (result.success) {
-      toast.success("Document saved to your Health Locker.");
+      toast.success(who ? `Saved to ${who.firstName}'s records.` : "Document saved to your Health Locker.");
       setSelectedFile(null);
       setNotes("");
       setDocumentType(DOCUMENT_TYPES[0]);
@@ -87,8 +96,25 @@ export default function HealthLockerClient() {
     <ProfileShell>
         <h1 className="text-2xl font-display font-extrabold text-slate-900 tracking-tight mb-1">Health Locker</h1>
         <p className="text-sm text-slate-500 mb-6">
-          Keep your prescriptions, lab reports, and other medical documents safe for future reference — from any visit, any hospital.
+          {who
+            ? `${who.fullName}'s prescriptions, lab reports and other medical documents, kept together.`
+            : "Keep your prescriptions, lab reports, and other medical documents safe for future reference — from any visit, any hospital."}
         </p>
+
+        {members.length > 0 && (
+          <div className="mb-6">
+            <label htmlFor="hl-who" className="block text-[11px] font-semibold text-slate-400 uppercase tracking-wide mb-1.5">Whose records</label>
+            <select
+              id="hl-who"
+              value={memberId ?? ""}
+              onChange={(e) => router.replace(e.target.value ? `${pathname}?member=${e.target.value}` : pathname)}
+              className="w-full sm:w-80 h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-brand-teal/30 focus:border-brand-teal"
+            >
+              <option value="">Me</option>
+              {members.map((m) => <option key={m.memberId} value={m.memberId}>{m.fullName} ({m.relation})</option>)}
+            </select>
+          </div>
+        )}
 
         {/* Upload card */}
         <div className="bg-white rounded-3xl p-5 mb-6 shadow-[0_4px_20px_rgb(0,0,0,0.03)] border border-slate-100 space-y-4">

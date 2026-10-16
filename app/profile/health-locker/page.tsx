@@ -1,4 +1,5 @@
 import { Metadata } from "next";
+import { Suspense } from "react";
 import HealthLockerClient from "./HealthLockerClient";
 
 export const metadata: Metadata = {
@@ -11,5 +12,6 @@ export const metadata: Metadata = {
 };
 
 export default function HealthLockerPage() {
-  return <HealthLockerClient />;
+  // useSearchParams (which family member) needs a Suspense boundary above it.
+  return <Suspense><HealthLockerClient /></Suspense>;
 }

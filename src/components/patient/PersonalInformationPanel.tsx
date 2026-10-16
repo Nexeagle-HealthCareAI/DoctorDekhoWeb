@@ -1,10 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { Cake, Mail, Pencil, User, Users } from "lucide-react";
+import { Cake, Droplet, Mail, Pencil, User, Users } from "lucide-react";
 import { toast } from "sonner";
 import { usePatientAuth } from "@/hooks/usePatientAuth";
-import { usePatientProfile, useSavePatientProfile, type PatientProfile, type PatientProfileInput } from "@/hooks/usePatientProfile";
+import { BLOOD_GROUPS, usePatientProfile, useSavePatientProfile, type PatientProfile, type PatientProfileInput } from "@/hooks/usePatientProfile";
 
 const FIELD = "w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm text-slate-900 focus:outline-none focus:border-brand-teal focus:ring-2 focus:ring-brand-teal/20";
 const LABEL = "block text-[11px] font-semibold text-slate-500 uppercase tracking-wide mb-1.5";
@@ -22,8 +22,18 @@ function Row({ icon, label, value }: { icon: React.ReactNode; label: string; val
   );
 }
 
+/** An older record may only have one full name: its first word is the first name, the rest the last name. */
+const splitName = (p?: PatientProfile): [string, string | null] => {
+  if (p?.firstName) return [p.firstName, p.lastName ?? null];
+  const full = (p?.fullName ?? "").trim();
+  const i = full.indexOf(" ");
+  return i < 0 ? [full, null] : [full.slice(0, i), full.slice(i + 1).trim() || null];
+};
+
 const asInput = (p?: PatientProfile): PatientProfileInput => ({
-  fullName: p?.fullName ?? "",
+  firstName: splitName(p)[0],
+  lastName: splitName(p)[1],
+  bloodGroup: p?.bloodGroup ?? null,
   age: p?.age ?? null,
   ageUnit: (p?.ageUnit as PatientProfileInput["ageUnit"]) ?? (p?.age != null ? "Y" : null),
   sex: (p?.sex as PatientProfileInput["sex"]) ?? null,
@@ -41,20 +51,26 @@ function EditForm({ initial, onDone }: { initial: PatientProfileInput; onDone: (
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (v.fullName.trim().length < 2) return setError("Enter your full name.");
+    if (v.firstName.trim().length < 1) return setError("Enter your first name.");
     if (v.age != null && (v.age < 0 || v.age > 120)) return setError("Age must be between 0 and 120.");
     setError(null);
     save.mutate(
-      { ...v, fullName: v.fullName.trim(), ageUnit: v.age != null ? v.ageUnit ?? "Y" : null },
+      { ...v, firstName: v.firstName.trim(), lastName: v.lastName?.trim() || null, ageUnit: v.age != null ? v.ageUnit ?? "Y" : null },
       { onSuccess: () => { toast.success("Your details are saved."); onDone(); }, onError: (err) => setError(err instanceof Error ? err.message : "Could not save. Try again.") },
     );
   };
 
   return (
     <form onSubmit={submit} noValidate aria-label="Edit personal information" className="bg-white rounded-3xl shadow-[0_4px_20px_rgb(0,0,0,0.03)] border border-slate-100 p-5 sm:p-6 space-y-5">
-      <div>
-        <label htmlFor="pi-name" className={LABEL}>Full name</label>
-        <input id="pi-name" className={FIELD} value={v.fullName} maxLength={200} autoComplete="name" onChange={(e) => set("fullName", e.target.value)} />
+      <div className="grid gap-5 sm:grid-cols-2">
+        <div>
+          <label htmlFor="pi-first" className={LABEL}>First name</label>
+          <input id="pi-first" className={FIELD} value={v.firstName} maxLength={100} autoComplete="given-name" onChange={(e) => set("firstName", e.target.value)} />
+        </div>
+        <div>
+          <label htmlFor="pi-last" className={LABEL}>Last name <span className="font-normal normal-case text-slate-400">(optional)</span></label>
+          <input id="pi-last" className={FIELD} value={v.lastName ?? ""} maxLength={100} autoComplete="family-name" onChange={(e) => set("lastName", blank(e.target.value))} />
+        </div>
       </div>
       <div className="grid gap-5 sm:grid-cols-2">
         <div>
@@ -76,13 +92,22 @@ function EditForm({ initial, onDone }: { initial: PatientProfileInput; onDone: (
           </select>
         </div>
       </div>
-      <div>
-        <label htmlFor="pi-email" className={LABEL}>Email <span className="font-normal normal-case text-slate-400">(optional)</span></label>
-        <input id="pi-email" type="email" className={FIELD} value={v.email ?? ""} maxLength={200} autoComplete="email" onChange={(e) => set("email", blank(e.target.value))} />
+      <div className="grid gap-5 sm:grid-cols-2">
+        <div>
+          <label htmlFor="pi-blood" className={LABEL}>Blood group <span className="font-normal normal-case text-slate-400">(optional)</span></label>
+          <select id="pi-blood" className={FIELD} value={v.bloodGroup ?? ""} onChange={(e) => set("bloodGroup", e.target.value || null)}>
+            <option value="">Not sure</option>
+            {BLOOD_GROUPS.map((g) => <option key={g} value={g}>{g}</option>)}
+          </select>
+        </div>
+        <div>
+          <label htmlFor="pi-email" className={LABEL}>Email <span className="font-normal normal-case text-slate-400">(optional)</span></label>
+          <input id="pi-email" type="email" className={FIELD} value={v.email ?? ""} maxLength={200} autoComplete="email" onChange={(e) => set("email", blank(e.target.value))} />
+        </div>
       </div>
       <div className="grid gap-5 sm:grid-cols-2">
         <div>
-          <label htmlFor="pi-guardian" className={LABEL}>Guardian <span className="font-normal normal-case text-slate-400">(optional)</span></label>
+          <label htmlFor="pi-guardian" className={LABEL}>Guardian name <span className="font-normal normal-case text-slate-400">(optional)</span></label>
           <input id="pi-guardian" className={FIELD} value={v.guardianName ?? ""} maxLength={200} onChange={(e) => set("guardianName", blank(e.target.value))} />
         </div>
         <div>
@@ -141,7 +166,9 @@ export default function PersonalInformationPanel() {
       ) : (
         <>
           <div className="bg-white rounded-3xl shadow-[0_4px_20px_rgb(0,0,0,0.03)] border border-slate-100 overflow-hidden">
-            <Row icon={<User className="w-5 h-5" />} label="Full Name" value={profile!.fullName!} />
+            <Row icon={<User className="w-5 h-5" />} label="First Name" value={splitName(profile)[0]} />
+            {splitName(profile)[1] && <Row icon={<User className="w-5 h-5" />} label="Last Name" value={splitName(profile)[1]!} />}
+            {profile!.bloodGroup && <Row icon={<Droplet className="w-5 h-5" />} label="Blood Group" value={profile!.bloodGroup} />}
             {ageSex && <Row icon={<Cake className="w-5 h-5" />} label="Age / Sex" value={ageSex} />}
             {profile!.email && <Row icon={<Mail className="w-5 h-5" />} label="Email" value={profile!.email} />}
             {profile!.guardianName && (

@@ -6,6 +6,9 @@ export interface PatientProfile {
   success: boolean;
   message?: string;
   fullName?: string | null;
+  firstName?: string | null;
+  lastName?: string | null;
+  bloodGroup?: string | null;
   age?: number | null;
   ageUnit?: string | null;
   sex?: string | null;
@@ -17,7 +20,9 @@ export interface PatientProfile {
 }
 
 export interface PatientProfileInput {
-  fullName: string;
+  firstName: string;
+  lastName: string | null;
+  bloodGroup: string | null;
   age: number | null;
   ageUnit: "Y" | "M" | "D" | null;
   sex: "Male" | "Female" | "Other" | null;
@@ -30,6 +35,8 @@ async function fetchPatientProfile(): Promise<PatientProfile> {
   const res = await fetch("/api/public/patients/me");
   return res.json();
 }
+
+export const BLOOD_GROUPS = ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"] as const;
 
 /** Read-only "Personal Information" — only meaningful once logged in, so callers should gate
  * `enabled` on usePatientAuth().isLoggedIn rather than fetching this on every page load. */

@@ -4,7 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { BookOpen, Calendar, ChevronRight, FolderHeart, HelpCircle, PenLine, User } from "lucide-react";
+import { BookOpen, Calendar, ChevronRight, FolderHeart, HelpCircle, PenLine, User, Users } from "lucide-react";
 import { openContributorArea, useContributorTag } from "@/hooks/useContributorTag";
 import { usePatientAuth } from "@/hooks/usePatientAuth";
 import { CONTRIBUTOR_ENABLED } from "@/lib/contributor/session";
@@ -46,6 +46,7 @@ export default function ProfileNav({ className = "" }: { className?: string }) {
 
   const rows: Row[] = [
     { key: "info", label: "Personal Information", icon: <User className="w-5 h-5" />, href: "/profile/personal-information" },
+    { key: "family", label: "Family Members", hint: "Keep your child's and family's health records", icon: <Users className="w-5 h-5" />, href: "/profile/family" },
     { key: "appointments", label: "My Appointments", icon: <Calendar className="w-5 h-5" />, href: "/appointments" },
     { key: "locker", label: "Health Locker", icon: <FolderHeart className="w-5 h-5" />, href: "/profile/health-locker" },
   ];

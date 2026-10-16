@@ -6,13 +6,15 @@ import { PATIENT_SESSION_COOKIE } from "@/lib/api/patientSession";
 export const dynamic = "force-dynamic";
 
 // GET /api/public/patients/me/documents  →  proxies GET {EASYHMS}/public/patients/me/documents
-export async function GET(_req: NextRequest) {
+export async function GET(req: NextRequest) {
   const token = cookies().get(PATIENT_SESSION_COOKIE)?.value;
   if (!token) {
     return NextResponse.json({ success: false, message: "Please log in again.", documents: [] }, { status: 401 });
   }
 
-  const r = await easyhmsFetch("/public/patients/me/documents", {
+  // Whose records: a family member of this account (the API checks it is theirs), or empty for their own.
+  const memberId = req.nextUrl.searchParams.get("memberId");
+  const r = await easyhmsFetch(`/public/patients/me/documents${memberId ? `?memberId=${encodeURIComponent(memberId)}` : ""}`, {
     headers: { Authorization: `Bearer ${token}` },
   });
   if (r.notConfigured) {

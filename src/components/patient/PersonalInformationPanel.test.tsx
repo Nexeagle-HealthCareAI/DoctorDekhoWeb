@@ -20,7 +20,7 @@ beforeEach(() => {
   fetchMock.mockImplementation(async (url: string, init?: RequestInit) => {
     if (init?.method === "PUT") {
       saved = JSON.parse(String(init.body));
-      return { ok: true, status: 200, json: async () => ({ success: true, ...saved, source: "ACCOUNT" }) };
+      return { ok: true, status: 200, json: async () => ({ success: true, ...saved, fullName: `${saved.firstName} ${saved.lastName ?? ""}`.trim(), source: "ACCOUNT" }) };
     }
     return { ok: true, status: 200, json: async () => booking };
   });
@@ -41,17 +41,21 @@ describe("Personal Information: edit and save", () => {
     renderPanel();
     await userEvent.click(await screen.findByRole("button", { name: /Edit/ }));
     const form = screen.getByRole("form", { name: "Edit personal information" });
-    const name = within(form).getByLabelText("Full name");
-    await userEvent.clear(name);
-    await userEvent.type(name, "Aquib Khan");
+    const first = within(form).getByLabelText("First name");
+    await userEvent.clear(first);
+    await userEvent.type(first, "Aquib");
+    await userEvent.type(within(form).getByLabelText(/Last name/), "Khan");
+    await userEvent.selectOptions(within(form).getByLabelText(/Blood group/), "O+");
     await userEvent.type(within(form).getByLabelText(/Email/), "aquib@example.com");
     await userEvent.click(within(form).getByRole("button", { name: "Save" }));
 
     await waitFor(() => expect(screen.queryByRole("form")).toBeNull());
-    expect(await screen.findByText("Aquib Khan")).toBeInTheDocument();
+    expect(await screen.findByText("Aquib")).toBeInTheDocument();
+    expect(screen.getByText("Khan")).toBeInTheDocument();
+    expect(screen.getByText("O+")).toBeInTheDocument();
     expect(screen.getByText("aquib@example.com")).toBeInTheDocument();
     expect(screen.getByText(/Saved on your Doctor Dekho account/)).toBeInTheDocument();
-    expect(saved).toMatchObject({ fullName: "Aquib Khan", age: 32, ageUnit: "Y", sex: "Male", email: "aquib@example.com" });
+    expect(saved).toMatchObject({ firstName: "Aquib", lastName: "Khan", bloodGroup: "O+", age: 32, ageUnit: "Y", sex: "Male", email: "aquib@example.com" });
     expect(toast.success).toHaveBeenCalled();
   });
 
@@ -59,9 +63,9 @@ describe("Personal Information: edit and save", () => {
     renderPanel();
     await userEvent.click(await screen.findByRole("button", { name: /Edit/ }));
     const form = screen.getByRole("form", { name: "Edit personal information" });
-    await userEvent.clear(within(form).getByLabelText("Full name"));
+    await userEvent.clear(within(form).getByLabelText("First name"));
     await userEvent.click(within(form).getByRole("button", { name: "Save" }));
-    expect(await within(form).findByRole("alert")).toHaveTextContent("Enter your full name");
+    expect(await within(form).findByRole("alert")).toHaveTextContent("Enter your first name");
     expect(fetchMock.mock.calls.some((c) => c[1]?.method === "PUT")).toBe(false);
   });
 
@@ -80,10 +84,18 @@ describe("Personal Information: edit and save", () => {
   it("Cancel leaves the details as they were", async () => {
     renderPanel();
     await userEvent.click(await screen.findByRole("button", { name: /Edit/ }));
-    await userEvent.type(screen.getByLabelText("Full name"), " changed");
+    await userEvent.type(screen.getByLabelText("First name"), " changed");
     await userEvent.click(screen.getByRole("button", { name: "Cancel" }));
     expect(screen.queryByRole("form")).toBeNull();
     expect(screen.getByText("Aquiib")).toBeInTheDocument();
+  });
+
+  it("splits an older single full name into first and last name for editing", async () => {
+    fetchMock.mockImplementation(async () => ({ ok: true, status: 200, json: async () => ({ success: true, fullName: "Zara Bano Ali", source: "BOOKING" }) }));
+    renderPanel();
+    await userEvent.click(await screen.findByRole("button", { name: /Edit/ }));
+    expect(screen.getByLabelText("First name")).toHaveValue("Zara");
+    expect(screen.getByLabelText(/Last name/)).toHaveValue("Bano Ali");
   });
 
   it("lets someone with nothing on file add details", async () => {

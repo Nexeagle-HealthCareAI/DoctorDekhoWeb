@@ -5,6 +5,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 export interface HealthLockerDocument {
   documentId: string;
   apptId: string | null;
+  memberId?: string | null;
   documentType: string | null;
   fileName: string | null;
   storageUrl: string | null;
@@ -19,22 +20,23 @@ interface DocumentsResponse {
   notConfigured?: boolean;
 }
 
-const QUERY_KEY = ["health-locker", "documents"];
+const queryKey = (memberId: string | null) => ["health-locker", "documents", memberId ?? "me"];
 
-async function fetchDocuments(): Promise<DocumentsResponse> {
-  const res = await fetch("/api/public/patients/me/documents");
+async function fetchDocuments(memberId: string | null): Promise<DocumentsResponse> {
+  const res = await fetch(`/api/public/patients/me/documents${memberId ? `?memberId=${encodeURIComponent(memberId)}` : ""}`);
   return res.json();
 }
 
 /** Patient-owned document uploads, independent of any appointment (see PatientHealthLockerDocument
  * on the backend) — same httpOnly-cookie session as usePatientAuth, so this is only meaningful
  * once logged in; callers should gate `enabled` on usePatientAuth().isLoggedIn. */
-export function useHealthLocker(enabled: boolean) {
+export function useHealthLocker(enabled: boolean, memberId: string | null = null) {
+  const QUERY_KEY = queryKey(memberId);
   const queryClient = useQueryClient();
 
   const documents = useQuery({
     queryKey: QUERY_KEY,
-    queryFn: fetchDocuments,
+    queryFn: () => fetchDocuments(memberId),
     enabled,
     staleTime: 15_000,
   });
@@ -46,11 +48,13 @@ export function useHealthLocker(enabled: boolean) {
       formData.append("FileName", vars.file.name);
       formData.append("DocumentType", vars.documentType);
       if (vars.notes) formData.append("Notes", vars.notes);
+      if (memberId) formData.append("MemberId", memberId);
       const res = await fetch("/api/public/patients/me/documents", { method: "POST", body: formData });
       return (await res.json()) as { success: boolean; message?: string };
     },
     onSuccess: async (data) => {
-      if (data.success) await queryClient.invalidateQueries({ queryKey: QUERY_KEY });
+      if (data.success) await queryClient.invalidateQueries({ queryKey: ["health-locker"] });
+        await queryClient.invalidateQueries({ queryKey: ["family-members"] });
     },
   });
 
@@ -60,7 +64,8 @@ export function useHealthLocker(enabled: boolean) {
       return (await res.json()) as { success: boolean; message?: string };
     },
     onSuccess: async (data) => {
-      if (data.success) await queryClient.invalidateQueries({ queryKey: QUERY_KEY });
+      if (data.success) await queryClient.invalidateQueries({ queryKey: ["health-locker"] });
+        await queryClient.invalidateQueries({ queryKey: ["family-members"] });
     },
   });
 
