@@ -5,27 +5,45 @@ import { toast } from "sonner";
 import PatientTopBar from "@/components/patient/PatientTopBar";
 import ProfileShell from "@/components/patient/ProfileShell";
 import { usePatientAuth } from "@/hooks/usePatientAuth";
-import { useHealthLocker } from "@/hooks/useHealthLocker";
-import { FileText, Upload, Trash2, LogIn, ShieldCheck } from "lucide-react";
+import { useHealthLocker, type HealthLockerDocument, type LockerScope } from "@/hooks/useHealthLocker";
+import { FileText, Upload, Trash2, LogIn, ShieldCheck, Stethoscope, User, Users } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useFamilyMembers } from "@/hooks/useFamilyMembers";
 
 const DOCUMENT_TYPES = ["Prescription", "Lab Report", "X-ray / Scan", "Discharge Summary", "Vaccination Record", "Other"];
 
+/** "Dr. Rao · Rao Clinic, Lucknow · 01 Sep 2026" — the visit a record is from, whether it is a booking here or a doctor added by hand. */
+const visitLine = (d: HealthLockerDocument) => {
+  const doctor = d.externalDoctorName ?? d.doctorName;
+  const place = d.externalDoctorName ? [d.externalClinicName, d.externalLocation].filter(Boolean).join(", ") : d.hospitalName;
+  return [doctor, place, d.visitDate ? formatDate(d.visitDate) : null].filter(Boolean).join(" · ");
+};
+
 const formatDate = (iso: string) =>
   new Date(iso).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
 
 export default function HealthLockerClient() {
-  const { isLoggedIn, isLoading: authLoading } = usePatientAuth();
+  const { isLoggedIn, isLoading: authLoading, appointments } = usePatientAuth();
   const router = useRouter();
   const pathname = usePathname();
   const { members } = useFamilyMembers(isLoggedIn);
-  // Whose records: ?member=<id> for a family member of this account, nothing for the person's own.
+  // Whose records to show: ?member=me, ?member=<id> for a family member of this account, otherwise everyone's.
   const requested = useSearchParams().get("member");
-  const memberId = requested && members.some((m) => m.memberId === requested) ? requested : null;
-  const who = members.find((m) => m.memberId === memberId);
-  const { documents, isLoading, upload, remove } = useHealthLocker(isLoggedIn, memberId);
+  const scope: LockerScope = requested === "me" ? "me" : requested && members.some((m) => m.memberId === requested) ? requested : "all";
+  const { documents, isLoading, upload, remove } = useHealthLocker(isLoggedIn, scope);
+  const nameOf = (id?: string | null) => members.find((m) => m.memberId === id);
+
+  // Whose record is being added, and which visit it is from. Starts on whoever is being looked at.
+  const [forMember, setForMember] = useState<string>("");
+  const ownerId = scope !== "all" && scope !== "me" ? scope : forMember;
+  const who = nameOf(ownerId);
+  const [visit, setVisit] = useState<"none" | "appointment" | "other">("none");
+  const [apptId, setApptId] = useState("");
+  const [doctorName, setDoctorName] = useState("");
+  const [clinicName, setClinicName] = useState("");
+  const [location, setLocation] = useState("");
+  const [visitDate, setVisitDate] = useState("");
 
   const [documentType, setDocumentType] = useState(DOCUMENT_TYPES[0]);
   const [notes, setNotes] = useState("");
@@ -71,12 +89,25 @@ export default function HealthLockerClient() {
       toast.error("Please select a file first.");
       return;
     }
-    const result = await upload.mutateAsync({ file: selectedFile, documentType, notes: notes || undefined });
+    if (visit === "appointment" && !apptId) return toast.error("Choose the visit, or pick another option.");
+    if (visit === "other" && !doctorName.trim()) return toast.error("Enter the doctor's name.");
+    const result = await upload.mutateAsync({
+      file: selectedFile,
+      documentType,
+      notes: notes || undefined,
+      target: {
+        memberId: ownerId || null,
+        apptId: visit === "appointment" ? apptId : null,
+        external: visit === "other" ? { doctorName, clinicName, location } : null,
+        visitDate: visit === "other" && visitDate ? visitDate : null,
+      },
+    });
     if (result.success) {
       toast.success(who ? `Saved to ${who.firstName}'s records.` : "Document saved to your Health Locker.");
       setSelectedFile(null);
       setNotes("");
       setDocumentType(DOCUMENT_TYPES[0]);
+      setVisit("none"); setApptId(""); setDoctorName(""); setClinicName(""); setLocation(""); setVisitDate("");
       if (fileInputRef.current) fileInputRef.current.value = "";
     } else {
       toast.error(result.message || "Could not upload the document.");
@@ -95,29 +126,89 @@ export default function HealthLockerClient() {
   return (
     <ProfileShell>
         <h1 className="text-2xl font-display font-extrabold text-slate-900 tracking-tight mb-1">Health Locker</h1>
-        <p className="text-sm text-slate-500 mb-6">
-          {who
-            ? `${who.fullName}'s prescriptions, lab reports and other medical documents, kept together.`
-            : "Keep your prescriptions, lab reports, and other medical documents safe for future reference — from any visit, any hospital."}
+        <p className="text-sm text-slate-500 mb-5">
+          Keep prescriptions, lab reports and other medical documents for you and your family, and link each one to the doctor visit it came from.
         </p>
 
         {members.length > 0 && (
-          <div className="mb-6">
-            <label htmlFor="hl-who" className="block text-[11px] font-semibold text-slate-400 uppercase tracking-wide mb-1.5">Whose records</label>
-            <select
-              id="hl-who"
-              value={memberId ?? ""}
-              onChange={(e) => router.replace(e.target.value ? `${pathname}?member=${e.target.value}` : pathname)}
-              className="w-full sm:w-80 h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-brand-teal/30 focus:border-brand-teal"
-            >
-              <option value="">Me</option>
-              {members.map((m) => <option key={m.memberId} value={m.memberId}>{m.fullName} ({m.relation})</option>)}
-            </select>
+          <div className="flex flex-wrap gap-2 mb-6" role="tablist" aria-label="Whose records">
+            {[{ key: "all", label: "Everyone" }, { key: "me", label: "Me" }, ...members.map((m) => ({ key: m.memberId, label: m.firstName }))].map((t) => (
+              <button
+                key={t.key}
+                type="button"
+                role="tab"
+                aria-selected={scope === t.key}
+                onClick={() => router.replace(t.key === "all" ? pathname : `${pathname}?member=${t.key}`)}
+                className={`px-4 py-2 rounded-full text-sm font-semibold border transition-colors ${scope === t.key ? "bg-brand-teal text-white border-brand-teal" : "bg-white text-slate-600 border-slate-200 hover:border-brand-teal hover:text-brand-teal"}`}
+              >
+                {t.label}
+              </button>
+            ))}
           </div>
         )}
 
         {/* Upload card */}
         <div className="bg-white rounded-3xl p-5 mb-6 shadow-[0_4px_20px_rgb(0,0,0,0.03)] border border-slate-100 space-y-4">
+          <div>
+            <label htmlFor="hl-for" className="block text-[11px] font-semibold text-slate-400 uppercase tracking-wide mb-1.5">This record is for</label>
+            {scope !== "all" && scope !== "me" ? (
+              <p id="hl-for" className="text-sm font-semibold text-slate-900">{who ? `${who.fullName} (${who.relation})` : ""}</p>
+            ) : (
+              <select id="hl-for" value={forMember} onChange={(e) => setForMember(e.target.value)} className="w-full h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-brand-teal/30 focus:border-brand-teal">
+                <option value="">Me</option>
+                {members.map((m) => <option key={m.memberId} value={m.memberId}>{m.fullName} ({m.relation})</option>)}
+              </select>
+            )}
+            {members.length === 0 && (
+              <p className="text-xs text-slate-400 mt-1.5">Keeping records for your child or parent too? <Link href="/profile/family" className="font-semibold text-brand-teal hover:underline">Add a family member</Link></p>
+            )}
+          </div>
+
+          <div>
+            <label htmlFor="hl-visit" className="block text-[11px] font-semibold text-slate-400 uppercase tracking-wide mb-1.5">Doctor visit <span className="font-normal normal-case text-slate-400">(optional)</span></label>
+            <select id="hl-visit" value={visit} onChange={(e) => setVisit(e.target.value as typeof visit)} className="w-full h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-brand-teal/30 focus:border-brand-teal">
+              <option value="none">Not linked to a visit</option>
+              {appointments.length > 0 && <option value="appointment">A visit from my appointments</option>}
+              <option value="other">A doctor who is not listed here</option>
+            </select>
+          </div>
+
+          {visit === "appointment" && (
+            <div>
+              <label htmlFor="hl-appt" className="block text-[11px] font-semibold text-slate-400 uppercase tracking-wide mb-1.5">Which visit</label>
+              <select id="hl-appt" value={apptId} onChange={(e) => setApptId(e.target.value)} className="w-full h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-brand-teal/30 focus:border-brand-teal">
+                <option value="">Choose a visit</option>
+                {appointments.map((a) => (
+                  <option key={a.appointmentId} value={a.appointmentId}>{`${a.doctorName} · ${a.hospitalName} · ${formatDate(a.apptDate)}`}</option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          {visit === "other" && (
+            <fieldset className="space-y-4 rounded-2xl border border-slate-100 bg-slate-50 p-4">
+              <legend className="px-1 text-xs font-semibold text-slate-500">Add the doctor</legend>
+              <div>
+                <label htmlFor="hl-doc" className="block text-[11px] font-semibold text-slate-400 uppercase tracking-wide mb-1.5">Doctor&apos;s name</label>
+                <input id="hl-doc" value={doctorName} maxLength={200} onChange={(e) => setDoctorName(e.target.value)} className="w-full h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-brand-teal/30 focus:border-brand-teal" placeholder="For example: Dr. Rao" />
+              </div>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div>
+                  <label htmlFor="hl-clinic" className="block text-[11px] font-semibold text-slate-400 uppercase tracking-wide mb-1.5">Clinic or hospital <span className="font-normal normal-case text-slate-400">(optional)</span></label>
+                  <input id="hl-clinic" value={clinicName} maxLength={200} onChange={(e) => setClinicName(e.target.value)} className="w-full h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-brand-teal/30 focus:border-brand-teal" />
+                </div>
+                <div>
+                  <label htmlFor="hl-loc" className="block text-[11px] font-semibold text-slate-400 uppercase tracking-wide mb-1.5">Location <span className="font-normal normal-case text-slate-400">(optional)</span></label>
+                  <input id="hl-loc" value={location} maxLength={300} onChange={(e) => setLocation(e.target.value)} className="w-full h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-brand-teal/30 focus:border-brand-teal" placeholder="Area and city" />
+                </div>
+              </div>
+              <div>
+                <label htmlFor="hl-date" className="block text-[11px] font-semibold text-slate-400 uppercase tracking-wide mb-1.5">Date of visit <span className="font-normal normal-case text-slate-400">(optional)</span></label>
+                <input id="hl-date" type="date" value={visitDate} max={new Date().toISOString().slice(0, 10)} onChange={(e) => setVisitDate(e.target.value)} className="w-full h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-brand-teal/30 focus:border-brand-teal sm:w-56" />
+              </div>
+            </fieldset>
+          )}
+
           <div>
             <label className="block text-[11px] font-semibold text-slate-400 uppercase tracking-wide mb-1.5">Document type</label>
             <select
@@ -194,6 +285,17 @@ export default function HealthLockerClient() {
                     {doc.documentType && <span>{doc.documentType} · </span>}
                     {formatDate(doc.uploadedAt)}
                   </p>
+                  {visitLine(doc) && (
+                    <p className="text-[11px] text-slate-500 mt-0.5 flex items-center gap-1 min-w-0">
+                      <Stethoscope className="w-3 h-3 shrink-0" aria-hidden="true" /> <span className="truncate">{visitLine(doc)}</span>
+                    </p>
+                  )}
+                  {members.length > 0 && (
+                    <span className="inline-flex items-center gap-1 mt-1 px-2 py-0.5 rounded-full bg-teal-50 text-[11px] font-semibold text-brand-teal">
+                      {doc.memberId ? <Users className="w-3 h-3" aria-hidden="true" /> : <User className="w-3 h-3" aria-hidden="true" />}
+                      {nameOf(doc.memberId)?.fullName ?? "Me"}
+                    </span>
+                  )}
                 </a>
                 <button
                   onClick={() => handleDelete(doc.documentId)}
