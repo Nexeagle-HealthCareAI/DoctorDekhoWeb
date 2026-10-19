@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useIsRestoring } from "@tanstack/react-query";
 import { motion, useReducedMotion } from "framer-motion";
 import { Frown, Loader2, ChevronDown, ChevronLeft, ChevronRight, SlidersHorizontal, MapPin, Sparkles } from "lucide-react";
@@ -315,9 +315,16 @@ export default function DoctorDirectory({
   // an actual search intent (free-text query or a specialty filter), not the default browse-all
   // state. This is the only place that knows the final result count, so it's the natural home for
   // this event rather than the search box itself (PatientHero.tsx).
+  // One event per distinct search: results growing as more pages load, or this effect re-running
+  // for the same query, must not log the search again (it used to, inflating the CMS search counts).
+  const lastLoggedSearchRef = useRef<string | null>(null);
+
   useEffect(() => {
     const q = query.trim();
     if (!q && !specialtyId) return;
+    // Wait for the symptom router: logging before it answers recorded the same search twice
+    // (once without AI results, once with).
+    if (smartSearch.isPending) return;
 
     const handle = setTimeout(() => {
       // When the AI path drove the results, log what it ACTUALLY predicted (aiIntent's own
@@ -327,6 +334,9 @@ export default function DoctorDirectory({
       // previous manual selection. This is what feeds the 1HMS-NLP-Router feedback loop, so
       // getting the predicted value right matters.
       const loggedSpecialtyId = usingAiResults ? aiIntent?.specialtyId ?? undefined : specialtyId || undefined;
+      const searchKey = `${q.toLowerCase()}|${loggedSpecialtyId ?? ""}|${usingAiResults}`;
+      if (lastLoggedSearchRef.current === searchKey) return;
+      lastLoggedSearchRef.current = searchKey;
 
       trackEvent("search_performed", {
         specialtyId: loggedSpecialtyId,
@@ -368,7 +378,7 @@ export default function DoctorDirectory({
 
     return () => clearTimeout(handle);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [query, specialtyId, filtered.length, usingAiResults, aiIntent]);
+  }, [query, specialtyId, filtered.length, usingAiResults, aiIntent, smartSearch.isPending]);
 
   // ── Paginated page slice ─────────────────────────────────────────────────
   // When browsing unfiltered (no specialty chip, free-text query, GPS radius, or area narrowing
