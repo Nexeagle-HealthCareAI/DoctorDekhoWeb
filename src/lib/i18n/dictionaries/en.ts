@@ -218,6 +218,11 @@ export const en = {
   "footer.allRightsReserved": "All rights reserved.",
   "footer.privacy": "Privacy",
   "footer.terms": "Terms",
+  "footer.trackingChoices": "Tracking choices",
+  "consent.text": "We record how this site is used (pages visited, searches and booking steps) to improve Doctor Dekho and to show hospitals which of their doctors people look at. IP addresses are shortened before storage. Visit data is deleted after 12 months, hospital-interest records after 24. You can decline.",
+  "consent.accept": "OK",
+  "consent.decline": "Decline",
+  "consent.learnMore": "Privacy policy",
 
   // ── Language toggle itself ───────────────────────────────────────────────
   "language.choose": "Choose your language",

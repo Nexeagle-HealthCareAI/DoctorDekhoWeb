@@ -199,6 +199,11 @@ export const bn: Record<keyof typeof en, string> = {
   "footer.allRightsReserved": "সর্বস্বত্ব সংরক্ষিত।",
   "footer.privacy": "গোপনীয়তা",
   "footer.terms": "শর্তাবলী",
+  "footer.trackingChoices": "ট্র্যাকিং পছন্দ",
+  "consent.text": "Doctor Dekho আরও ভালো করতে আমরা দেখি সাইটটি কীভাবে ব্যবহার হচ্ছে (কোন পেজ খোলা হলো, কী সার্চ করা হলো, বুকিংয়ের ধাপ), এবং হাসপাতালগুলোকে জানাই মানুষ তাদের কোন ডাক্তারদের দেখছেন। IP ঠিকানা সেভ করার আগে ছোট করে দেওয়া হয়। ভিজিটের তথ্য ১২ মাস পরে এবং হাসপাতালের তথ্য ২৪ মাস পরে মুছে ফেলা হয়। আপনি না বলতে পারেন।",
+  "consent.accept": "ঠিক আছে",
+  "consent.decline": "না বলুন",
+  "consent.learnMore": "গোপনীয়তা নীতি",
 
   "language.choose": "আপনার ভাষা নির্বাচন করুন",
 

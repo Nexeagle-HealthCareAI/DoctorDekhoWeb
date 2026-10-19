@@ -201,6 +201,11 @@ export const hinglish: Record<keyof typeof en, string> = {
   "footer.allRightsReserved": "Sabhi adhikar surakshit.",
   "footer.privacy": "Privacy",
   "footer.terms": "Terms",
+  "footer.trackingChoices": "Tracking choices",
+  "consent.text": "Doctor Dekho ko behtar banane ke liye hum record karte hain ki site kaise use hoti hai (kaun se pages khole, kya search kiya, booking ke steps), aur hospitals ko batate hain ki log unke kaun se doctors dekh rahe hain. IP address save karne se pehle chhota kar diya jata hai. Visit data 12 mahine baad aur hospital wali jaankari 24 mahine baad delete ho jaati hai. Aap mana kar sakte hain.",
+  "consent.accept": "Theek hai",
+  "consent.decline": "Mana karein",
+  "consent.learnMore": "Privacy policy",
 
   "language.choose": "Apni bhasha chunein",
 

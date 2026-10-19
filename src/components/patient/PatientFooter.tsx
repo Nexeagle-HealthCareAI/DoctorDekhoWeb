@@ -1,6 +1,7 @@
 "use client";
 
 import { BUSINESS_URL } from "@/lib/site";
+import { openConsentChoices } from "@/lib/analytics";
 import Link from "next/link";
 import { Phone, Mail, Building2 } from "lucide-react";
 import { Logo } from "@/components/Logo";
@@ -70,6 +71,7 @@ export default function PatientFooter() {
           <span className="flex items-center gap-4">
             <Link href={`${BUSINESS_URL}/privacy`} className="hover:text-slate-900 transition-colors">{t("footer.privacy")}</Link>
             <Link href={`${BUSINESS_URL}/terms`} className="hover:text-slate-900 transition-colors">{t("footer.terms")}</Link>
+            <button type="button" onClick={openConsentChoices} className="hover:text-slate-900 transition-colors">{t("footer.trackingChoices")}</button>
           </span>
         </div>
       </div>
