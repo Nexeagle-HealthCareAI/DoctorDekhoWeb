@@ -1,5 +1,7 @@
 "use client";
 
+import { isAutomatedBrowser } from "./botUserAgent";
+
 // Website analytics for the CMS Insights tab and the hospitals' Lead Generation page.
 //
 // Privacy rules (decided 2026-10-19):
@@ -138,7 +140,8 @@ function flush(): void {
 }
 
 function enqueue(kind: keyof Batch, item: Record<string, unknown>): void {
-  if (typeof window === "undefined" || !isTrackingAllowed()) return;
+  // Crawlers and automated browsers run this script too; they are not visitors.
+  if (typeof window === "undefined" || !isTrackingAllowed() || isAutomatedBrowser()) return;
   queue[kind].push(item);
   if (!unloadHooked) {
     unloadHooked = true;
