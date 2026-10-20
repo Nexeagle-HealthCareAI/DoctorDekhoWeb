@@ -22,6 +22,10 @@ const GROQ_TIMEOUT_MS = 8000;
 // its DECISIVE answers are used; anything it defers on, is unsure about, or fails to answer falls
 // through to Groq — so leaving this unset just means every query goes to Groq.
 const NLP_ROUTER_BASE_URL = process.env.NLP_ROUTER_BASE_URL ?? "";
+// The router's "doctordekho" API key (scope route), sent as X-Api-Key. The router answers 401
+// without it whenever its HMS_API_KEYS is set (always in production) — and every search then
+// silently goes to Groq.
+const NLP_ROUTER_API_KEY = process.env.NLP_ROUTER_API_KEY ?? "";
 
 // What "decisive" means. The router returns a ranked candidate list, padded with every runner-up
 // within its CANDIDATE_MARGIN of the top score (up to 5). One to three candidates means it had a
@@ -53,11 +57,17 @@ async function callNlpRouter(query: string): Promise<NlpRouterResult | null> {
   try {
     const res = await fetch(`${NLP_ROUTER_BASE_URL}/route-symptom`, {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers: {
+        "content-type": "application/json",
+        ...(NLP_ROUTER_API_KEY ? { "X-Api-Key": NLP_ROUTER_API_KEY } : {}),
+      },
       body: JSON.stringify({ query }),
       signal: AbortSignal.timeout(3000),
     });
-    if (!res.ok) return null;
+    if (!res.ok) {
+      console.warn(`NLP router answered ${res.status}, falling back to Groq`);
+      return null;
+    }
     const data = await res.json();
     return {
       specialtyIds: Array.isArray(data?.specialtyIds) ? data.specialtyIds : [],

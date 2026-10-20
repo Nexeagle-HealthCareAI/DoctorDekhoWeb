@@ -93,5 +93,5 @@ curl -X POST https://doctordekho.nexeagle.com/api/search/parse \
 
 ## Config (server env, for whoever maintains it)
 
-`NLP_ROUTER_BASE_URL`, `GROQ_API_KEY`, `GROQ_MODEL` (default `openai/gpt-oss-20b`),
+`NLP_ROUTER_BASE_URL`, `NLP_ROUTER_API_KEY` (the router's "doctordekho" key, sent as `X-Api-Key`), `GROQ_API_KEY`, `GROQ_MODEL` (default `openai/gpt-oss-20b`),
 `SEARCH_ROUTER_MAX_CANDIDATES` (default 3). See `README.md` and `scripts/search-eval/README.md`.
