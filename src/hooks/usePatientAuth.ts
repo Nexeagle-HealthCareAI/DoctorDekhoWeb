@@ -1,6 +1,7 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 
 export interface PatientAppointment {
   appointmentId: string;
@@ -47,7 +48,10 @@ export function usePatientAuth() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ mobileNumber: mobile }),
       });
-      return (await res.json()) as { success: boolean; message: string };
+      const data = (await res.json()) as { success: boolean; message: string; devCode?: string };
+      // Only a Development server ever sends this back (instead of a WhatsApp message), so on any other server nothing is shown.
+      if (data.success && data.devCode) toast.info(`Dev only: your OTP is ${data.devCode}`, { duration: 180_000 });
+      return data;
     },
   });
 
