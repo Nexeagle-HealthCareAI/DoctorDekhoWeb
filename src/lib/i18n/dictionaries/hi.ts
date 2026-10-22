@@ -48,6 +48,13 @@ export const hi: Record<keyof typeof en, string> = {
   "directory.aiHintGeneric": "“{query}” के आधार पर मिलते-जुलते विशेषज्ञ दिखाए जा रहे हैं",
   "directory.findingSpecialists": "आपके लिए सबसे अच्छे विशेषज्ञ खोजे जा रहे हैं…",
   "directory.lookingBroadly": "थोड़ा और खोजा जा रहा है…",
+  "directory.emergencyTitle": "यह मेडिकल इमरजेंसी हो सकती है",
+  "directory.emergencyBody": "अपॉइंटमेंट का इंतज़ार न करें। अभी एम्बुलेंस बुलाएँ या सबसे पास के इमरजेंसी विभाग में जाएँ।",
+  "directory.emergencySigns": "हमने ये लक्षण देखे:",
+  "directory.emergencyCall": "108 पर कॉल करें (एम्बुलेंस)",
+  "directory.emergencySelfHarm": "अगर आपके मन में खुद को नुकसान पहुँचाने के विचार आ रहे हैं, तो अभी किसी से बात करें:",
+  "directory.emergencySelfHarmCall": "टेली-मानस 14416 पर कॉल करें (मुफ़्त, 24×7)",
+  "directory.emergencyDoctorsBelow": "नीचे इमरजेंसी और संबंधित डॉक्टर दिए गए हैं।",
   "directory.noMatch": "आपकी खोज से कोई डॉक्टर नहीं मिला",
   "directory.noMatchDesc": "इस क्षेत्र में आपकी खोज से मेल खाता कोई विशेषज्ञ नहीं मिला। अपने फ़िल्टर बदलें या पूरे भारत में खोजें।",
 

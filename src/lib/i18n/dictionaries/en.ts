@@ -61,6 +61,13 @@ export const en = {
   "directory.aiHintGeneric": "Showing matching specialists based on “{query}”",
   "directory.findingSpecialists": "Finding the best specialists for you…",
   "directory.lookingBroadly": "Looking a little more broadly for you…",
+  "directory.emergencyTitle": "This may be a medical emergency",
+  "directory.emergencyBody": "Don't wait for an appointment. Call an ambulance or go to the nearest emergency department now.",
+  "directory.emergencySigns": "Signs we noticed:",
+  "directory.emergencyCall": "Call 108 (Ambulance)",
+  "directory.emergencySelfHarm": "If you are thinking of harming yourself, please talk to someone now:",
+  "directory.emergencySelfHarmCall": "Call Tele-MANAS 14416 (free, 24×7)",
+  "directory.emergencyDoctorsBelow": "Emergency and related doctors are listed below.",
   "directory.noMatch": "No doctors match your criteria",
   "directory.noMatchDesc": "We couldn't find any specialists matching your search in this area. Try adjusting your filters or searching across All India.",
 

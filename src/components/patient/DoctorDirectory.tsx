@@ -5,6 +5,7 @@ import { useIsRestoring } from "@tanstack/react-query";
 import { motion, useReducedMotion } from "framer-motion";
 import { Frown, Loader2, ChevronDown, ChevronLeft, ChevronRight, SlidersHorizontal, MapPin, Sparkles } from "lucide-react";
 import DoctorCard from "./DoctorCard";
+import EmergencyBanner from "./EmergencyBanner";
 import { specialties, cityLabel } from "@/data/patient";
 import type { CityOption, Doctor } from "@/data/patient";
 import { usePaginatedDoctors, useSmartSearch, type SmartSearchIntent } from "@/lib/api/hooks";
@@ -169,6 +170,40 @@ export default function DoctorDirectory({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [query, keywordFiltered.length]);
 
+  // ── Emergency check for keyword matches ─────────────────────────────────
+  // The AI fallback above only runs when the keyword match is empty, so symptom text that
+  // happens to match a doctor's profile ("chest pain", "saans") used to skip the router and its
+  // emergency check entirely. This asks the router ONLY "is this an emergency?" (safetyOnly:
+  // router only, never Groq, ~20 ms server-side) for every 4+ character search that DID match
+  // doctors. The keyword results stay exactly as they are; only the banner can change.
+  const safetyCheck = useSmartSearch();
+  const [safetyEmergency, setSafetyEmergency] = useState<SmartSearchIntent["emergency"]>(null);
+  const [safetyCheckedQuery, setSafetyCheckedQuery] = useState<string | null>(null);
+
+  useEffect(() => {
+    const q = query.trim();
+    if (q.length < 4 || keywordFiltered.length === 0) {
+      if (safetyEmergency) setSafetyEmergency(null);
+      return;
+    }
+    if (safetyCheckedQuery === q) return;
+    setSafetyCheckedQuery(q);
+    setSafetyEmergency(null);
+    safetyCheck.mutate(
+      { query: q, safetyOnly: true },
+      {
+        onSuccess: (intent) => {
+          // Ignore a late answer for a query the patient has already replaced.
+          if (query.trim() === q) setSafetyEmergency(intent.emergency);
+        },
+      }
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [query, keywordFiltered.length]);
+
+  // Whichever path ran, an emergency answer wins over everything else on the page.
+  const emergency = aiIntent?.emergency ?? safetyEmergency;
+
   const aiFiltered = useMemo(() => {
     if (!aiIntent) return null;
     let list = baseFiltered;
@@ -324,7 +359,7 @@ export default function DoctorDirectory({
     if (!q && !specialtyId) return;
     // Wait for the symptom router: logging before it answers recorded the same search twice
     // (once without AI results, once with).
-    if (smartSearch.isPending) return;
+    if (smartSearch.isPending || safetyCheck.isPending) return;
 
     const handle = setTimeout(() => {
       // When the AI path drove the results, log what it ACTUALLY predicted (aiIntent's own
@@ -347,6 +382,12 @@ export default function DoctorDirectory({
           method: usingAiResults ? aiIntent?.method ?? undefined : undefined,
           confidence: usingAiResults ? aiIntent?.confidence ?? undefined : undefined,
           modelVersion: usingAiResults ? aiIntent?.modelVersion ?? undefined : undefined,
+          // Router decision (answer / clarify / abstain) and whether an emergency banner was
+          // shown, from either path — lets the CMS count how often patients see the warning.
+          decision: usingAiResults ? aiIntent?.decision ?? undefined : undefined,
+          emergency: emergency ? true : undefined,
+          emergencySource: emergency?.source,
+          emergencyReasons: emergency && emergency.reasons.length > 0 ? emergency.reasons : undefined,
           // Full candidate set the router considered, not just the top pick — lets the
           // feedback-log correlation (CMSAPI SymptomRouterRepository) tell a genuine
           // misprediction apart from a booking that landed on a close-call runner-up we
@@ -378,7 +419,7 @@ export default function DoctorDirectory({
 
     return () => clearTimeout(handle);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [query, specialtyId, filtered.length, usingAiResults, aiIntent, smartSearch.isPending]);
+  }, [query, specialtyId, filtered.length, usingAiResults, aiIntent, smartSearch.isPending, safetyCheck.isPending, emergency]);
 
   // ── Paginated page slice ─────────────────────────────────────────────────
   // When browsing unfiltered (no specialty chip, free-text query, GPS radius, or area narrowing
@@ -499,8 +540,11 @@ export default function DoctorDirectory({
           </div>
         </div>
 
+        {/* ── Emergency warning: always above the results, whichever search path found it ── */}
+        {emergency && <EmergencyBanner reasons={emergency.reasons} />}
+
         {/* ── AI-enhanced results hint ── */}
-        {usingAiResults && (
+        {usingAiResults && !emergency && (
           <div className="flex items-center gap-2 mb-6 -mt-4 text-sm text-brand-teal font-semibold">
             <Sparkles className="w-4 h-4 shrink-0" />
             <span>

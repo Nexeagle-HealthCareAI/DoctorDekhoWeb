@@ -274,7 +274,8 @@ function log(path: string, r: RouterResult | null) {
   );
 }
 
-// POST /api/search/parse — { query: string, ageGroup?: "child" | "adult" } -> SearchIntent | { notConfigured: true }
+// POST /api/search/parse — { query: string, ageGroup?: "child" | "adult", safetyOnly?: true }
+//   -> SearchIntent | { notConfigured: true } | (safetyOnly, no emergency) { safetyOnly: true, emergency: null }
 //
 // Current router (returns `decision`), checked in this order:
 //   emergency.flag ............ emergency (Emergency Medicine + reasons). Never sent to Groq.
@@ -293,12 +294,19 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "query is required" }, { status: 400 });
   }
   const ageGroup: AgeGroup | null = body?.ageGroup === "child" || body?.ageGroup === "adult" ? body.ageGroup : null;
+  // safetyOnly: the search page already found doctors by keyword and only needs to know whether
+  // the text describes an emergency. Router only, never Groq, so it costs nothing extra; the
+  // legacy router has no emergency data, so it simply answers "no emergency" there.
+  const safetyOnly = body?.safetyOnly === true;
 
   const r = await callNlpRouter(query, ageGroup);
 
   if (r?.emergency.flag) {
-    log("router-emergency", r);
+    log(safetyOnly ? "safety-emergency" : "router-emergency", r);
     return NextResponse.json(emergencyIntent(r, query));
+  }
+  if (safetyOnly) {
+    return NextResponse.json({ safetyOnly: true, emergency: null });
   }
 
   let clarifyForGroq: ClarifyInfo | null = null;
