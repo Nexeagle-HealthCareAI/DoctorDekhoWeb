@@ -6,6 +6,7 @@ import { motion, useReducedMotion } from "framer-motion";
 import { Frown, Loader2, ChevronDown, ChevronLeft, ChevronRight, SlidersHorizontal, MapPin, Sparkles } from "lucide-react";
 import DoctorCard from "./DoctorCard";
 import EmergencyBanner from "./EmergencyBanner";
+import SearchFollowUp from "./SearchFollowUp";
 import { specialties, cityLabel } from "@/data/patient";
 import type { CityOption, Doctor } from "@/data/patient";
 import { usePaginatedDoctors, useSmartSearch, type SmartSearchIntent } from "@/lib/api/hooks";
@@ -203,6 +204,24 @@ export default function DoctorDirectory({
 
   // Whichever path ran, an emergency answer wins over everything else on the page.
   const emergency = aiIntent?.emergency ?? safetyEmergency;
+
+  // Answers to the router's follow-up question (SearchFollowUp). An age answer re-runs the same
+  // search with ageGroup, so the router can settle (child + fever -> Paediatrics); a specialty pick
+  // just shows that specialty's doctors, keeping the question on screen so the patient can switch.
+  function answerAge(ageGroup: "child" | "adult") {
+    const q = query.trim();
+    smartSearch.mutate(
+      { query: q, ageGroup },
+      {
+        onSuccess: (intent) => {
+          if (!intent.notConfigured && query.trim() === q) setAiIntent(intent);
+        },
+      }
+    );
+  }
+  function pickSpecialty(id: string) {
+    setAiIntent((prev) => (prev ? { ...prev, specialtyId: id, specialtyIds: [id] } : prev));
+  }
 
   const aiFiltered = useMemo(() => {
     if (!aiIntent) return null;
@@ -553,6 +572,17 @@ export default function DoctorDirectory({
                 : t("directory.aiHintGeneric", { query: query.trim() })}
             </span>
           </div>
+        )}
+
+        {/* ── The router's follow-up: age or specialty question, or a General Physician suggestion ── */}
+        {aiIntent && !emergency && keywordFiltered.length === 0 && (aiIntent.clarify || aiIntent.decision === "abstain") && (
+          <SearchFollowUp
+            intent={aiIntent}
+            pending={smartSearch.isPending}
+            onAnswerAge={answerAge}
+            onPickSpecialty={pickSpecialty}
+            selectedSpecialtyId={aiIntent.specialtyId}
+          />
         )}
 
         {/* ── Grid ── */}

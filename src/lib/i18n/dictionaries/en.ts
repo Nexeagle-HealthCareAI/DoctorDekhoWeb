@@ -68,6 +68,8 @@ export const en = {
   "directory.emergencySelfHarm": "If you are thinking of harming yourself, please talk to someone now:",
   "directory.emergencySelfHarmCall": "Call Tele-MANAS 14416 (free, 24×7)",
   "directory.emergencyDoctorsBelow": "Emergency and related doctors are listed below.",
+  "directory.pickClosest": "Not quite right? Pick the closest match:",
+  "directory.gpSuggestion": "We couldn't match this to one specialty. A General Physician can assess it first and refer you if needed.",
   "directory.noMatch": "No doctors match your criteria",
   "directory.noMatchDesc": "We couldn't find any specialists matching your search in this area. Try adjusting your filters or searching across All India.",
 

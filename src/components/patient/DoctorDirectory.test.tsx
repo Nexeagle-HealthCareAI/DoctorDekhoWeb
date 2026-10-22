@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
 import type { Doctor } from "@/data/patient";
 
@@ -93,6 +94,53 @@ describe("Doctor Dekho search page: emergency warning", () => {
     show("chest pain");
     await screen.findByRole("alert");
     expect(screen.queryByRole("link", { name: /Tele-MANAS/ })).not.toBeInTheDocument();
+  });
+
+  it("asks the router's age question and re-runs the search with the answer", async () => {
+    doctors.list = [
+      doctor("1", "Dr. Kids", "pediatrics", "Pediatrics", []),
+      doctor("2", "Dr. General", "general", "General Physician", []),
+    ];
+    parse.respond = (input) =>
+      typeof input === "object" && (input as { ageGroup?: string }).ageGroup === "child"
+        ? intent({ decision: "answer", specialtyId: "pediatrics", specialtyIds: ["pediatrics"] })
+        : intent({
+            decision: "clarify", specialtyId: "pediatrics", specialtyIds: ["pediatrics", "general"],
+            clarify: { kind: "age", question: "Yeh bachche ke liye hai ya bade ke liye?", options: [{ id: "child", label: "Bachcha" }, { id: "adult", label: "Bada" }] },
+          });
+    show("2 din se bukhar aur gale mein dard hai");
+    expect(await screen.findByText("Yeh bachche ke liye hai ya bade ke liye?")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Bachcha" }));
+    await waitFor(() => expect(screen.queryByText("Yeh bachche ke liye hai ya bade ke liye?")).not.toBeInTheDocument());
+    expect(parse.calls).toContainEqual({ query: "2 din se bukhar aur gale mein dard hai", ageGroup: "child" });
+    expect(screen.getByText("Dr. Kids")).toBeInTheDocument();
+    expect(screen.queryByText("Dr. General")).not.toBeInTheDocument();
+  });
+
+  it("lets the patient switch to another of the router's specialty options", async () => {
+    doctors.list = [
+      doctor("1", "Dr. Brain", "neurology", "Neurology", []),
+      doctor("2", "Dr. Ear", "ent", "ENT", []),
+    ];
+    parse.respond = () =>
+      intent({
+        decision: "clarify", specialtyId: "neurology", specialtyIds: ["neurology"],
+        clarify: { kind: "specialty", question: "Inmein se kaunsa?", options: [{ id: "neurology", label: "Neurology" }, { id: "ent", label: "ENT" }] },
+      });
+    show("sir mein dard aur chakkar");
+    expect(await screen.findByText("Dr. Brain")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Neurology" })).toHaveAttribute("aria-pressed", "true");
+    await userEvent.click(screen.getByRole("button", { name: "ENT" }));
+    expect(await screen.findByText("Dr. Ear")).toBeInTheDocument();
+    expect(screen.queryByText("Dr. Brain")).not.toBeInTheDocument();
+  });
+
+  it("suggests a General Physician when the router cannot match a specialty", async () => {
+    doctors.list = [doctor("1", "Dr. General", "general", "General Physician", [])];
+    parse.respond = () => intent({ decision: "abstain", specialtyId: "general", specialtyIds: ["general"], reason: "x" });
+    show("hello kaise ho");
+    expect(await screen.findByText(/A General Physician can assess it first/)).toBeInTheDocument();
+    expect(screen.getByText("Dr. General")).toBeInTheDocument();
   });
 
   it("does not call the router for very short text", async () => {
