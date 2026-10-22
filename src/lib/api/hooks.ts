@@ -349,8 +349,10 @@ export interface SmartSearchIntent {
   reason: string | null;
 }
 
-/** The search text, plus the patient's answer to an age question when re-asking. */
-export type SmartSearchInput = string | { query: string; ageGroup?: "child" | "adult" };
+/** The search text, plus the patient's answer to an age question when re-asking. safetyOnly asks
+ * only "is this an emergency?" (router only, never Groq): used when keyword search already found
+ * doctors, so symptom text that happens to match a doctor's profile is still safety-checked. */
+export type SmartSearchInput = string | { query: string; ageGroup?: "child" | "adult"; safetyOnly?: boolean };
 
 const EMPTY_INTENT_EXTRAS = { decision: null, emergency: null, clarify: null, reason: null } as const;
 

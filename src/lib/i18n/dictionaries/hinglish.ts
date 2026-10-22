@@ -50,6 +50,13 @@ export const hinglish: Record<keyof typeof en, string> = {
   "directory.aiHintGeneric": "“{query}” ke hisaab se milte-julte specialists dikha rahe hain",
   "directory.findingSpecialists": "Aapke liye best specialists dhoondhe ja rahe hain…",
   "directory.lookingBroadly": "Thoda aur dhoonda ja raha hai…",
+  "directory.emergencyTitle": "Yeh medical emergency ho sakti hai",
+  "directory.emergencyBody": "Appointment ka intezaar mat kijiye. Abhi ambulance bulaiye ya sabse paas ke emergency department jaiye.",
+  "directory.emergencySigns": "Humne yeh lakshan dekhe:",
+  "directory.emergencyCall": "108 par call karein (Ambulance)",
+  "directory.emergencySelfHarm": "Agar aapke mann mein khud ko nuksaan pahunchane ke vichaar aa rahe hain, toh abhi kisi se baat kijiye:",
+  "directory.emergencySelfHarmCall": "Tele-MANAS 14416 par call karein (free, 24×7)",
+  "directory.emergencyDoctorsBelow": "Neeche emergency aur related doctors diye gaye hain.",
   "directory.noMatch": "Aapki search se koi doctor nahi mila",
   "directory.noMatchDesc": "Is area mein aapki search se milta koi specialist nahi mila. Filters badal ke dekhein ya pure India mein search karein.",
 

@@ -163,6 +163,29 @@ describe("search parse: current router", () => {
   });
 });
 
+describe("search parse: safetyOnly (keyword search already found doctors)", () => {
+  it("returns the emergency when the router flags one", async () => {
+    fetchMock.mockResolvedValueOnce(json(ROUTER.emergency));
+    const { body } = await ask({ query: "chest pain and sweating", safetyOnly: true });
+    expect(body.emergency).toEqual({ reasons: ["Chest pain", "Breathlessness"], source: "router" });
+    expect(groqCalls()).toHaveLength(0);
+  });
+
+  it("answers no emergency without ever calling Groq, even when the router is undecided", async () => {
+    fetchMock.mockResolvedValueOnce(json(ROUTER.clarifySpecialty));
+    const { body } = await ask({ query: "dr sharma", safetyOnly: true });
+    expect(body).toEqual({ safetyOnly: true, emergency: null });
+    expect(groqCalls()).toHaveLength(0);
+  });
+
+  it("answers no emergency when the router is unreachable, without Groq", async () => {
+    fetchMock.mockRejectedValueOnce(new Error("ECONNREFUSED"));
+    const { body } = await ask({ query: "skin specialist", safetyOnly: true });
+    expect(body).toEqual({ safetyOnly: true, emergency: null });
+    expect(groqCalls()).toHaveLength(0);
+  });
+});
+
 describe("search parse: legacy router and no router", () => {
   it("legacy router, 1-3 candidates: its answer", async () => {
     fetchMock.mockResolvedValueOnce(json(ROUTER.legacyDecisive));
