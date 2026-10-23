@@ -12,9 +12,11 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ success: false, message: "Please log in again.", documents: [] }, { status: 401 });
   }
 
-  // Whose records: a family member of this account (the API checks it is theirs), or empty for their own.
+  // Whose records: everyone's on the account (all=true), a family member of this account (the API checks it is theirs), or their own.
   const memberId = req.nextUrl.searchParams.get("memberId");
-  const r = await easyhmsFetch(`/public/patients/me/documents${memberId ? `?memberId=${encodeURIComponent(memberId)}` : ""}`, {
+  const all = req.nextUrl.searchParams.get("all") === "true";
+  const query = all ? "?all=true" : memberId ? `?memberId=${encodeURIComponent(memberId)}` : "";
+  const r = await easyhmsFetch(`/public/patients/me/documents${query}`, {
     headers: { Authorization: `Bearer ${token}` },
   });
   if (r.notConfigured) {
