@@ -2,7 +2,7 @@
 
 import { forwardRef } from "react";
 import Link from "next/link";
-import Image from "next/image";
+import DoctorPhoto from "@/components/patient/DoctorPhoto";
 import { motion } from "framer-motion";
 import {
   BadgeCheck, MapPin, Award, CalendarCheck, CalendarX, Star,
@@ -95,20 +95,16 @@ const DoctorCard = forwardRef<HTMLDivElement, DoctorCardProps>(function DoctorCa
           <div className="flex items-start gap-4">
             {/* Avatar */}
             <div className="relative shrink-0">
-              {doctor.photo ? (
-                <Image
-                  src={doctor.photo}
-                  alt={doctor.name}
-                  width={80}
-                  height={80}
-                  quality={network.type === "2g" || network.type === "slow-2g" || network.saveData ? 30 : 75}
-                  className="w-20 h-20 rounded-2xl object-cover shadow-[0_6px_18px_rgba(0,0,0,0.08)] border border-slate-100 bg-slate-100"
-                />
-              ) : (
-                <div className={`w-20 h-20 rounded-2xl bg-gradient-to-br ${doctor.gradient} text-white flex items-center justify-center font-display font-bold text-2xl shadow-[0_6px_18px_rgba(0,0,0,0.10)] border border-white/20`}>
-                  {doctor.initials}
-                </div>
-              )}
+              <DoctorPhoto
+                photo={doctor.photo}
+                name={doctor.name}
+                initials={doctor.initials}
+                gradient={doctor.gradient}
+                size={80}
+                quality={network.type === "2g" || network.type === "slow-2g" || network.saveData ? 30 : 75}
+                imageClassName="w-20 h-20 rounded-2xl object-cover shadow-[0_6px_18px_rgba(0,0,0,0.08)] border border-slate-100 bg-slate-100"
+                fallbackClassName="w-20 h-20 rounded-2xl text-white flex items-center justify-center font-display font-bold text-2xl shadow-[0_6px_18px_rgba(0,0,0,0.10)] border border-white/20"
+              />
               {doctor.verified && (
                 <span className="absolute -bottom-2 -right-2 w-6 h-6 rounded-full bg-white border-2 border-white shadow flex items-center justify-center">
                   <BadgeCheck className="w-3.5 h-3.5 text-brand-teal" />

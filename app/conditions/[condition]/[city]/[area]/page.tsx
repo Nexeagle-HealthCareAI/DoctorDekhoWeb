@@ -138,6 +138,7 @@ export default async function ConditionCityAreaPage({ params }: PageProps) {
         initialQuery={conditionName}
         initialCityId={city.id}
         initialArea={areaName}
+        pageHeading={`Doctors for ${conditionName} in ${areaName}, ${city.name}`}
         initialDoctors={initialDoctors}
         breadcrumb={<PageBreadcrumb items={breadcrumbItems} />}
       />

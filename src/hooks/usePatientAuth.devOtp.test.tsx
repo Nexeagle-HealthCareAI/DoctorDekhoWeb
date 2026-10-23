@@ -38,3 +38,26 @@ describe("patient OTP on a development server", () => {
     expect(toast.info).not.toHaveBeenCalled();
   });
 });
+
+describe("login state and hydration", () => {
+  it("reports 'still checking' on the first render even when the cache already knows the answer, then the real state", async () => {
+    fetchMock.mockImplementation(async () => ({ ok: true, status: 200, json: async () => ({ loggedIn: true, mobile: "9876543210", appointments: [] }) }));
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    client.setQueryData(["patient-auth", "mine"], { loggedIn: true, mobile: "9876543210", appointments: [] });
+    const seen: boolean[] = [];
+    const { result } = renderHook(() => { const a = usePatientAuth(); seen.push(a.isLoading); return a; }, { wrapper: ({ children }) => <QueryClientProvider client={client}>{children}</QueryClientProvider> });
+    expect(seen[0]).toBe(true);
+    await waitFor(() => expect(result.current.isLoggedIn).toBe(true));
+    expect(result.current.isLoading).toBe(false);
+  });
+
+  it("keeps the last known login when a later check fails with a temporary error", async () => {
+    fetchMock.mockImplementation(async () => ({ ok: false, status: 503, json: async () => ({ loggedIn: false }) }));
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    client.setQueryData(["patient-auth", "mine"], { loggedIn: true, mobile: "9876543210", appointments: [] }, { updatedAt: 0 });
+    const { result } = renderHook(() => usePatientAuth(), { wrapper: ({ children }) => <QueryClientProvider client={client}>{children}</QueryClientProvider> });
+    await waitFor(() => expect(result.current.isLoggedIn).toBe(true));
+    await client.refetchQueries({ queryKey: ["patient-auth", "mine"] });
+    expect(result.current.isLoggedIn).toBe(true);
+  });
+});

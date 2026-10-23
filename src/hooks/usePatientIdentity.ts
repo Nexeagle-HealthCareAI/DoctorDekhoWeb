@@ -16,15 +16,24 @@ export const initialsOf = (name: string) => {
 };
 
 /**
- * Who is signed in, for the places that show them (top bar menu, profile): the contributor's own name when the number belongs to a
- * contributor, else the name from their bookings, else nothing. Everything is read only once they are signed in.
+ * Who is signed in, for the places that show them (top bar menu, profile). The name the person saved themselves in Personal
+ * Information always wins; before they have saved one it is the contributor's own name when the number belongs to a contributor,
+ * else the name from their bookings, else nothing. Everything is read only once they are signed in.
  */
+export const pickDisplayName = (
+  profile: { source?: string; fullName?: string | null } | undefined,
+  contributor: { isContributor?: boolean; fullName?: string | null } | undefined,
+): string | null => {
+  const own = profile?.source === "ACCOUNT" ? profile.fullName?.trim() : null;
+  return own || (contributor?.isContributor ? contributor.fullName : null) || profile?.fullName?.trim() || null;
+};
+
 export function usePatientIdentity() {
   const auth = usePatientAuth();
   const profile = usePatientProfile(auth.isLoggedIn).data;
   const tag = useContributorTag(auth.isLoggedIn).data;
 
-  const name = (tag?.isContributor ? tag.fullName : null) || profile?.fullName?.trim() || null;
+  const name = pickDisplayName(profile, tag);
   const initials = name ? initialsOf(name) : auth.mobile ? auth.mobile.slice(-2) : "P";
 
   return { ...auth, name, initials, tag };

@@ -123,6 +123,7 @@ export default async function SpecialtyCityAreaPage({ params }: PageProps) {
         initialSpecialtyId={specialty.id}
         initialCityId={city.id}
         initialArea={areaName}
+        pageHeading={`${specialty.name}s in ${areaName}, ${city.name}`}
         initialDoctors={initialDoctors}
         breadcrumb={<PageBreadcrumb items={breadcrumbItems} />}
       />

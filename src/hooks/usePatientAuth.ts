@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
@@ -25,6 +26,9 @@ const MINE_QUERY_KEY = ["patient-auth", "mine"];
 async function fetchMine(): Promise<MineResponse> {
   const res = await fetch("/api/public/appointments/mine");
   // 401 just means "not logged in" here — not an error state, the route always returns JSON.
+  // Any other failure (rate limit, a deploy in progress) says nothing about the login: throw, so the query keeps the last known
+  // state instead of showing a signed-in patient as signed out.
+  if (!res.ok && res.status !== 401) throw new Error(`login check failed (${res.status})`);
   return res.json();
 }
 
@@ -33,6 +37,11 @@ async function fetchMine(): Promise<MineResponse> {
  * simply "does GET /api/public/appointments/mine currently return loggedIn: true". */
 export function usePatientAuth() {
   const queryClient = useQueryClient();
+  // The query cache is restored from localStorage in the browser but is empty on the server, so on the first client render the login
+  // state could already be known while the server's HTML was drawn without it (React hydration errors #418/#423). Until mounted,
+  // both sides report "still checking", which is what the server draws; the real state follows one tick later.
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
 
   const mine = useQuery({
     queryKey: MINE_QUERY_KEY,
@@ -83,10 +92,10 @@ export function usePatientAuth() {
   });
 
   return {
-    isLoggedIn: mine.data?.loggedIn === true,
-    mobile: mine.data?.mobile ?? null,
-    appointments: mine.data?.appointments ?? [],
-    isLoading: mine.isLoading,
+    isLoggedIn: mounted && mine.data?.loggedIn === true,
+    mobile: mounted ? mine.data?.mobile ?? null : null,
+    appointments: mounted ? mine.data?.appointments ?? [] : [],
+    isLoading: mine.isLoading || !mounted,
     notConfigured: mine.data?.notConfigured === true,
     refetch: mine.refetch,
     sendOtp,

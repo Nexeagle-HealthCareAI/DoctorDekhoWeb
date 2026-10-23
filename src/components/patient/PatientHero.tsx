@@ -31,6 +31,8 @@ const POPULAR_TAG_COUNT = 4;
 // (slicing into popular/more, the expand toggle, etc.) stays the same.
 
 interface PatientHeroProps {
+  /** The page's own heading for search engines and screen readers, e.g. "General Physicians in Kishanganj, Bihar". The home page leaves it out. */
+  pageHeading?: string;
   query: string;
   onQueryChange: (q: string) => void;
   specialtyId: string;
@@ -56,6 +58,7 @@ export default function PatientHero({
   cities = [],
   onCityChange,
   onRequestLocation,
+  pageHeading,
 }: PatientHeroProps) {
   const { t, locale } = useTranslation();
 
@@ -305,7 +308,7 @@ export default function PatientHero({
             transition={{ duration: 4, repeat: Infinity, ease: "easeInOut", delay: 1 }}
             className="font-display text-6xl sm:text-7xl md:text-8xl lg:text-9xl font-extrabold text-slate-900 tracking-tighter leading-[1.05] flex flex-col items-center"
           >
-            <span className="sr-only">Find & Book Top Specialists Near You on </span>
+            <span className="sr-only">{pageHeading ? `${pageHeading} on ` : "Find & Book Top Specialists Near You on "}</span>
             <span>
               {/* mr- instead of a trailing "Doctor " text space — inline-block trims trailing
                   whitespace at its own edge, so a plain space character here would silently

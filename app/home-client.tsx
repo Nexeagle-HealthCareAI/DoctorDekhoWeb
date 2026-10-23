@@ -33,6 +33,8 @@ interface HomeClientProps {
    * on-site navigation trail into their own hierarchical URL structure, only the XML sitemap.
    * Omitted on the plain homepage. */
   breadcrumb?: ReactNode;
+  /** This page's heading (the H1's readable text), e.g. "General Physicians in Kishanganj, Bihar". Omitted on the plain homepage. */
+  pageHeading?: string;
 }
 
 export default function HomeClient({
@@ -43,6 +45,7 @@ export default function HomeClient({
   initialDoctors,
   whatsAppQrCodeDataUrl,
   breadcrumb,
+  pageHeading,
 }: HomeClientProps = {}) {
   const { t } = useTranslation();
   const { data: doctorsData } = useDoctors(
@@ -143,6 +146,7 @@ export default function HomeClient({
           cities={dynamicCities}
           onCityChange={handleCityChange}
           onRequestLocation={handleRequestLocation}
+          pageHeading={pageHeading}
         />
 
         <TrustStrip />

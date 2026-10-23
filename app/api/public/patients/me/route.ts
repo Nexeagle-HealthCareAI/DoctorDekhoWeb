@@ -21,8 +21,9 @@ export async function GET(_req: NextRequest) {
     return NextResponse.json({ notConfigured: true });
   }
   if (!r.ok) {
-    const res = NextResponse.json({ success: false, message: "Session expired." }, { status: r.status });
-    res.cookies.delete(PATIENT_SESSION_COOKIE);
+    // Same rule as /appointments/mine: only a 401 ends the session; a temporary error must not sign the patient out.
+    const res = NextResponse.json({ success: false, message: r.status === 401 ? "Session expired." : "Could not load your details right now. Try again in a moment." }, { status: r.status || 502 });
+    if (r.status === 401) res.cookies.delete(PATIENT_SESSION_COOKIE);
     return res;
   }
 

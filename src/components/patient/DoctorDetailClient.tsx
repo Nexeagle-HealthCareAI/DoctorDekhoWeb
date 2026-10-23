@@ -2,7 +2,7 @@
 
 import { SITE_URL } from "@/lib/site";
 import { useEffect } from "react";
-import Image from "next/image";
+import DoctorPhoto from "@/components/patient/DoctorPhoto";
 import Link from "next/link";
 import {
   ChevronLeft,
@@ -103,21 +103,15 @@ export default function DoctorDetailClient({ doctor, similarDoctors, canonicalSl
               <div className="bg-white rounded-3xl border border-slate-200/80 shadow-sm p-6">
                 <div className="flex gap-5 items-start">
                   {/* Avatar */}
-                  {doctor.photo ? (
-                    <Image
-                      src={doctor.photo}
-                      alt={doctor.name}
-                      width={112}
-                      height={112}
-                      className="w-24 h-24 sm:w-28 sm:h-28 rounded-3xl object-cover shadow-md shrink-0 bg-slate-100"
-                    />
-                  ) : (
-                    <div
-                      className={`w-24 h-24 sm:w-28 sm:h-28 rounded-3xl bg-gradient-to-br ${doctor.gradient} text-white flex items-center justify-center font-extrabold text-3xl shadow-md shrink-0`}
-                    >
-                      {doctor.initials}
-                    </div>
-                  )}
+                  <DoctorPhoto
+                    photo={doctor.photo}
+                    name={doctor.name}
+                    initials={doctor.initials}
+                    gradient={doctor.gradient}
+                    size={112}
+                    imageClassName="w-24 h-24 sm:w-28 sm:h-28 rounded-3xl object-cover shadow-md shrink-0 bg-slate-100"
+                    fallbackClassName="w-24 h-24 sm:w-28 sm:h-28 rounded-3xl text-white flex items-center justify-center font-extrabold text-3xl shadow-md shrink-0"
+                  />
 
                   {/* Identity */}
                   <div className="min-w-0 flex-1">

@@ -124,6 +124,7 @@ export default async function ConditionCityPage({ params }: PageProps) {
       <HomeClient
         initialQuery={conditionName}
         initialCityId={city.id}
+        pageHeading={`Doctors for ${conditionName} in ${city.name}, ${city.state}`}
         initialDoctors={initialDoctors}
         breadcrumb={<PageBreadcrumb items={breadcrumbItems} />}
       />
