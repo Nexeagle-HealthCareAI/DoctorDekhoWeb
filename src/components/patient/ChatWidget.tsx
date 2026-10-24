@@ -191,7 +191,8 @@ function VitaGettingReady({ whatsappUrl, onClose }: { whatsappUrl: string; onClo
         </button>
       </header>
       <div className="flex flex-1 flex-col items-center justify-center gap-3 px-6 text-center">
-        <Eagle mood="relaxed" size={128} />
+        {/* A snack break while the service gets ready -- friendly, not an error. */}
+        <Eagle mood="eating" size={128} />
         <h2 className="text-xl font-extrabold text-[#10302D]">{t("vita.offlineTitle")}</h2>
         <p className="text-sm leading-snug text-[#3D5A57]">{t("vita.offlineBody")}</p>
         <a href={whatsappUrl} target="_blank" rel="noopener noreferrer" onClick={() => trackEvent("chat_whatsapp_handoff")}

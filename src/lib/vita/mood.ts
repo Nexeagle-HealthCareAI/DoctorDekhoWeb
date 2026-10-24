@@ -8,7 +8,10 @@ import type { VitaReply } from "./types";
 export type VitaMood = "welcome" | "thinking" | "working" | "joyful" | "relaxed" | "emergency";
 export type LauncherMood = "resting" | "flying" | "sleeping";
 
-/** Poses in /public/vita. Emergency has none on purpose. */
+/** Poses in /public/vita (transparent PNGs cut from the Vita mascot set). Emergency has none on
+ * purpose. welcome: coffee in hand; resting: the same, head and shoulders, for the round launcher;
+ * thinking: wing to beak; working: glasses and screen; joyful: wings open; relaxed: on a cushion;
+ * sleeping: on a cloud; flying: the first-visit nudge; eating: the "getting ready" note. */
 export const POSE: Record<Exclude<VitaMood, "emergency"> | LauncherMood | "eating", string> = {
   welcome: "/vita/welcome.png",
   thinking: "/vita/thinking.png",
