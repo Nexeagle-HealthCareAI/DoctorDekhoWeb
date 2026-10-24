@@ -48,6 +48,8 @@ export default function ChatWidget() {
   // is always Vita.
   const [vitaOn, setVitaOn] = useState<boolean | null>(null);
   const [nudge, setNudge] = useState(false);
+  // Desktop only: a bigger panel. Phones always get the whole screen.
+  const [expanded, setExpanded] = useState(false);
   // Vita answers in the patient's own language; the site's language is only its first guess.
   const chat = useVitaChat({ uiLanguage: locale });
 
@@ -96,8 +98,34 @@ export default function ChatWidget() {
       setNudge(false);
       markSeen();
       if (vitaOn === false) setChecks((n) => n + 1);
+      // the phone's back button closes the chat instead of leaving the page
+      try {
+        window.history.pushState({ ...(window.history.state ?? {}), vita: true }, "");
+      } catch {
+        /* ignore */
+      }
+    } else {
+      try {
+        if (window.history.state?.vita) window.history.back();
+      } catch {
+        /* ignore */
+      }
     }
   };
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const onBack = () => setIsOpen(false);
+    window.addEventListener("popstate", onBack);
+    // full screen on phones: the page behind must not scroll
+    const phone = window.matchMedia?.("(max-width: 767px)").matches;
+    const before = document.body.style.overflow;
+    if (phone) document.body.style.overflow = "hidden";
+    return () => {
+      window.removeEventListener("popstate", onBack);
+      document.body.style.overflow = before;
+    };
+  }, [isOpen]);
 
   const lastReply = [...chat.entries].reverse().find((e) => e.role === "vita")?.reply;
   const launcher = launcherMood(lastReply);
@@ -135,10 +163,11 @@ export default function ChatWidget() {
       <motion.button
         type="button"
         onClick={() => open(!isOpen)}
+        data-open={isOpen}
         whileTap={{ scale: 0.94 }}
         aria-label={isOpen ? t("vita.close") : t("vita.ask")}
         aria-expanded={isOpen}
-        className="fixed z-50 bottom-[calc(4rem+1rem)] right-4 md:bottom-6 md:right-6 flex h-16 w-16 items-center justify-center overflow-hidden rounded-full border-[3px] border-white bg-[#0B4F4A] shadow-[0_6px_18px_rgba(11,79,74,0.35)] active:scale-95 transition-transform"
+        className={`fixed z-50 bottom-[calc(4rem+1rem)] right-4 md:bottom-6 md:right-6 h-16 w-16 items-center justify-center overflow-hidden rounded-full border-[3px] border-white bg-[#0B4F4A] shadow-[0_6px_18px_rgba(11,79,74,0.35)] active:scale-95 transition-transform ${isOpen ? "hidden md:flex" : "flex"}`}
       >
         <AnimatePresence mode="wait" initial={false}>
           {isOpen ? (
@@ -162,12 +191,17 @@ export default function ChatWidget() {
             transition={{ type: "spring", stiffness: 260, damping: 24 }}
             role="dialog"
             aria-label={t("vita.title")}
-            className="fixed z-50 bottom-[calc(4rem+5.75rem)] right-4 md:bottom-[6.5rem] md:right-6 w-[calc(100vw-2rem)] max-w-sm h-[75svh] md:h-[min(680px,78svh)] rounded-3xl bg-white shadow-[0_16px_48px_rgba(0,0,0,0.18)] border border-slate-200/70 overflow-hidden flex flex-col"
+            aria-modal="true"
+            className={`fixed z-[70] inset-0 h-[100dvh] w-full bg-white overflow-hidden flex flex-col md:inset-auto md:rounded-3xl md:border md:border-slate-200/70 md:shadow-[0_16px_48px_rgba(0,0,0,0.18)] ${
+              expanded
+                ? "md:top-4 md:bottom-4 md:right-4 md:h-auto md:w-[min(760px,calc(100vw-2rem))]"
+                : "md:bottom-[6.5rem] md:right-6 md:w-[400px] md:h-[min(700px,80svh)]"
+            }`}
           >
             {vitaOn === false ? (
               <VitaGettingReady whatsappUrl={greeting.whatsappUrl} onClose={() => open(false)} />
             ) : (
-              <VitaChat chat={chat} onClose={() => open(false)} />
+              <VitaChat chat={chat} onClose={() => open(false)} expanded={expanded} onToggleExpand={() => setExpanded((v) => !v)} />
             )}
           </motion.div>
         )}

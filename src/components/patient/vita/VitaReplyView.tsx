@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { CalendarCheck, MessageCircle, RotateCw, X } from "lucide-react";
+import { CalendarCheck, MessageCircle, RotateCcw, RotateCw, Square, ThumbsDown, ThumbsUp, Volume2, X } from "lucide-react";
 import EmergencyBanner from "@/components/patient/EmergencyBanner";
 import VitaDoctorCard, { doctorHref, feeOf } from "@/components/patient/vita/VitaDoctorCard";
 import { useTranslation } from "@/lib/i18n/I18nContext";
@@ -10,6 +10,7 @@ import type { VitaDoctor, VitaDoctorsBlock, VitaOption, VitaReply } from "@/lib/
 import { WHATSAPP_BUSINESS_NUMBER } from "@/lib/site";
 import { replyMood } from "@/lib/vita/mood";
 import Eagle from "@/components/patient/vita/Eagle";
+import { REFINE_LABEL, refineOptions, type RefineKey } from "@/lib/vita/refine";
 
 // One Vita reply, drawn by its kind (requirements doc, section 9; UI-2 to UI-7). Doctors, hours and
 // numbers are shown exactly as the router passed them on from 1HMS.
@@ -24,6 +25,15 @@ export interface ReplyActions {
   removeFilter: (block: VitaDoctorsBlock, key: FilterKey) => void;
   askKind: (kind: string) => void;
   retry: () => void;
+  /** One-tap narrowing of the latest list, said in the conversation's language. */
+  refine: (key: RefineKey, language?: string) => void;
+  startOver: () => void;
+}
+
+export interface ReplySpeech {
+  speaking: boolean;
+  speak: () => void;
+  stop: () => void;
 }
 
 export function emergencyReasons(reply: VitaReply): string[] {
@@ -36,6 +46,9 @@ export default function VitaReplyView({
   active,
   busy,
   chosenId,
+  speech,
+  vote,
+  onVote,
 }: {
   reply: VitaReply;
   actions: ReplyActions;
@@ -43,6 +56,11 @@ export default function VitaReplyView({
   active: boolean;
   busy: boolean;
   chosenId?: string | null;
+  /** Read this reply aloud (absent where the browser has no voices). */
+  speech?: ReplySpeech;
+  /** The patient's thumbs on this reply, if any; onVote only on the latest reply. */
+  vote?: boolean;
+  onVote?: (helpful: boolean) => void;
 }) {
   const { t } = useTranslation();
   const off = !active || busy;
@@ -71,6 +89,7 @@ export default function VitaReplyView({
 
   const mood = replyMood(reply);
   const relaxed = mood === "relaxed";
+  const deadEnd = active && (reply.clarify?.kind === "no_match" || (reply.clarify?.options ?? []).some((o) => o.id === "human"));
 
   return (
     <div className="flex w-full flex-col gap-2">
@@ -78,8 +97,35 @@ export default function VitaReplyView({
         {reply.kind !== "doctor_selected" && (
           <Eagle mood={mood === "emergency" ? "welcome" : mood} size={relaxed ? 96 : 44} className={relaxed ? "-mb-1" : ""} />
         )}
-        <div className="max-w-[88%] whitespace-pre-line rounded-[18px] rounded-bl-[4px] bg-white px-3.5 py-2.5 text-[15px] leading-snug text-[#10302D] shadow-[0_1px_2px_rgba(16,48,45,0.08)]">
-          {reply.message}
+        <div className="max-w-[88%]">
+          <div className="whitespace-pre-line rounded-[18px] rounded-bl-[4px] bg-white px-3.5 py-2.5 text-[15px] leading-snug text-[#10302D] shadow-[0_1px_2px_rgba(16,48,45,0.08)]">
+            {reply.message}
+          </div>
+          {(speech || onVote || vote !== undefined) && (
+            <div className="mt-0.5 flex items-center gap-0.5 pl-1 text-slate-500">
+              {speech && (
+                <button type="button" onClick={speech.speaking ? speech.stop : speech.speak}
+                  aria-label={speech.speaking ? t("vita.stopListening") : t("vita.listen")} aria-pressed={speech.speaking}
+                  className={`flex h-8 w-8 items-center justify-center rounded-full hover:bg-white ${speech.speaking ? "text-[#0B5E57]" : ""}`}>
+                  {speech.speaking ? <Square className="h-3.5 w-3.5" aria-hidden="true" /> : <Volume2 className="h-4 w-4" aria-hidden="true" />}
+                </button>
+              )}
+              {vote !== undefined ? (
+                <span className="px-1 text-[11px]">{t("vita.thanksFeedback")}</span>
+              ) : onVote ? (
+                <>
+                  <button type="button" onClick={() => onVote(true)} aria-label={t("vita.helpful")}
+                    className="flex h-8 w-8 items-center justify-center rounded-full hover:bg-white">
+                    <ThumbsUp className="h-3.5 w-3.5" aria-hidden="true" />
+                  </button>
+                  <button type="button" onClick={() => onVote(false)} aria-label={t("vita.notHelpful")}
+                    className="flex h-8 w-8 items-center justify-center rounded-full hover:bg-white">
+                    <ThumbsDown className="h-3.5 w-3.5" aria-hidden="true" />
+                  </button>
+                </>
+              ) : null}
+            </div>
+          )}
         </div>
       </div>
 
@@ -100,7 +146,7 @@ export default function VitaReplyView({
       )}
 
       {block && block.items.length > 0 && (
-        <DoctorList block={block} actions={actions} off={off} chosenId={chosenId} />
+        <DoctorList block={block} actions={actions} off={off} chosenId={chosenId} active={active} language={reply.language} />
       )}
 
       {reply.kind === "doctor_selected" && reply.doctor && (
@@ -138,6 +184,13 @@ export default function VitaReplyView({
         </a>
       )}
 
+      {deadEnd && (
+        <button type="button" disabled={off} onClick={actions.startOver}
+          className="inline-flex min-h-[40px] items-center gap-1.5 self-start rounded-full border border-slate-300 bg-white px-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50">
+          <RotateCcw className="h-4 w-4" aria-hidden="true" /> {t("vita.startOver")}
+        </button>
+      )}
+
       {clarify && clarify.options.length > 0 && (
         <div className="flex flex-wrap gap-2" role="group" aria-label={clarify.question ?? undefined}>
           {clarify.options.map((o) => (
@@ -152,9 +205,12 @@ export default function VitaReplyView({
   );
 }
 
-function DoctorList({ block, actions, off, chosenId }: { block: VitaDoctorsBlock; actions: ReplyActions; off: boolean; chosenId?: string | null }) {
+function DoctorList({ block, actions, off, chosenId, active, language }: {
+  block: VitaDoctorsBlock; actions: ReplyActions; off: boolean; chosenId?: string | null; active: boolean; language?: string;
+}) {
   const { t } = useTranslation();
   const chips = filterChips(block);
+  const refines = refineOptions(block);
   const choose = (d: VitaDoctor) => actions.choose(d.doctorId, t("vita.chooseDoctor", { name: d.name ?? "" }));
   const byId = new Map(block.items.map((d) => [d.doctorId, d]));
   const groups = block.groups && block.groups.length > 0
@@ -190,6 +246,19 @@ function DoctorList({ block, actions, off, chosenId }: { block: VitaDoctorsBlock
           className="min-h-[44px] rounded-lg border border-slate-300 bg-white px-3 text-sm font-medium text-slate-800 hover:bg-slate-50 disabled:opacity-50">
           {t("vita.showMore")}
         </button>
+      )}
+      {active && block.items.length > 1 && refines.length > 0 && (
+        <div className="flex flex-col gap-1" role="group" aria-label={t("vita.refineLabel")}>
+          <p className="text-xs font-semibold text-slate-600">{t("vita.refineLabel")}</p>
+          <div className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1">
+            {refines.map((k) => (
+              <button key={k} type="button" disabled={off} onClick={() => actions.refine(k, language)}
+                className="inline-flex min-h-[40px] shrink-0 items-center rounded-full border border-[#9CC5BD] bg-white px-3 text-[13px] font-semibold text-[#0B5E57] hover:bg-emerald-50 disabled:opacity-50">
+                {t(REFINE_LABEL[k])}
+              </button>
+            ))}
+          </div>
+        </div>
       )}
     </div>
   );

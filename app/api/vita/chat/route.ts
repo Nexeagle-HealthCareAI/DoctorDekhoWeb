@@ -126,3 +126,22 @@ export async function POST(req: NextRequest) {
     clearTimeout(timer);
   }
 }
+
+const SESSION_ID = /^sess_[0-9a-f]{6,32}$/;
+
+/** "New chat": ask the router to forget this conversation now rather than in 30 minutes. Best effort. */
+export async function DELETE(req: NextRequest) {
+  const sid = req.nextUrl.searchParams.get("session") ?? "";
+  if (!ENABLED || !SESSION_ID.test(sid)) return new NextResponse(null, { status: 204 });
+  try {
+    await fetch(`${BASE}/v2/agent/session/${sid}`, {
+      method: "DELETE",
+      headers: KEY ? { "X-Api-Key": KEY } : {},
+      cache: "no-store",
+      signal: AbortSignal.timeout(4000),
+    });
+  } catch {
+    /* the router forgets it after 30 minutes anyway */
+  }
+  return new NextResponse(null, { status: 204 });
+}
