@@ -2,7 +2,7 @@ import * as Clipboard from "expo-clipboard";
 import * as Haptics from "expo-haptics";
 import { Redirect, useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useRef, useState } from "react";
-import { AppState, StyleSheet, Text, View } from "react-native";
+import { Alert, AppState, StyleSheet, Text, View } from "react-native";
 import { KeyboardScreen } from "../../components/KeyboardScreen";
 import { OtpInput } from "../../components/OtpInput";
 import { Button, Card, TopBar, Txt } from "../../components/ui";
@@ -89,6 +89,7 @@ export default function OtpScreen() {
     try {
       const res = await sendOtp(mobile);
       if (!res.success) setError(res.message);
+      else if (res.devCode) Alert.alert("Dev only", `Your OTP is ${res.devCode}`);   // Development API only, see login/index.tsx
     } catch (e) {
       setError(e instanceof ApiError ? e.message : t("retry"));
     }

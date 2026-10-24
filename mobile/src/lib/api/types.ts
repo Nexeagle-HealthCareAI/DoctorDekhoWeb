@@ -85,6 +85,8 @@ export interface BookAppointmentResponse {
 export interface OtpSendResponse {
   success: boolean;
   message: string;
+  /** Only a Development API sends this, instead of a WhatsApp message (PatientAuth:ShowOtpOnScreen). */
+  devCode?: string | null;
 }
 
 export interface OtpVerifyResponse {

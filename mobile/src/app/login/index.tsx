@@ -1,6 +1,6 @@
 import { useRouter } from "expo-router";
 import { useRef, useState, type ComponentRef, type ReactNode } from "react";
-import { Linking, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { Alert, Linking, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { KeyboardScreen, useRevealField } from "../../components/KeyboardScreen";
 import { Button, Logo, Txt } from "../../components/ui";
@@ -37,6 +37,8 @@ export default function LoginScreen() {
         return;
       }
       router.push({ pathname: "/login/otp", params: { mobile } });
+      // Only a Development API hands the code back (it sends no WhatsApp message there); every other server sends nothing here.
+      if (res.devCode) Alert.alert("Dev only", `Your OTP is ${res.devCode}`);
     } catch (e) {
       setError(e instanceof ApiError ? e.message : t("retry"));
     } finally {
