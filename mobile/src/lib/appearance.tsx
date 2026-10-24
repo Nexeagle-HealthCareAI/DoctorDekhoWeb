@@ -31,7 +31,10 @@ const DEVANAGARI = { "NSD-500": NotoSansDevanagari_500Medium, "NSD-600": NotoSan
 const BENGALI = { "NSB-500": NotoSansBengali_500Medium, "NSB-600": NotoSansBengali_600SemiBold, "NSB-700": NotoSansBengali_700Bold, "NSB-800": NotoSansBengali_800ExtraBold };
 
 const BIG_TEXT_KEY = "dd_big_text";
-/** "Bigger text" multiplies every size by this (on top of the phone's own font-size setting). */
+/**
+ * Calm mode (stored under the old "bigger text" key, so people who turned that on keep it): every size is
+ * multiplied by this on top of the phone's own font-size setting, nothing moves, and bars are solid.
+ */
 const BIG_SCALE = 1.15;
 
 type Ctx = {
@@ -42,6 +45,9 @@ type Ctx = {
   scale: number;
   bigText: boolean;
   setBigText: (on: boolean) => void;
+  /** Calm mode: bigger text + no movement + solid bars. Same switch as bigText. */
+  calm: boolean;
+  setCalm: (on: boolean) => void;
   fontsReady: boolean;
 };
 
@@ -73,6 +79,8 @@ export function AppearanceProvider({ children }: { children: ReactNode }) {
       scale: bigText ? BIG_SCALE : 1,
       bigText,
       setBigText,
+      calm: bigText,
+      setCalm: setBigText,
       fontsReady: latinOk,
     }),
     [script, scriptOk, latinOk, bigText, setBigText],

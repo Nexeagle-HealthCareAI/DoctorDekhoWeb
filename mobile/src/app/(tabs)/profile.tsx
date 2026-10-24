@@ -1,10 +1,11 @@
 import { useQueryClient } from "@tanstack/react-query";
 import Constants from "expo-constants";
-import { useRouter } from "expo-router";
-import { useState } from "react";
+import { useFocusEffect, useRouter } from "expo-router";
+import { setStatusBarStyle } from "expo-status-bar";
+import { useCallback, useState } from "react";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { Alert, Linking, Pressable, ScrollView, StyleSheet, View } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Avatar, Button, Card, ListGroup, ListRow, Logo, ToggleRow, Txt } from "../../components/ui";
 import { ApiError } from "../../lib/api/http";
 import { deleteAccount, saveAppProfile } from "../../lib/api/patient";
@@ -16,6 +17,7 @@ import { syncDevice } from "../../lib/device";
 import { useI18n } from "../../lib/i18n";
 import { LOCALES } from "../../lib/i18n/types";
 import { keys, useAppProfile, useFamily, useProfile } from "../../lib/queries";
+import { skyNow } from "../../lib/sky";
 import { contactSupport } from "../../lib/support";
 import { colors, space, TINT_ORDER } from "../../lib/theme";
 
@@ -29,7 +31,17 @@ export default function ProfileScreen() {
   const family = useFamily();
   const [reminders, setReminders] = useState<boolean | null>(null);
   const [deleting, setDeleting] = useState(false);
-  const { bigText, setBigText } = useAppearance();
+  const { calm, setCalm } = useAppearance();
+  const insets = useSafeAreaInsets();
+  const [sky, setSky] = useState(skyNow);
+  useFocusEffect(
+    useCallback(() => {
+      const s = skyNow();
+      setSky(s);
+      setStatusBarStyle(s.bar);
+      return () => setStatusBarStyle("dark");
+    }, []),
+  );
   const remindersOn = reminders ?? app.data?.remindersOptIn ?? false;
 
   const p = profile.data;
@@ -77,26 +89,36 @@ export default function ProfileScreen() {
   const max = family.data?.max ?? 10;
 
   return (
-    <SafeAreaView edges={["top"]} style={{ flex: 1, backgroundColor: colors.bg }}>
-      <ScrollView contentContainerStyle={styles.content}>
-        <View style={{ alignItems: "flex-end" }}>
-          <Logo height={30} />
-        </View>
-
-        <View style={styles.me}>
-          <Avatar initials={(name[0] ?? "?").toUpperCase()} size={64} tint="teal" />
-          <View style={{ flex: 1, minWidth: 0 }}>
-            <Txt variant="title" numberOfLines={1} style={{ fontSize: 22 }}>
-              {name || t("personalInfo")}
-            </Txt>
-            <Txt variant="small" color={colors.muted} numberOfLines={2}>
-              {[mobile ? `+91 ${mobile}` : "", ageSex].filter(Boolean).join(" · ")}
-            </Txt>
+    <View style={{ flex: 1, backgroundColor: colors.bg }}>
+      <ScrollView contentContainerStyle={{ paddingBottom: space.xxl }}>
+        <View style={[styles.sky, { backgroundColor: sky.bg, paddingTop: insets.top + space.md }]}>
+          <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: space.sm }}>
+              <View style={[styles.orb, { backgroundColor: sky.orbBg }]}>
+                <Ionicons name={sky.icon} size={18} color={sky.orbInk} />
+              </View>
+              <Txt variant="smallBold" color={sky.ink}>
+                {t(sky.greeting)}
+              </Txt>
+            </View>
+            <Logo height={36} />
           </View>
-          <Button label={t("edit")} variant="secondary" size="sm" onPress={() => router.push("/profile/about")} />
+          <View style={styles.me}>
+            <Avatar initials={(name[0] ?? "?").toUpperCase()} size={64} tint="teal" />
+            <View style={{ flex: 1, minWidth: 0 }}>
+              <Txt variant="title" color={sky.ink} numberOfLines={1} style={{ fontSize: 22 }}>
+                {name || t("personalInfo")}
+              </Txt>
+              <Txt variant="small" color={sky.ink} numberOfLines={2}>
+                {[mobile ? `+91 ${mobile}` : "", ageSex].filter(Boolean).join(" · ")}
+              </Txt>
+            </View>
+            <Button label={t("edit")} variant="secondary" size="sm" onPress={() => router.push("/profile/about")} />
+          </View>
         </View>
 
-        <Card style={{ gap: space.md }}>
+        <View style={styles.content}>
+        <Card style={{ gap: space.md, elevation: 3, shadowColor: "#10231F", shadowOpacity: 0.08, shadowRadius: 14, shadowOffset: { width: 0, height: 6 } }}>
           <View style={{ flexDirection: "row", alignItems: "baseline", justifyContent: "space-between", gap: space.sm }}>
             <Txt variant="subheading">{t("family")}</Txt>
             <Pressable onPress={() => router.push("/profile/family")} hitSlop={10} accessibilityRole="button">
@@ -133,11 +155,20 @@ export default function ProfileScreen() {
           </ScrollView>
         </Card>
 
+        <Txt variant="subheading" style={styles.groupTitle}>
+          {t("makeItEasy")}
+        </Txt>
         <ListGroup>
-          <ListRow first icon="language-outline" label={t("language")} value={LOCALES.find((l) => l.code === locale)?.nativeLabel} onPress={() => router.push("/profile/language")} />
+          <ToggleRow first icon="leaf-outline" label={t("biggerText")} hint={t("calmHint")} value={calm} onChange={setCalm} />
+          <ListRow icon="language-outline" label={t("language")} value={LOCALES.find((l) => l.code === locale)?.nativeLabel} onPress={() => router.push("/profile/language")} />
           <ToggleRow icon="notifications-outline" label={t("visitReminders")} value={remindersOn} onChange={toggleReminders} />
-          <ToggleRow icon="text-outline" label={t("biggerText")} value={bigText} onChange={setBigText} />
-          <ListRow icon="logo-whatsapp" label={t("helpOnWhatsApp")} onPress={() => contactSupport("whatsapp", t("helpMessage"))} />
+        </ListGroup>
+
+        <Txt variant="subheading" style={styles.groupTitle}>
+          {t("helpAndPrivacy")}
+        </Txt>
+        <ListGroup>
+          <ListRow first icon="logo-whatsapp" label={t("helpOnWhatsApp")} onPress={() => contactSupport("whatsapp", t("helpMessage"))} />
           <ListRow icon="call-outline" label={t("callUs")} onPress={() => contactSupport("call")} />
           <ListRow icon="shield-checkmark-outline" label={t("privacy")} onPress={() => void Linking.openURL(`${config.businessUrl}/privacy`)} />
           <ListRow icon="document-text-outline" label={t("terms")} onPress={() => void Linking.openURL(`${config.businessUrl}/terms`)} />
@@ -151,14 +182,18 @@ export default function ProfileScreen() {
         <Txt variant="tiny" color={colors.muted} center>
           {t("appVersion", { version: Constants.expoConfig?.version ?? "1.0.0" })}
         </Txt>
+        </View>
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  content: { padding: space.lg, paddingTop: space.md, gap: space.lg, paddingBottom: space.xxl },
-  me: { flexDirection: "row", alignItems: "center", gap: space.md + 2, paddingHorizontal: 4 },
+  sky: { paddingHorizontal: space.lg, paddingBottom: 46, gap: space.lg },
+  orb: { width: 32, height: 32, borderRadius: 16, alignItems: "center", justifyContent: "center" },
+  content: { marginTop: -30, paddingHorizontal: space.lg, gap: space.lg },
+  groupTitle: { paddingHorizontal: 4, marginBottom: -space.sm },
+  me: { flexDirection: "row", alignItems: "center", gap: space.md + 2 },
   member: { width: 72, alignItems: "center", gap: 4 },
   addCircle: { width: 56, height: 56, borderRadius: 28, borderWidth: 1.5, borderStyle: "dashed", borderColor: "#9FB0A8", alignItems: "center", justifyContent: "center" },
 });

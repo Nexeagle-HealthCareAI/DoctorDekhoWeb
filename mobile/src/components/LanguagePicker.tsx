@@ -90,18 +90,18 @@ export function LanguageSheet({ visible, onClose }: { visible: boolean; onClose:
 }
 
 /** Small "🌐 English ▾" link that opens the sheet — on Home, beside the city, so language is one tap away. */
-export function LanguageLink() {
+export function LanguageLink({ color = colors.primaryDark }: { color?: string } = {}) {
   const { t, locale } = useI18n();
   const [open, setOpen] = useState(false);
   const current = LOCALES.find((l) => l.code === locale);
   return (
     <>
       <Pressable onPress={() => setOpen(true)} accessibilityRole="button" accessibilityLabel={`${t("language")}: ${current?.englishLabel ?? ""}`} hitSlop={8} style={styles.link}>
-        <Ionicons name="language" size={16} color={colors.primaryDark} />
-        <Text style={styles.linkText} numberOfLines={1}>
+        <Ionicons name="language" size={16} color={color} />
+        <Text style={[styles.linkText, { color }]} numberOfLines={1}>
           {current?.nativeLabel}
         </Text>
-        <Ionicons name="chevron-down" size={14} color={colors.primaryDark} />
+        <Ionicons name="chevron-down" size={14} color={color} />
       </Pressable>
       <LanguageSheet visible={open} onClose={() => setOpen(false)} />
     </>

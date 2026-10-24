@@ -95,6 +95,8 @@ function RootNavigator() {
         <Stack.Screen name="profile/family" />
         <Stack.Screen name="profile/member" options={{ presentation: "modal" }} />
         <Stack.Screen name="profile/language" />
+        <Stack.Screen name="route/[id]" />
+        <Stack.Screen name="area" />
       </Stack.Protected>
     </Stack>
   );

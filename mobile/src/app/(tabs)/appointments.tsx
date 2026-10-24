@@ -5,7 +5,8 @@ import { useMemo, useState } from "react";
 import { Alert, FlatList, Linking, Pressable, RefreshControl, StyleSheet, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { DoctorAvatar } from "../../components/DoctorCard";
-import { Banner, Card, DateBlock, EmptyState, Loading, Logo, Segmented, Txt, type IconName } from "../../components/ui";
+import { LiveDot } from "../../components/Motion";
+import { Banner, Card, DateBlock, EmptyState, IconButton, Loading, Logo, Segmented, Txt, type IconName } from "../../components/ui";
 import type { Doctor } from "../../lib/api/doctors";
 import { cancelAppointment, getAppointmentDocuments } from "../../lib/api/patient";
 import type { MyAppointment } from "../../lib/api/types";
@@ -14,8 +15,9 @@ import { formatShortDate, formatTime, istDateString } from "../../lib/format";
 import { useI18n } from "../../lib/i18n";
 import type { StringKey } from "../../lib/i18n/strings";
 import { visitKind, type VisitKind } from "../../lib/booking";
+import { km, leaveBy, minutes, useQuietPosition, useRoutes } from "../../lib/map";
 import { keys, useDoctors, useMyAppointments } from "../../lib/queries";
-import { openDirections } from "../../lib/support";
+import { callNumber, openDirections } from "../../lib/support";
 import { colors, radius, space } from "../../lib/theme";
 
 type Kind = VisitKind;
@@ -35,6 +37,8 @@ export default function AppointmentsScreen() {
   const q = useMyAppointments();
   const doctors = useDoctors();
   const [tab, setTab] = useState<"upcoming" | "past">("upcoming");
+  // Shared phones: one tap hides every visit (doctor names say a lot) until tapped again.
+  const [hidden, setHidden] = useState(false);
 
   const { upcoming, past } = useMemo(() => {
     const today = istDateString();
@@ -57,7 +61,9 @@ export default function AppointmentsScreen() {
           <Txt variant="display" style={{ flex: 1 }}>
             {t("myBookings")}
           </Txt>
-          <Logo height={30} />
+          <IconButton icon={hidden ? "eye-off-outline" : "eye-outline"} label={hidden ? t("showPrivate") : t("hidePrivate")} onPress={() => setHidden(!hidden)} bordered />
+          <View style={{ width: space.sm }} />
+          <Logo height={36} />
         </View>
         <Segmented
           value={tab}
@@ -75,6 +81,13 @@ export default function AppointmentsScreen() {
       ) : null}
       {q.isLoading ? (
         <Loading />
+      ) : hidden ? (
+        <Pressable onPress={() => setHidden(false)} accessibilityRole="button" style={styles.hiddenBox}>
+          <Ionicons name="lock-closed-outline" size={22} color={colors.ink} />
+          <Txt variant="bodyBold" style={{ marginLeft: space.sm }}>
+            {t("hiddenTapToShow")}
+          </Txt>
+        </Pressable>
       ) : (
         <FlatList
           data={list}
@@ -101,6 +114,15 @@ function UpcomingCard({ a, doctor }: { a: MyAppointment; doctor?: Doctor }) {
   const kind = kindOf(a);
   const st = STATUS[kind];
   const time = formatTime(a.startAt);
+  const day = a.apptDate.slice(0, 10);
+  const start = a.startAt?.slice(11, 16) && a.startAt.slice(11, 16) !== "00:00" ? a.startAt.slice(11, 16) : undefined;
+  // "Leave by" only for a visit today or tomorrow, and only from a position the patient already shared.
+  const soon = day === istDateString() || day === istDateString(1);
+  const here = useQuietPosition();
+  const clinic = doctor?.latitude != null && doctor?.longitude != null ? { lat: doctor.latitude, lng: doctor.longitude } : null;
+  const routes = useRoutes(soon ? here : null, soon ? clinic : null);
+  const auto = routes.data?.auto;
+  const leave = auto ? leaveBy(start, auto.seconds) : null;
 
   const docs = useQuery({ queryKey: ["appt-docs", a.appointmentId], queryFn: () => getAppointmentDocuments(a.appointmentId), enabled: docsOpen, staleTime: 5 * 60 * 1000 });
 
@@ -148,15 +170,37 @@ function UpcomingCard({ a, doctor }: { a: MyAppointment; doctor?: Doctor }) {
         </View>
       </View>
 
-      <View style={[styles.status, { backgroundColor: st.bg }]}>
-        <Ionicons name={st.icon} size={18} color={st.fg} />
-        <Txt variant="smallBold" color={st.fg} style={{ marginLeft: space.sm, flex: 1 }}>
-          {t(st.key)}
-        </Txt>
-      </View>
+      <Journey current={kind === "pending" ? 1 : day === istDateString() ? 3 : 2} />
+      {kind === "pending" ? (
+        <View style={[styles.status, { backgroundColor: st.bg, alignItems: "flex-start" }]}>
+          <Ionicons name={st.icon} size={18} color={st.fg} style={{ marginTop: 2 }} />
+          <Txt variant="small" color={colors.ink} style={{ marginLeft: space.sm, flex: 1 }}>
+            {doctor?.hospitalPhone ? t("trustNumber", { phone: doctor.hospitalPhone }) : t(st.key)}
+          </Txt>
+        </View>
+      ) : null}
+      {doctor ? (
+        <Pressable
+          onPress={() => router.push({ pathname: "/route/[id]", params: { id: doctor.id, date: day, start: start ?? "" } })}
+          accessibilityRole="button"
+          style={({ pressed }) => [styles.routeRow, pressed && { transform: [{ scale: 0.98 }] }]}
+        >
+          <Ionicons name="navigate" size={20} color="#1D63D8" />
+          <Txt variant="bodyBold" style={{ flex: 1, marginLeft: space.md, fontSize: 15 }}>
+            {leave ? t("leaveByTime", { time: leave }) : t("seeTheWay")}
+            {auto ? (
+              <Txt variant="small" color={colors.muted}>
+                {"  ·  "}
+                {t("routeSummary", { min: minutes(auto.seconds), mode: t("byAuto"), dist: km(auto.meters) })}
+              </Txt>
+            ) : null}
+          </Txt>
+          <Ionicons name="chevron-forward" size={16} color={colors.muted} />
+        </Pressable>
+      ) : null}
 
       <View style={{ flexDirection: "row", gap: space.sm }}>
-        <Action icon="navigate" label={t("directions")} onPress={() => openDirections({ lat: doctor?.latitude, lng: doctor?.longitude, query: [a.hospitalName, doctor?.city].filter(Boolean).join(", ") })} />
+        {doctor?.hospitalPhone ? <Action icon="call" label={t("callHospital")} onPress={() => callNumber(doctor.hospitalPhone!)} /> : <Action icon="navigate" label={t("directions")} onPress={() => openDirections({ query: [a.hospitalName, doctor?.city].filter(Boolean).join(", ") })} />}
         <Action icon="calendar" label={t("reschedule")} onPress={() => router.push({ pathname: "/reschedule/[id]", params: { id: a.appointmentId, date: a.apptDate.slice(0, 10), doctor: a.doctorName } })} />
         <Action icon="close-circle" label={t("cancel")} danger busy={busy} onPress={cancel} />
       </View>
@@ -170,6 +214,32 @@ function UpcomingCard({ a, doctor }: { a: MyAppointment; doctor?: Doctor }) {
       </Pressable>
       {docsOpen ? <Documents loading={docs.isLoading} list={docs.data?.documents ?? []} /> : null}
     </Card>
+  );
+}
+
+/** The request's real steps. Only what the server knows: sent → the hospital calls → confirmed → visit day. */
+function Journey({ current }: { current: number }) {
+  const { t } = useI18n();
+  const steps = [t("jSent"), t("jCall"), t("jConfirmed"), t("jVisit")];
+  return (
+    <View style={styles.journey} accessibilityLabel={t("stepOf", { n: current + 1, total: steps.length, step: steps[current] })}>
+      {steps.map((label, i) => (
+        <View key={label} style={{ flex: 1, alignItems: "center", gap: 6 }}>
+          <View style={{ flexDirection: "row", alignItems: "center", width: "100%" }}>
+            <View style={[styles.bar, { backgroundColor: i === 0 ? "transparent" : i <= current ? colors.primary : colors.line }]} />
+            {i === current ? (
+              <LiveDot size={14} color={colors.primary} />
+            ) : (
+              <View style={[styles.dot, { backgroundColor: i < current ? colors.primary : colors.line }]}>{i < current ? <Ionicons name="checkmark" size={9} color="#fff" /> : null}</View>
+            )}
+            <View style={[styles.bar, { backgroundColor: i === steps.length - 1 ? "transparent" : i < current ? colors.primary : colors.line }]} />
+          </View>
+          <Txt variant="tinyBold" color={i <= current ? colors.primaryDark : colors.muted} center numberOfLines={1} style={{ fontSize: 12, fontWeight: i === current ? "800" : undefined }}>
+            {label}
+          </Txt>
+        </View>
+      ))}
+    </View>
   );
 }
 
@@ -253,6 +323,11 @@ const styles = StyleSheet.create({
   head: { paddingHorizontal: space.lg, paddingTop: space.md, paddingBottom: space.sm, gap: space.md },
   titleRow: { flexDirection: "row", alignItems: "center", paddingHorizontal: 4 },
   status: { flexDirection: "row", alignItems: "center", borderRadius: radius.md - 2, paddingVertical: 10, paddingHorizontal: space.md },
+  journey: { flexDirection: "row" },
+  bar: { flex: 1, height: 3, borderRadius: 2 },
+  dot: { width: 14, height: 14, borderRadius: 7, alignItems: "center", justifyContent: "center" },
+  routeRow: { flexDirection: "row", alignItems: "center", minHeight: 52, paddingHorizontal: space.md, borderRadius: radius.md, backgroundColor: colors.bg },
+  hiddenBox: { flexDirection: "row", alignItems: "center", justifyContent: "center", margin: space.lg, minHeight: 64, borderRadius: radius.lg, borderWidth: 1.5, borderStyle: "dashed", borderColor: colors.lineStrong, backgroundColor: colors.card },
   action: { flex: 1, minHeight: 64, borderRadius: radius.md, alignItems: "center", justifyContent: "center", paddingHorizontal: 4 },
   docsToggle: { flexDirection: "row", alignItems: "center", borderTopWidth: 1, borderTopColor: colors.divider, paddingTop: space.md, minHeight: 40 },
   doc: { flexDirection: "row", alignItems: "center", paddingVertical: space.sm, minHeight: 44 },

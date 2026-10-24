@@ -32,6 +32,10 @@ jobs:
         working-directory: mobile
     env:
       API_TARGET: ${{ inputs.api || 'dev' }}
+      # Public Mapbox token (pk.…) for maps, routes and area names. Add it once under
+      # Settings → Secrets and variables → Actions → New repository secret, named MAPBOX_PUBLIC_TOKEN.
+      # Without it the app still builds; map screens fall back to the list and Google Maps directions.
+      EXPO_PUBLIC_MAPBOX_TOKEN: ${{ secrets.MAPBOX_PUBLIC_TOKEN }}
     steps:
       - uses: actions/checkout@v4
 

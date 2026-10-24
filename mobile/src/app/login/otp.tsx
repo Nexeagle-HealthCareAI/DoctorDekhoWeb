@@ -1,9 +1,11 @@
+import Ionicons from "@expo/vector-icons/Ionicons";
 import * as Clipboard from "expo-clipboard";
 import * as Haptics from "expo-haptics";
 import { Redirect, useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useRef, useState } from "react";
 import { Alert, AppState, StyleSheet, Text, View } from "react-native";
 import { KeyboardScreen } from "../../components/KeyboardScreen";
+import { LiveDot, PopIn } from "../../components/Motion";
 import { OtpInput } from "../../components/OtpInput";
 import { Button, Card, TopBar, Txt } from "../../components/ui";
 import { ApiError } from "../../lib/api/http";
@@ -26,6 +28,7 @@ export default function OtpScreen() {
   const [busy, setBusy] = useState(false);
   const [left, setLeft] = useState(RESEND_SECONDS);
   const [hasClip, setHasClip] = useState(false);
+  const [verified, setVerified] = useState(false);
   const submitting = useRef(false);
 
   useEffect(() => {
@@ -72,6 +75,7 @@ export default function OtpScreen() {
         return;
       }
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+      setVerified(true);
       // The router guards move the patient on to "About you" or Home once the session flips.
       await signIn(res.accessToken, res.mobile || mobile);
     } catch (e) {
@@ -110,6 +114,11 @@ export default function OtpScreen() {
             </Txt>
           </Txt>
 
+          <View style={styles.steps} accessibilityLabel={t("codeStatus")}>
+            <Step done label={t("stepSent")} />
+            <Step done={verified} busy={busy} label={verified ? t("stepChecked") : busy ? t("verifying") : t("stepWaiting")} />
+          </View>
+
           <OtpInput value={code} onChange={(v) => { setCode(v); setError(null); }} onComplete={verify} error={!!error} />
           {error ? (
             <Txt variant="smallBold" color={colors.danger} style={{ marginTop: space.md }}>
@@ -117,7 +126,18 @@ export default function OtpScreen() {
             </Txt>
           ) : null}
 
-          {busy ? (
+          {verified ? (
+            <View style={styles.ok} accessibilityLiveRegion="polite">
+              <PopIn>
+                <View style={styles.okTick}>
+                  <Ionicons name="checkmark" size={24} color="#fff" />
+                </View>
+              </PopIn>
+              <Txt variant="bodyBold" color={colors.success} style={{ flex: 1 }}>
+                {t("codeRight")}
+              </Txt>
+            </View>
+          ) : busy ? (
             <Button label={t("verifying")} onPress={() => {}} loading style={{ marginTop: space.xl }} />
           ) : code.length < 6 ? (
             <Button label={t("pasteCode")} variant="secondary" icon="clipboard-outline" onPress={pasteFromClipboard} style={{ marginTop: space.xl }} accessibilityLabel={hasClip ? t("pasteCode") : t("pasteCode")} />
@@ -144,6 +164,22 @@ export default function OtpScreen() {
   );
 }
 
+/** One honest status chip: green with a tick when done, amber while it waits on the patient. */
+function Step({ label, done, busy }: { label: string; done: boolean; busy?: boolean }) {
+  return (
+    <View style={[styles.step, { backgroundColor: done ? colors.successSoft : colors.warningSoft }]}>
+      {done ? <Ionicons name="checkmark" size={14} color={colors.success} /> : busy ? null : <LiveDot size={8} color={colors.warning} />}
+      <Txt variant="tinyBold" color={done ? colors.success : colors.warning} style={{ marginLeft: 6, fontSize: 13 }}>
+        {label}
+      </Txt>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   content: { padding: space.xl, paddingTop: space.md },
+  steps: { flexDirection: "row", gap: space.sm, marginBottom: space.lg },
+  step: { flexDirection: "row", alignItems: "center", minHeight: 32, paddingHorizontal: 12, borderRadius: 16 },
+  ok: { flexDirection: "row", alignItems: "center", gap: space.md, marginTop: space.xl, padding: space.md + 2, borderRadius: 18, backgroundColor: colors.successSoft },
+  okTick: { width: 40, height: 40, borderRadius: 20, backgroundColor: colors.success, alignItems: "center", justifyContent: "center" },
 });

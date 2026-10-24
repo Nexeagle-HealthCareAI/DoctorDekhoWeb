@@ -5,12 +5,14 @@ import { FlatList, Pressable, ScrollView, StyleSheet, TextInput, View } from "re
 import { SafeAreaView } from "react-native-safe-area-context";
 import { CityPicker } from "../components/CityPicker";
 import { DoctorCard } from "../components/DoctorCard";
+import { MapPreview } from "../components/MapPreview";
 import { Banner, Button, Chip, EmptyState, IconButton, Loading, Logo, Txt } from "../components/ui";
 import { effectiveFee, parseSearch } from "../lib/api/doctors";
 import type { SearchParseResult } from "../lib/api/types";
 import { useTextStyle } from "../lib/appearance";
 import { useI18n } from "../lib/i18n";
 import { useHomePlace } from "../lib/location";
+import { hasMapImages } from "../lib/map";
 import { useDoctors } from "../lib/queries";
 import { filterDoctors } from "../lib/search";
 import { useVoiceSearch } from "../lib/speech";
@@ -36,6 +38,8 @@ export default function DoctorsScreen() {
   const [symptomOn, setSymptomOn] = useState(!!symptom);
   const [todayOnly, setTodayOnly] = useState(false);
   const [cheapest, setCheapest] = useState(false);
+  const [mine, setMine] = useState(false);
+  const myLang = locale === "hi" || locale === "hinglish" ? "Hindi" : locale === "bn" ? "Bengali" : null;
   const [pickCity, setPickCity] = useState(false);
   const [ai, setAi] = useState<{ query: string; result: SearchParseResult } | null>(null);
   const voice = useVoiceSearch(locale, (text) => setQuery(text));
@@ -50,6 +54,7 @@ export default function DoctorsScreen() {
 
   const refine = (list: ReturnType<typeof filterDoctors>) => {
     let out = todayOnly ? list.filter((d) => d.isAvailableToday) : list;
+    if (mine && myLang) out = out.filter((d) => d.languages.some((l) => l.toLowerCase().includes(myLang.toLowerCase())));
     if (cheapest) out = [...out].sort((a, b) => (effectiveFee(a) ?? 1e9) - (effectiveFee(b) ?? 1e9));
     return out;
   };
@@ -57,7 +62,7 @@ export default function DoctorsScreen() {
   const direct = useMemo(
     () => refine(filterDoctors(doctors.data ?? [], { query, specialtyIds, place })),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [doctors.data, query, specialty, symptomOn, place, todayOnly, cheapest],
+    [doctors.data, query, specialty, symptomOn, place, todayOnly, cheapest, mine],
   );
 
   // Ask the router only when typed words match nobody (debounced).
@@ -87,9 +92,17 @@ export default function DoctorsScreen() {
   const aiList = useMemo(
     () => (direct.length || !aiIds.length ? [] : refine(filterDoctors(doctors.data ?? [], { specialtyIds: aiIds, place }))),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [direct.length, aiIds, doctors.data, place, todayOnly, cheapest],
+    [direct.length, aiIds, doctors.data, place, todayOnly, cheapest, mine],
   );
   const list = direct.length ? direct : aiList;
+  // A still map strip of these results that opens the live map.
+  const pinned = list.filter((d) => d.latitude != null && d.longitude != null);
+  const mapCenter =
+    place?.lat != null && place?.lng != null
+      ? { lat: place.lat, lng: place.lng }
+      : pinned.length
+        ? { lat: pinned.slice(0, 8).reduce((a, d) => a + d.latitude!, 0) / Math.min(8, pinned.length), lng: pinned.slice(0, 8).reduce((a, d) => a + d.longitude!, 0) / Math.min(8, pinned.length) }
+        : null;
 
   const chipIds = useMemo(() => [...POPULAR_SPECIALTY_IDS, ...SPECIALTIES.map((s) => s.id).filter((id) => !POPULAR_SPECIALTY_IDS.includes(id))], []);
 
@@ -128,6 +141,7 @@ export default function DoctorsScreen() {
           <Chip label={place?.city ?? t("allIndia")} icon="location" selected onPress={() => setPickCity(true)} />
           <Chip label={t("availableToday")} selected={todayOnly} onPress={() => setTodayOnly(!todayOnly)} tone="ink" />
           <Chip label={t("lowestFee")} selected={cheapest} onPress={() => setCheapest(!cheapest)} tone="ink" />
+          {myLang ? <Chip label={t("speaksMyLanguage")} selected={mine} onPress={() => setMine(!mine)} tone="ink" /> : null}
         </ScrollView>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={[styles.chips, { paddingTop: 0 }]} keyboardShouldPersistTaps="handled">
           {chipIds.map((id) => (
@@ -163,7 +177,19 @@ export default function DoctorsScreen() {
                 </Pressable>
               ) : null}
               {!direct.length && aiList.length ? (
-                <Banner icon="sparkles" text={t("aiMatched", { specialty: aiIds.map((id) => plainSpecialty(id, locale)).join(", "), query: q })} />
+                <Banner icon="sparkles" text={`${t("aiMatched", { specialty: aiIds.map((id) => plainSpecialty(id, locale)).join(", "), query: q })} ${t("notDiagnosis")}`} />
+              ) : null}
+              {mapCenter && pinned.length && hasMapImages() ? (
+                <MapPreview
+                  center={mapCenter}
+                  zoom={place?.lat != null ? 13 : 12}
+                  pins={pinned.slice(0, 10).map((d) => ({ lat: d.latitude!, lng: d.longitude! }))}
+                  me={place?.lat != null}
+                  action={t("showOnMap")}
+                  height={96}
+                  onPress={() => router.push("/map")}
+                  accessibilityLabel={t("showOnMap")}
+                />
               ) : null}
               {list.length ? (
                 <Txt variant="smallBold" color={colors.muted}>

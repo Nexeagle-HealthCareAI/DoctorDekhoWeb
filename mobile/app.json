@@ -51,7 +51,7 @@
       [
         "expo-location",
         {
-          "locationWhenInUsePermission": "Doctor Dekho uses your location once to show doctors in your city."
+          "locationWhenInUsePermission": "Doctor Dekho uses your location to show doctors near you and the way to the hospital."
         }
       ],
       [
@@ -75,7 +75,8 @@
           "microphonePermission": "Doctor Dekho uses the microphone only when you tap Speak to search for a doctor.",
           "speechRecognitionPermission": "Doctor Dekho turns what you say into a search when you tap Speak."
         }
-      ]
+      ],
+      "@rnmapbox/maps"
     ],
     "scheme": "doctordekho",
     "newArchEnabled": true,

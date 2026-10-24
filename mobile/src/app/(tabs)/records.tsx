@@ -1,6 +1,7 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useQueryClient } from "@tanstack/react-query";
 import * as DocumentPicker from "expo-document-picker";
+import { Image } from "expo-image";
 import * as ImagePicker from "expo-image-picker";
 import { useMemo, useState } from "react";
 import { Alert, Linking, Modal, Pressable, RefreshControl, ScrollView, SectionList, StyleSheet, View } from "react-native";
@@ -49,6 +50,8 @@ export default function RecordsScreen() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<string | "all">("all");
+  // Photos stay covered until the patient taps them (shared phones); this is per session, never saved.
+  const [shown, setShown] = useState<Record<string, boolean>>({});
 
   const members = family.data?.members ?? [];
   const docs = useMemo(() => {
@@ -119,6 +122,7 @@ export default function RecordsScreen() {
     ]);
   }
 
+  const filterName = filter === "all" || filter === "me" ? profile.data?.firstName || t("me") : (members.find((m) => m.memberId === filter)?.firstName ?? t("me"));
   const whoName = (d: HealthLockerDocument) => (d.memberId ? members.find((m) => m.memberId === d.memberId)?.firstName : profile.data?.firstName || t("me"));
 
   const sections = useMemo(() => {
@@ -164,9 +168,9 @@ export default function RecordsScreen() {
                   {people.map((p) => {
                     const on = filter === p.id;
                     return (
-                      <Pressable key={p.id} onPress={() => setFilter(p.id)} accessibilityRole="button" accessibilityState={{ selected: on }} style={[styles.person, on && styles.personOn]}>
+                      <Pressable key={p.id} onPress={() => setFilter(p.id)} accessibilityRole="button" accessibilityState={{ selected: on }} style={({ pressed }) => [styles.person, on && styles.personOn, pressed && { transform: [{ scale: 0.96 }] }]}>
                         <Avatar initials={p.initial.toUpperCase()} tint={p.tint} size={32} />
-                        <Txt variant="smallBold" color={on ? "#fff" : colors.ink} style={{ marginLeft: space.sm }}>
+                        <Txt variant="smallBold" color={on ? colors.primaryDark : colors.ink} style={{ marginLeft: space.sm }}>
                           {p.name}
                         </Txt>
                       </Pressable>
@@ -176,13 +180,22 @@ export default function RecordsScreen() {
               ) : null}
 
               <View style={styles.addCard}>
-                <Txt variant="bodyBold" color="#fff">
+                <Txt variant="subheading" color="#fff">
+                  {t("keepPapersSafe", { name: filterName })}
+                </Txt>
+                <Txt variant="small" color="#DDF1ED" style={{ marginTop: -space.sm }}>
                   {t("addRecordLong")}
                 </Txt>
                 <View style={{ flexDirection: "row", gap: 10 }}>
                   <Button label={t("takePhoto")} icon="camera" variant="onDark" size="md" style={{ flex: 1 }} onPress={fromCamera} />
                   <Button label={t("uploadFile")} icon="cloud-upload-outline" variant="onDarkSoft" size="md" style={{ flex: 1 }} onPress={fromFiles} />
                 </View>
+              </View>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: space.sm, paddingHorizontal: 4 }}>
+                <Ionicons name="lock-closed-outline" size={16} color={colors.success} />
+                <Txt variant="small" color={colors.text} style={{ flex: 1, fontSize: 13 }}>
+                  {t("recordsPrivate")}
+                </Txt>
               </View>
             </View>
           }
@@ -191,7 +204,7 @@ export default function RecordsScreen() {
               {monthTitle(section.month, locale)}
             </Txt>
           )}
-          ListEmptyComponent={<EmptyState icon="folder-open-outline" title={t("noRecords")} body={t("noRecordsHint")} />}
+          ListEmptyComponent={<EmptyState icon="folder-open-outline" title={filter === "all" ? t("noRecords") : t("nothingFor", { name: filterName })} body={t("noRecordsHint")} />}
           renderItem={({ item, index, section }) => {
             const tp = TYPES.find((x) => x.value.toLowerCase() === (item.documentType ?? "").toLowerCase());
             const source = item.doctorName || item.externalDoctorName || item.hospitalName || item.externalClinicName;
@@ -203,7 +216,23 @@ export default function RecordsScreen() {
                 accessibilityRole="button"
                 style={({ pressed }) => [styles.doc, first && styles.docFirst, last && styles.docLast, !first && styles.docDivider, pressed && { backgroundColor: colors.bg }]}
               >
-                <IconCircle icon={tp?.icon ?? "document-outline"} tint={tp?.tint ?? "gray"} size={44} square />
+                {isImage(item) ? (
+                  <Pressable
+                    onPress={() => setShown((m) => ({ ...m, [item.documentId]: !m[item.documentId] }))}
+                    accessibilityRole="button"
+                    accessibilityLabel={shown[item.documentId] ? t("coverPhoto") : t("showPhoto")}
+                    style={styles.thumb}
+                  >
+                    <Image source={{ uri: item.storageUrl! }} style={StyleSheet.absoluteFill} contentFit="cover" blurRadius={shown[item.documentId] ? 0 : 22} cachePolicy="memory" accessible={false} />
+                    {!shown[item.documentId] ? (
+                      <View style={styles.cover}>
+                        <Ionicons name="eye-outline" size={20} color="#fff" />
+                      </View>
+                    ) : null}
+                  </Pressable>
+                ) : (
+                  <IconCircle icon={tp?.icon ?? "document-outline"} tint={tp?.tint ?? "gray"} size={44} square />
+                )}
                 <View style={{ flex: 1, marginHorizontal: space.md, minWidth: 0 }}>
                   <Txt variant="bodyBold" numberOfLines={1} style={{ fontSize: 15 }}>
                     {tp ? t(tp.key) : item.documentType || item.fileName}
@@ -256,6 +285,8 @@ export default function RecordsScreen() {
   );
 }
 
+const isImage = (d: HealthLockerDocument) => !!d.storageUrl && /\.(jpe?g|png|webp|heic)(\?|$)/i.test(d.fileName || d.storageUrl);
+
 const MONTHS: Record<Locale, string[]> = {
   en: ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"],
   hinglish: ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"],
@@ -267,7 +298,9 @@ const monthTitle = (ym: string, locale: Locale) => `${MONTHS[locale][Number(ym.s
 const styles = StyleSheet.create({
   wrap: { flexDirection: "row", flexWrap: "wrap", gap: space.sm },
   person: { flexDirection: "row", alignItems: "center", minHeight: 48, paddingLeft: 6, paddingRight: space.md + 2, borderRadius: radius.pill, borderWidth: 1.5, borderColor: colors.lineStrong, backgroundColor: colors.card },
-  personOn: { backgroundColor: colors.ink, borderColor: colors.ink },
+  personOn: { backgroundColor: colors.primarySoft, borderColor: colors.primary },
+  thumb: { width: 52, height: 64, borderRadius: 10, overflow: "hidden", backgroundColor: colors.segment },
+  cover: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, backgroundColor: "rgba(16,35,31,0.35)", alignItems: "center", justifyContent: "center" },
   addCard: { backgroundColor: colors.primary, borderRadius: radius.lg + 2, padding: space.lg, gap: space.md },
   doc: { flexDirection: "row", alignItems: "center", padding: space.md + 2, backgroundColor: colors.card, borderLeftWidth: 1, borderRightWidth: 1, borderColor: colors.line },
   docFirst: { borderTopWidth: 1, borderTopLeftRadius: radius.lg, borderTopRightRadius: radius.lg },

@@ -132,7 +132,8 @@ export function Button({
       }}
       style={({ pressed }) => [
         styles.button,
-        { minHeight: h, backgroundColor: c.bg, opacity: off ? 0.45 : pressed ? 0.85 : 1, paddingHorizontal: size === "lg" ? space.xl : space.lg },
+        // A quick squish on press: instant, no animation library, so it costs nothing on budget phones.
+        { minHeight: h, backgroundColor: c.bg, opacity: off ? 0.45 : pressed ? 0.9 : 1, transform: [{ scale: pressed && !off ? 0.97 : 1 }], paddingHorizontal: size === "lg" ? space.xl : space.lg },
         c.border ? { borderWidth: 1.5, borderColor: c.border } : null,
         style,
       ]}
