@@ -144,6 +144,20 @@ async function callNlpRouter(query: string, ageGroup: AgeGroup | null): Promise<
 // location parsing, so this does it locally — it runs only for the router paths.
 const NEAR_ME_PATTERN = /\b(near me|nearby|close to me|paas mein|aas paas)\b/i;
 
+const CITY_BY_LOWER = new Map(CITIES.map((c) => [c.name.toLowerCase(), c.name]));
+
+function knownCity(raw: string): string | null {
+  const v = raw.trim();
+  if (!v) return null;
+  if (v.toUpperCase() === "NEAR_ME") return "NEAR_ME";
+  const lower = v.toLowerCase();
+  const exact = CITY_BY_LOWER.get(lower);
+  if (exact) return exact;
+  // "Delhi" -> "Delhi NCR": a known city whose name starts with the word Groq gave
+  const prefixed = CITIES.find((c) => c.name.toLowerCase().startsWith(lower + " "));
+  return prefixed ? prefixed.name : null;
+}
+
 function extractCityFromQuery(query: string): string | null {
   if (NEAR_ME_PATTERN.test(query)) return "NEAR_ME";
   const q = query.toLowerCase();
@@ -158,8 +172,12 @@ function extractCityFromQuery(query: string): string | null {
 // DoctorDirectory.tsx's specialty chips) — the blurbs already describe symptoms in plain
 // language ("Heart, BP & chest concerns"), which is exactly what lets the model map free
 // text to the right specialty without a hand-maintained synonym dictionary.
-function buildSystemPrompt(): string {
+// `allowedIds`: when the router has narrowed the choice to a few options ("which of these?"), Groq
+// is shown only those, so it cannot wander off to a specialty the router never considered.
+function buildSystemPrompt(allowedIds?: string[]): string {
+  const allowed = allowedIds && allowedIds.length > 0 ? new Set(allowedIds) : null;
   const taxonomy = specialties
+    .filter((s) => !allowed || allowed.has(s.id))
     .map((s) => `- ${s.id}: ${s.name} — ${s.blurb}`)
     .join("\n");
   return (
@@ -213,8 +231,9 @@ function sanitizeIntent(raw: unknown, allowEmergency: boolean): SearchIntent {
   const obj = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
   const specialtyId =
     typeof obj.specialtyId === "string" && SPECIALTY_IDS.has(obj.specialtyId) ? obj.specialtyId : null;
-  const city =
-    typeof obj.city === "string" && obj.city.trim() ? obj.city.trim().slice(0, 80) : null;
+  // A city is kept only if it is NEAR_ME or one of the cities the site knows (canonical spelling);
+  // anything else is a place Groq made up or one we cannot filter on anyway.
+  const city = typeof obj.city === "string" ? knownCity(obj.city) : null;
   const keywords = strings(obj.keywords)
     .filter((k) => k.trim().length > 0)
     .map((k) => k.trim().slice(0, 40))
@@ -357,7 +376,7 @@ export async function POST(req: NextRequest) {
         ...(GROQ_MODEL.startsWith("openai/gpt-oss") ? { reasoning_effort: "low" } : {}),
         response_format: { type: "json_object" },
         messages: [
-          { role: "system", content: buildSystemPrompt() },
+          { role: "system", content: buildSystemPrompt(clarifyForGroq?.options.map((o) => o.id)) },
           { role: "user", content: query },
         ],
       }),
@@ -383,6 +402,15 @@ export async function POST(req: NextRequest) {
     }
 
     const intent = sanitizeIntent(parsed, r === null);
+    // Guard as well as prompt: a pick outside the router's own options is not trusted; the
+    // router's ranked list is used instead (test plan H-09).
+    if (clarifyForGroq && intent.specialtyId && !clarifyForGroq.options.some((o) => o.id === intent.specialtyId)) {
+      console.warn(`search-parse: groq picked ${intent.specialtyId}, outside the router's options`);
+      const fallback = routerHedge();
+      if (fallback) return fallback;
+      intent.specialtyId = null;
+      intent.specialtyIds = [];
+    }
     // A successful Groq "null" (nothing medical in the query) is honoured, not overridden by the
     // router hedge: the legacy router will happily "match" "cricket score today" to a specialty.
     if (clarifyForGroq) intent.clarify = clarifyForGroq;

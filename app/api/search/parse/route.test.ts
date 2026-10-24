@@ -137,6 +137,27 @@ describe("search parse: current router", () => {
     expect(groqCalls()).toHaveLength(1);
   });
 
+  it("clarify (specialty): Groq is shown only the router's options", async () => {
+    fetchMock
+      .mockResolvedValueOnce(json(ROUTER.clarifySpecialty))
+      .mockResolvedValueOnce(groqSays({ specialtyId: "neurology", city: null, keywords: [], emergency: false, emergencyReasons: [] }));
+    await ask({ query: "sir mein dard aur chakkar" });
+    const prompt: string = JSON.parse(groqCalls()[0][1].body).messages[0].content;
+    expect(prompt).toContain("- neurology:");
+    expect(prompt).toContain("- ent:");
+    expect(prompt).not.toContain("- cardiology:");
+    expect(prompt).not.toContain("- dermatology:");
+  });
+
+  it("clarify (specialty): a Groq pick outside the router's options is replaced by the router's list (H-09)", async () => {
+    fetchMock
+      .mockResolvedValueOnce(json(ROUTER.clarifySpecialty))
+      .mockResolvedValueOnce(groqSays({ specialtyId: "dermatology", city: null, keywords: [], emergency: false, emergencyReasons: [] }));
+    const { body } = await ask({ query: "sir mein dard aur chakkar" });
+    expect(body.specialtyIds).toEqual(ROUTER.clarifySpecialty.specialtyIds);
+    expect(body.clarify.kind).toBe("specialty");
+  });
+
   it("clarify (specialty) with Groq down: the router's hedge list", async () => {
     fetchMock.mockResolvedValueOnce(json(ROUTER.clarifySpecialty)).mockResolvedValueOnce(json({ error: "rate limited" }, 429));
     const { status, body } = await ask({ query: "sir mein dard aur chakkar" });
@@ -211,6 +232,22 @@ describe("search parse: legacy router and no router", () => {
     const { body } = await ask({ query: "seene mein bahut dard aur paseena" });
     expect(body.emergency).toEqual({ reasons: ["Chest pain"], source: "groq" });
     expect(body.specialtyIds).toEqual(["emergencymedicine"]);
+  });
+
+  it("drops a city Groq invented, keeps known cities and NEAR_ME (H-11)", async () => {
+    const groqCity = async (city: unknown) => {
+      fetchMock.mockReset();
+      fetchMock
+        .mockRejectedValueOnce(new Error("router down"))
+        .mockResolvedValueOnce(groqSays({ specialtyId: "dermatology", city, keywords: [], emergency: false, emergencyReasons: [] }));
+      return (await ask({ query: "skin pe daane" })).body.city;
+    };
+    expect(await groqCity("Atlantis")).toBeNull();
+    expect(await groqCity("Patna, Bihar but actually anywhere")).toBeNull();
+    expect(await groqCity("kolkata")).toBe("Kolkata");
+    expect(await groqCity("Delhi")).toBe("Delhi NCR");
+    expect(await groqCity("NEAR_ME")).toBe("NEAR_ME");
+    expect(await groqCity(null)).toBeNull();
   });
 
   it("no router configured and no Groq key: notConfigured", async () => {

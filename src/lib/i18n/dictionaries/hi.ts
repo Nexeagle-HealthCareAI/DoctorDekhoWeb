@@ -55,6 +55,8 @@ export const hi: Record<keyof typeof en, string> = {
   "directory.emergencySelfHarm": "अगर आपके मन में खुद को नुकसान पहुँचाने के विचार आ रहे हैं, तो अभी किसी से बात करें:",
   "directory.emergencySelfHarmCall": "टेली-मानस 14416 पर कॉल करें (मुफ़्त, 24×7)",
   "directory.emergencyDoctorsBelow": "नीचे इमरजेंसी और संबंधित डॉक्टर दिए गए हैं।",
+  "directory.pickClosest": "सही नहीं लगा? सबसे मिलता-जुलता चुनें:",
+  "directory.gpSuggestion": "हम इसे किसी एक विशेषज्ञता से नहीं मिला पाए। पहले जनरल फ़िज़िशियन को दिखाएँ, ज़रूरत हो तो वे आगे भेजेंगे।",
   "directory.noMatch": "आपकी खोज से कोई डॉक्टर नहीं मिला",
   "directory.noMatchDesc": "इस क्षेत्र में आपकी खोज से मेल खाता कोई विशेषज्ञ नहीं मिला। अपने फ़िल्टर बदलें या पूरे भारत में खोजें।",
 

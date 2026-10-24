@@ -57,6 +57,8 @@ export const hinglish: Record<keyof typeof en, string> = {
   "directory.emergencySelfHarm": "Agar aapke mann mein khud ko nuksaan pahunchane ke vichaar aa rahe hain, toh abhi kisi se baat kijiye:",
   "directory.emergencySelfHarmCall": "Tele-MANAS 14416 par call karein (free, 24×7)",
   "directory.emergencyDoctorsBelow": "Neeche emergency aur related doctors diye gaye hain.",
+  "directory.pickClosest": "Sahi nahi laga? Sabse milta-julta chuniye:",
+  "directory.gpSuggestion": "Hum ise kisi ek specialty se match nahi kar paaye. Pehle General Physician ko dikhaiye, zaroorat ho toh woh aage refer karenge.",
   "directory.noMatch": "Aapki search se koi doctor nahi mila",
   "directory.noMatchDesc": "Is area mein aapki search se milta koi specialist nahi mila. Filters badal ke dekhein ya pure India mein search karein.",
 
