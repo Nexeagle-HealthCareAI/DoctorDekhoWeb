@@ -1,9 +1,9 @@
 import { useState } from "react";
-import { Pressable, StyleSheet, Switch, Text, View } from "react-native";
+import { StyleSheet, View } from "react-native";
 import type { AgeUnit, PatientProfile, PatientProfileInput, Sex } from "../lib/api/types";
 import { useI18n } from "../lib/i18n";
-import { colors, font, space } from "../lib/theme";
-import { Banner, Button, Chip, Field, Label } from "./ui";
+import { colors, space } from "../lib/theme";
+import { Banner, Button, Chip, Field, Label, ListGroup, Segmented, ToggleRow, Txt } from "./ui";
 
 const BLOOD_GROUPS = ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"];
 
@@ -77,27 +77,32 @@ export function ProfileForm({
         </View>
       ) : null}
 
-      <Field label={t("firstName")} value={firstName} onChangeText={setFirstName} autoCapitalize="words" autoComplete="given-name" textContentType="givenName" maxLength={100} error={tried ? errors.firstName : null} returnKeyType="next" />
+      <Field label={t("yourName")} value={firstName} onChangeText={setFirstName} autoCapitalize="words" autoComplete="given-name" textContentType="givenName" maxLength={100} error={tried ? errors.firstName : null} returnKeyType="next" />
 
       <Label>{t("age")}</Label>
       <View style={styles.ageRow}>
-        <Field label="" value={age} onChangeText={(v) => setAge(v.replace(/\D/g, "").slice(0, 3))} keyboardType="number-pad" maxLength={3} style={{ width: 96, marginBottom: 0 }} accessibilityLabel={t("age")} />
-        <View style={styles.unitRow}>
-          {(["Y", "M", "D"] as AgeUnit[]).map((u) => (
-            <Chip key={u} label={u === "Y" ? t("years") : u === "M" ? t("months") : t("days")} selected={ageUnit === u} onPress={() => setAgeUnit(u)} />
-          ))}
-        </View>
+        <Field label="" value={age} onChangeText={(v) => setAge(v.replace(/\D/g, "").slice(0, 3))} keyboardType="number-pad" maxLength={3} style={{ width: 96, marginBottom: 0 }} accessibilityLabel={t("age")} error={tried && errors.age ? " " : null} />
+        <Segmented
+          style={{ flex: 1 }}
+          value={ageUnit}
+          onChange={setAgeUnit}
+          options={[
+            { value: "Y" as AgeUnit, label: t("years") },
+            { value: "M" as AgeUnit, label: t("months") },
+            { value: "D" as AgeUnit, label: t("days") },
+          ]}
+        />
       </View>
-      {tried && errors.age ? <Text style={styles.error}>{errors.age}</Text> : null}
+      {tried && errors.age ? <ErrorText text={errors.age} /> : null}
 
-      <View style={{ height: space.lg }} />
+      <View style={{ height: space.xl }} />
       <Label>{t("sex")}</Label>
       <View style={styles.sexRow}>
         {(["Male", "Female", "Other"] as Sex[]).map((s) => (
-          <Chip key={s} label={s === "Male" ? t("male") : s === "Female" ? t("female") : t("other")} selected={sex === s} onPress={() => setSex(s)} style={{ flex: 1 }} />
+          <Chip key={s} label={s === "Male" ? t("male") : s === "Female" ? t("female") : t("other")} selected={sex === s} onPress={() => setSex(s)} style={{ flex: 1, minHeight: 56 }} />
         ))}
       </View>
-      {tried && errors.sex ? <Text style={styles.error}>{errors.sex}</Text> : null}
+      {tried && errors.sex ? <ErrorText text={errors.sex} /> : null}
 
       {more ? (
         <View style={{ marginTop: space.xl }}>
@@ -112,21 +117,13 @@ export function ProfileForm({
           <Field label={`${t("email")} (${t("optional")})`} value={email} onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none" autoComplete="email" maxLength={200} />
         </View>
       ) : (
-        <Pressable onPress={() => setMore(true)} style={{ paddingVertical: space.lg }} hitSlop={8}>
-          <Text style={styles.more}>
-            + {t("lastName")}, {t("bloodGroup")}, {t("email")}
-          </Text>
-        </Pressable>
+        <Button label={`+ ${t("moreDetails")}`} variant="ghost" size="md" onPress={() => setMore(true)} style={{ alignSelf: "flex-start", paddingHorizontal: 0, marginTop: space.md }} />
       )}
 
       {showReminders ? (
-        <View style={styles.reminders}>
-          <View style={{ flex: 1, paddingRight: space.md }}>
-            <Text style={styles.remTitle}>{t("reminders")}</Text>
-            <Text style={styles.remHint}>{t("remindersHint")}</Text>
-          </View>
-          <Switch value={reminders} onValueChange={setReminders} trackColor={{ true: colors.primary, false: colors.line }} thumbColor="#fff" />
-        </View>
+        <ListGroup style={{ marginTop: space.lg }}>
+          <ToggleRow first icon="notifications-outline" label={t("reminders")} hint={t("remindersHint")} value={reminders} onChange={setReminders} />
+        </ListGroup>
       ) : null}
 
       {serverError ? (
@@ -140,14 +137,16 @@ export function ProfileForm({
   );
 }
 
+function ErrorText({ text }: { text: string }) {
+  return (
+    <Txt variant="small" color={colors.danger} style={{ marginTop: space.xs }}>
+      {text}
+    </Txt>
+  );
+}
+
 const styles = StyleSheet.create({
   ageRow: { flexDirection: "row", alignItems: "center", gap: space.md },
-  unitRow: { flexDirection: "row", gap: space.sm, flex: 1, flexWrap: "wrap" },
   sexRow: { flexDirection: "row", gap: space.sm },
   wrap: { flexDirection: "row", flexWrap: "wrap", gap: space.sm },
-  error: { color: colors.danger, fontSize: font.tiny, marginTop: space.xs },
-  more: { color: colors.primary, fontWeight: "600", fontSize: font.small },
-  reminders: { flexDirection: "row", alignItems: "center", marginTop: space.lg, padding: space.lg, backgroundColor: colors.card, borderRadius: 12, borderWidth: 1, borderColor: colors.line },
-  remTitle: { fontSize: font.body, fontWeight: "600", color: colors.text },
-  remHint: { fontSize: font.tiny, color: colors.muted, marginTop: 2 },
 });

@@ -20,7 +20,8 @@ type SessionCtx = {
   /** Signed in but the three-field "About you" profile is not saved yet. */
   needsProfile: boolean;
   signIn: (token: string, mobile: string) => Promise<void>;
-  signOut: () => Promise<void>;
+  /** `serverRevoked`: the server already ended every session (account deleted) — just clear this phone. */
+  signOut: (opts?: { serverRevoked?: boolean }) => Promise<void>;
   /** Call after the short profile is saved. */
   markProfileComplete: () => void;
 };
@@ -105,10 +106,12 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     [refreshProfileState],
   );
 
-  const signOut = useCallback(async () => {
-    const installationId = await getInstallationId();
-    await deactivateDevice(installationId);
-    await logoutOnServer();
+  const signOut = useCallback(async (opts?: { serverRevoked?: boolean }) => {
+    if (!opts?.serverRevoked) {
+      const installationId = await getInstallationId();
+      await deactivateDevice(installationId);
+      await logoutOnServer();
+    }
     await clearLocal();
   }, [clearLocal]);
 

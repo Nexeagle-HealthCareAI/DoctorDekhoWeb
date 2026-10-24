@@ -40,12 +40,13 @@ type Options = {
 };
 
 function messageFrom(body: unknown, status: number): string {
+  // The rate limiter's own 429 body (if any) is not patient-friendly; always say what to do.
+  if (status === 429) return "Too many tries. Please wait a minute and try again.";
   if (body && typeof body === "object") {
     const b = body as Record<string, unknown>;
     const m = (b.message ?? b.Message ?? b.title) as string | undefined;
     if (m && typeof m === "string") return m;
   }
-  if (status === 429) return "Too many tries. Please wait a minute and try again.";
   if (status >= 500) return "Our server had a problem. Please try again.";
   if (status === 404) return "Not found.";
   return "Something went wrong. Please try again.";

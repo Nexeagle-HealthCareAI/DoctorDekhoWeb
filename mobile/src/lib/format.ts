@@ -3,7 +3,7 @@ import type { Locale } from "./i18n/types";
 // Bookings are made against Indian hospitals, so "today" is always today in India (UTC+05:30), whatever the phone's zone.
 const IST_OFFSET_MIN = 330;
 
-function istNow(): Date {
+export function istNow(): Date {
   const now = new Date();
   return new Date(now.getTime() + (now.getTimezoneOffset() + IST_OFFSET_MIN) * 60000);
 }

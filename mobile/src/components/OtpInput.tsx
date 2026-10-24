@@ -1,5 +1,6 @@
 import { useEffect, useRef, type ComponentRef } from "react";
 import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { useTextStyle } from "../lib/appearance";
 import { colors, radius } from "../lib/theme";
 
 const LENGTH = 6;
@@ -10,6 +11,7 @@ const LENGTH = 6;
  */
 export function OtpInput({ value, onChange, onComplete, error }: { value: string; onChange: (v: string) => void; onComplete: (v: string) => void; error?: boolean }) {
   const ref = useRef<ComponentRef<typeof TextInput>>(null);
+  const ts = useTextStyle();
 
   useEffect(() => {
     const t = setTimeout(() => ref.current?.focus(), 250);
@@ -23,7 +25,7 @@ export function OtpInput({ value, onChange, onComplete, error }: { value: string
           const active = i === Math.min(value.length, LENGTH - 1);
           return (
             <View key={i} style={[styles.box, active && styles.boxActive, error && styles.boxError]}>
-              <Text style={styles.digit}>{value[i] ?? ""}</Text>
+              <Text style={[styles.digit, ts(26, "800"), { lineHeight: undefined }]}>{value[i] ?? ""}</Text>
             </View>
           );
         })}
@@ -51,17 +53,17 @@ const styles = StyleSheet.create({
   row: { flexDirection: "row", justifyContent: "space-between", gap: 8 },
   box: {
     flex: 1,
-    aspectRatio: 0.85,
-    maxWidth: 56,
+    height: 60,
+    maxWidth: 60,
     borderWidth: 1.5,
-    borderColor: colors.line,
+    borderColor: colors.lineStrong,
     borderRadius: radius.md,
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: colors.card,
   },
-  boxActive: { borderColor: colors.primary },
+  boxActive: { borderColor: colors.primary, borderWidth: 2 },
   boxError: { borderColor: colors.danger },
-  digit: { fontSize: 24, fontWeight: "700", color: colors.ink },
+  digit: { color: colors.ink },
   hidden: { position: "absolute", opacity: 0, width: 1, height: 1 },
 });

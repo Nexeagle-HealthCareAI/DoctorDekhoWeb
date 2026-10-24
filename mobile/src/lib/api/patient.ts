@@ -152,3 +152,9 @@ export async function uploadLockerDocument(u: LockerUpload): Promise<SimpleResul
 
 export const deleteLockerDocument = (documentId: string) =>
   api<SimpleResult>(`/public/patients/me/documents/${documentId}`, { method: "DELETE" });
+
+// ── Account ──────────────────────────────────────────────────────────────────────────────────────
+
+/** DELETE /public/patients/me — removes the account's profile, family, records, app settings and devices, and revokes every session. */
+export const deleteAccount = () =>
+  api<SimpleResult & { documentsPending?: number }>("/public/patients/me", { method: "DELETE", timeoutMs: 60000 });

@@ -33,6 +33,8 @@ export interface Doctor {
   latitude?: number;
   longitude?: number;
   isAvailableToday?: boolean;
+  /** Today's working hours as minutes after midnight, India time. Empty when not working today. */
+  todayHours?: { start: number; end: number }[];
   isOnlineNow?: boolean;
   /** Straight-line distance from the patient, set on the device when location is known. */
   distanceKm?: number;
@@ -145,6 +147,10 @@ export function mapDoctor(dto: DoctorDto): Doctor {
     latitude: orUndef(dto.latitude),
     longitude: orUndef(dto.longitude),
     isAvailableToday: dto.isAvailableToday,
+    todayHours: (dto.todayHours ?? [])
+      .map((h) => ({ start: toMinutes(h.startTime), end: toMinutes(h.endTime) }))
+      .filter((h): h is { start: number; end: number } => h.start != null && h.end != null && h.end > h.start)
+      .sort((a, b) => a.start - b.start),
     isOnlineNow: dto.isOnlineNow,
   };
 }
@@ -181,4 +187,10 @@ export function distanceKm(a: { lat: number; lng: number }, b: { lat: number; ln
 
 export function effectiveFee(d: Pick<Doctor, "fee" | "discountedFee">): number | undefined {
   return d.discountedFee ?? d.fee;
+}
+
+/** "17:30:00" → 1050 (minutes after midnight); anything unreadable → null. */
+function toMinutes(v?: string | null): number | null {
+  const m = /^(\d{1,2}):(\d{2})/.exec(v ?? "");
+  return m ? Number(m[1]) * 60 + Number(m[2]) : null;
 }
