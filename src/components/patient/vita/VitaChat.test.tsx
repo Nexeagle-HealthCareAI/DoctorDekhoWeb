@@ -167,6 +167,16 @@ describe("Vita chat panel", () => {
     expect(screen.getByTestId("site-city")).toHaveTextContent("Kishanganj");
   });
 
+  it("LANG: the site's language goes with each message, so Vita's first guess matches the screen", async () => {
+    function HindiHarness() {
+      const chat = useVitaChat({ uiLanguage: "hi" });
+      return <VitaChat chat={chat} onClose={() => {}} />;
+    }
+    render(<I18nProvider><HindiHarness /></I18nProvider>);
+    await say("Dr Anita Sen", replies.list);
+    expect(sent.at(-1)).toMatchObject({ text: "Dr Anita Sen", ui_language: "hi" });
+  });
+
   it("UI-6: an emergency shows the emergency card and nothing to book", async () => {
     show();
     await say("seene mein tez dard aur saans nahi aa rahi", replies.emergency);
