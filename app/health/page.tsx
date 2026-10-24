@@ -61,25 +61,33 @@ export default async function HealthWikiIndexPage({ searchParams }: { searchPara
             {hasSectorUpdates ? ", plus updates on what is happening in the health sector" : ""}.
           </p>
 
-          {hasSectorUpdates && <TypeFilter value={filter} />}
+          {/* Articles at the left; on a large screen the invitation to write sits in a column at the right and stays in view while scrolling.
+              On a phone or tablet the same card follows the articles. */}
+          <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_20rem] lg:gap-8 xl:gap-10 lg:items-start">
+            <div className="min-w-0">
+              {hasSectorUpdates && <TypeFilter value={filter} />}
 
-          {articles.length === 0 ? (
-            <div className="bg-white rounded-2xl border border-slate-200 p-10 text-center">
-              <p className="font-display text-lg font-bold text-slate-900 mb-1">No articles here yet</p>
-              <p className="text-sm text-slate-500 mb-4">New guides are added regularly.</p>
-              {filter !== "all" && <Link href="/health" className="text-sm font-bold text-brand-teal hover:underline">See all articles</Link>}
+              {articles.length === 0 ? (
+                <div className="bg-white rounded-2xl border border-slate-200 p-10 text-center">
+                  <p className="font-display text-lg font-bold text-slate-900 mb-1">No articles here yet</p>
+                  <p className="text-sm text-slate-500 mb-4">New guides are added regularly.</p>
+                  {filter !== "all" && <Link href="/health" className="text-sm font-bold text-brand-teal hover:underline">See all articles</Link>}
+                </div>
+              ) : (
+                <ul className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-6 list-none p-0">
+                  {articles.map((article, i) => (
+                    <li key={article.slug} className="flex">
+                      <div className="flex w-full"><ArticleCard article={article} priority={i < 3} /></div>
+                    </li>
+                  ))}
+                </ul>
+              )}
             </div>
-          ) : (
-            <ul className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 list-none p-0">
-              {articles.map((article, i) => (
-                <li key={article.slug} className="flex">
-                  <div className="flex w-full"><ArticleCard article={article} priority={i < 3} /></div>
-                </li>
-              ))}
-            </ul>
-          )}
 
-          <JoinCallout />
+            <aside aria-label="Contribute" className="mt-10 lg:mt-0 lg:sticky lg:top-28">
+              <JoinCallout variant="sidebar" />
+            </aside>
+          </div>
         </div>
       </main>
 
