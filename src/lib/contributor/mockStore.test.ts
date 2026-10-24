@@ -90,16 +90,18 @@ describe("articles", () => {
     expect(l.published).toHaveLength(2);
     expect(l.drafts).toHaveLength(1);
   });
-  it("lets a verified author submit a draft, which then cannot be edited", () => {
+  it("publishes a verified doctor's draft at once, with no reviewer", () => {
     const id = verified();
     const a = s.createDraft(id, draft);
-    expect(s.submitArticle(id, a.slug).status).toBe("IN_REVIEW");
-    expect(() => s.updateDraft(id, a.slug, draft)).toThrowError(expect.objectContaining({ status: 409 }));
+    const done = s.submitArticle(id, a.slug);
+    expect(done.status).toBe("PUBLISHED");
+    expect(done.reviewerName).toBeNull();
   });
-  it("lets an author whose profile is still waiting for approval send a draft for review", () => {
+  it("lets an author whose profile is still waiting for approval send a draft for review, which then cannot be edited", () => {
     const id = pending();
     const a = s.createDraft(id, draft);
     expect(s.submitArticle(id, a.slug).status).toBe("IN_REVIEW");
+    expect(() => s.updateDraft(id, a.slug, draft)).toThrowError(expect.objectContaining({ status: 409 }));
   });
   it("needs alt text on a cover image to submit", () => {
     const id = verified();

@@ -14,7 +14,7 @@ export default function EditPage({ params }: { params: { slug: string } }) {
   return (
     <div>
       <BackLink href="/contribute">My articles</BackLink>
-      <PageTitle title={art.data.title || "Untitled draft"} sub="Edit your draft." />
+      <PageTitle title={art.data.title || "Untitled draft"} sub={art.data.status === "PUBLISHED" ? "Edit your published article. Your changes go live when you publish them." : "Edit your draft."} />
       {/* key: a different article starts the editor from scratch */}
       <ArticleForm key={art.data.slug} me={me} existing={art.data} />
     </div>

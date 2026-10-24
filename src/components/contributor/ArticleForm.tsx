@@ -10,7 +10,7 @@ import { contributorApi } from "@/lib/contributor/client";
 import { CONDITION_OPTIONS, SLUG_LABEL } from "@/lib/contributor/conditions";
 import { messageOf } from "@/lib/contributor/hooks";
 import { ARTICLE_TYPE_LABEL } from "@/lib/health-wiki/types";
-import { isDoctorRole, type ArticleDraftInput, type ArticleType, type ContributorMe, type MyArticle } from "@/lib/contributor/types";
+import { canSelfPublish, isDoctorRole, type ArticleDraftInput, type ArticleType, type ContributorMe, type MyArticle } from "@/lib/contributor/types";
 import { Banner, Field, card, input, primaryBtn, secondaryBtn } from "./ui";
 import SubmitConsentDialog from "./SubmitConsentDialog";
 
@@ -34,7 +34,9 @@ export default function ArticleForm({ me, existing }: Props) {
   const doctor = isDoctorRole(me.role);
   const writer = me.role === "WRITER";
   const coverInput = useRef<HTMLInputElement>(null);
-  const locked = !!existing && existing.status !== "DRAFT";
+  const selfPublish = canSelfPublish(me, existing);
+  // A verified doctor can keep editing their live article: the changes go live when they publish them.
+  const locked = !!existing && existing.status !== "DRAFT" && !(selfPublish && existing.status === "PUBLISHED");
 
   const [type, setType] = useState<ArticleType>(existing?.type ?? (writer ? "SECTOR_UPDATE" : "MEDICAL"));
   const [title, setTitle] = useState(existing?.title ?? "");
@@ -103,9 +105,11 @@ export default function ArticleForm({ me, existing }: Props) {
       const saved = existing ? await contributorApi.updateArticle(existing.slug, payload()) : await contributorApi.createArticle(payload());
       if (submit) await contributorApi.submitArticle(saved.slug, true);
       setDirty(false);
-      toast.success(submit ? (medical ? "Sent for review. The team will assign a reviewing doctor." : "Sent for approval.") : "Draft saved. You can find it under My drafts.");
+      toast.success(submit
+        ? (selfPublish ? "Published on Doctor Dekho." : medical ? "Sent for review. The team will assign a reviewing doctor." : "Sent for approval.")
+        : existing?.status === "PUBLISHED" ? "Changes saved. They go live when you publish them." : "Draft saved. You can find it under My drafts.");
       // A saved draft is not sent to anyone: it waits under "My drafts" until the writer chooses Submit for review.
-      router.push(submit ? "/contribute" : "/contribute?tab=drafts");
+      router.push(submit ? (selfPublish ? "/contribute?tab=published" : "/contribute") : "/contribute?tab=drafts");
     } catch (err) {
       setErrors({ form: messageOf(err) });
       setAsking(false);
@@ -188,7 +192,9 @@ export default function ArticleForm({ me, existing }: Props) {
       </Field>
 
       <Banner tone="info">
-        {medical
+        {selfPublish
+          ? "You are a verified doctor, so your article goes live as soon as you publish it. Nobody reviews it first, and every change is kept in its history. The NexEagle team can pull it back or take it down."
+          : medical
           ? "After you submit, the NexEagle team assigns a reviewing doctor, who publishes it if it is right or tells you what to change. You get a WhatsApp message either way."
           : "After you submit, a NexEagle editor publishes it if it is right or tells you what to change. Sector updates must not give medical advice."}
       </Banner>
@@ -199,10 +205,10 @@ export default function ArticleForm({ me, existing }: Props) {
       {errors.form && <p role="alert" className="text-sm font-medium text-red-600">{errors.form}</p>}
       <div className="flex flex-wrap gap-3">
         <button type="submit" disabled={busy || locked} className={secondaryBtn}>{busy ? "Saving…" : "Save draft"}</button>
-        <button type="button" disabled={busy || locked || !canSubmit} onClick={askToSubmit} className={primaryBtn}>Submit for review</button>
+        <button type="button" disabled={busy || locked || !canSubmit} onClick={askToSubmit} className={primaryBtn}>{selfPublish ? (existing?.status === "PUBLISHED" ? "Publish changes" : "Publish") : "Submit for review"}</button>
         <Link href="/contribute" className="inline-flex items-center px-3 text-sm font-semibold text-slate-500 hover:text-brand-teal">Cancel</Link>
       </div>
-      <SubmitConsentDialog open={asking} medical={medical} busy={busy} onCancel={() => setAsking(false)} onConfirm={() => void save(true)} />
+      <SubmitConsentDialog open={asking} medical={medical} busy={busy} selfPublish={selfPublish} onCancel={() => setAsking(false)} onConfirm={() => void save(true)} />
     </form>
   );
 }

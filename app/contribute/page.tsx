@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Eye, Heart, Lightbulb, PenLine } from "lucide-react";
 import { contributorApi } from "@/lib/contributor/client";
 import { useContributor, useLoad } from "@/lib/contributor/hooks";
-import { isDoctorRole, type ArticleListResponse, type ArticleListTab, type MyArticle } from "@/lib/contributor/types";
+import { canSelfPublish, isDoctorRole, type ArticleListResponse, type ArticleListTab, type MyArticle } from "@/lib/contributor/types";
 import { ARTICLE_TYPE_LABEL } from "@/lib/health-wiki/types";
 import { formatDate } from "@/lib/health-wiki/format";
 import { ArticleStatusChip, Banner, Chip, ErrorBox, Loading, PageTitle, VerificationBanner, WaitingChip, card, primaryBtn, secondaryBtn } from "@/components/contributor/ui";
@@ -18,8 +18,9 @@ function Thumb({ a }: { a: MyArticle }) {
     : <div aria-hidden="true" className="w-28 sm:w-36 aspect-video rounded-xl shrink-0 bg-gradient-to-br from-brand-teal/15 to-brand-sky/15" />;
 }
 
-function Row({ a, tab }: { a: MyArticle; tab: ArticleListTab }) {
-  const href = tab === "pending" ? `/contribute/review/${a.slug}` : tab === "drafts" ? `/contribute/write/${a.slug}` : `/health/conditions/${a.slug}`;
+function Row({ a, tab, canEditLive }: { a: MyArticle; tab: ArticleListTab; canEditLive: boolean }) {
+  // A verified doctor opens their live article to edit it; everyone else opens it as readers see it.
+  const href = tab === "pending" ? `/contribute/review/${a.slug}` : tab === "drafts" || (tab === "published" && canEditLive && a.myRole === "AUTHOR" && !a.holdForReview) ? `/contribute/write/${a.slug}` : `/health/conditions/${a.slug}`;
   return (
     <li>
       <Link href={href} className={cn(card, "flex gap-4 items-center p-3 sm:p-4 hover:border-brand-teal/40 transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand-teal")}>
@@ -116,7 +117,7 @@ export default function ContributorHome() {
           <p className="text-sm text-slate-500 mt-1">{EMPTY[active.key].text}</p>
         </div>
       ) : (
-        <ul className="grid grid-cols-1 xl:grid-cols-2 gap-3 items-start" role="tabpanel">{active.items.map((a) => <Row key={a.slug} a={a} tab={active.key} />)}</ul>
+        <ul className="grid grid-cols-1 xl:grid-cols-2 gap-3 items-start" role="tabpanel">{active.items.map((a) => <Row key={a.slug} a={a} tab={active.key} canEditLive={!!me && canSelfPublish(me)} />)}</ul>
       )}
     </div>
   );

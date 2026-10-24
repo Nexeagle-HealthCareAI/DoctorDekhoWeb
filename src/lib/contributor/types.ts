@@ -19,6 +19,13 @@ export const ENROL_ROLE_LABEL: Record<EnrolRole, string> = {
 
 export const isDoctorRole = (r: ContributorRole) => r === "INDEPENDENT_DOCTOR" || r === "HOSPITAL_DOCTOR";
 
+/**
+ * A doctor the team has verified publishes their own articles (medical or sector update) with no review. The article stays in
+ * review for someone else when the team pulled it back, and everyone who is not a verified doctor goes through review.
+ */
+export const canSelfPublish = (me: { role: ContributorRole; status: ContributorStatus }, article?: { holdForReview?: boolean; myRole: MyArticleRole }) =>
+  isDoctorRole(me.role) && me.status === "VERIFIED" && !article?.holdForReview && (!article || article.myRole === "AUTHOR");
+
 export type ContributorStatus = "INVITED" | "PENDING" | "VERIFIED" | "REJECTED";
 
 export interface ContributorMe {
@@ -64,6 +71,8 @@ export interface MyArticle {
   waitingDays: number | null;
   /** The reviewer approved it, but the reviewer's registration is not verified yet, so it is not live. */
   awaitingVerification: boolean;
+  /** The team pulled this article back to review: its author cannot publish it alone until it is approved. */
+  holdForReview?: boolean;
   views: number | null;
   likes: number | null;
   publishedAt: string | null;
