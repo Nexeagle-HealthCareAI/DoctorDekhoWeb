@@ -1,7 +1,8 @@
 import { useRouter } from "expo-router";
-import { useState } from "react";
-import { KeyboardAvoidingView, Linking, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { useRef, useState, type ComponentRef, type ReactNode } from "react";
+import { Linking, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { KeyboardScreen, useRevealField } from "../../components/KeyboardScreen";
 import { Button, Logo, Txt } from "../../components/ui";
 import { ApiError } from "../../lib/api/http";
 import { sendOtp } from "../../lib/api/patient";
@@ -45,8 +46,7 @@ export default function LoginScreen() {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }}>
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
-        <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+      <KeyboardScreen contentContainerStyle={styles.content}>
           <View style={styles.brand}>
             <Logo height={74} accessible={false} />
             <Txt variant="display" style={{ marginTop: space.md, fontSize: 30 }}>
@@ -82,7 +82,7 @@ export default function LoginScreen() {
           <Txt variant="smallBold" color={colors.muted} style={{ fontSize: 15, marginTop: space.xl, marginBottom: space.sm }}>
             {t("phoneTitle")}
           </Txt>
-          <View style={[styles.phoneBox, error ? { borderColor: colors.danger } : null]}>
+          <PhoneBox error={!!error}>
             <Txt variant="subheading" style={styles.prefix}>
               +91
             </Txt>
@@ -103,7 +103,7 @@ export default function LoginScreen() {
               style={[styles.phoneInput, ts(20, "700"), { lineHeight: undefined }]}
               accessibilityLabel={t("phoneTitle")}
             />
-          </View>
+          </PhoneBox>
           {error ? (
             <Txt variant="small" color={colors.danger} style={{ marginTop: space.sm }}>
               {error}
@@ -127,9 +127,19 @@ export default function LoginScreen() {
               <Text onPress={() => Linking.openURL(`${config.businessUrl}/privacy`)}>{t("privacy")}</Text>
             </Txt>
           </Txt>
-        </ScrollView>
-      </KeyboardAvoidingView>
+      </KeyboardScreen>
     </SafeAreaView>
+  );
+}
+
+/** The +91 box; scrolls itself above the keyboard when its field is focused. */
+function PhoneBox({ error, children }: { error: boolean; children: ReactNode }) {
+  const box = useRef<ComponentRef<typeof View>>(null);
+  const reveal = useRevealField();
+  return (
+    <View ref={box} style={[styles.phoneBox, error ? { borderColor: colors.danger } : null]} onTouchStart={() => reveal(box)}>
+      {children}
+    </View>
   );
 }
 
@@ -142,5 +152,6 @@ const styles = StyleSheet.create({
   langText: { fontSize: 18, fontWeight: "700", color: colors.ink },
   phoneBox: { flexDirection: "row", alignItems: "center", borderWidth: 2, borderColor: colors.primary, borderRadius: radius.md + 2, backgroundColor: colors.card, minHeight: 60, overflow: "hidden" },
   prefix: { paddingHorizontal: space.md + 2, alignSelf: "stretch", textAlignVertical: "center", lineHeight: 60, borderRightWidth: 1, borderRightColor: colors.line, backgroundColor: colors.bg },
-  phoneInput: { flex: 1, paddingHorizontal: space.md + 2, color: colors.ink, letterSpacing: 1 },
+  // Fixed height, no font padding: some Android phones otherwise clip or hide the typed digits.
+  phoneInput: { flex: 1, height: 56, paddingVertical: 0, includeFontPadding: false, textAlignVertical: "center", paddingHorizontal: space.md + 2, color: colors.ink, letterSpacing: 1 },
 });

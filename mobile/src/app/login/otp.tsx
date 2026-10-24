@@ -2,7 +2,8 @@ import * as Clipboard from "expo-clipboard";
 import * as Haptics from "expo-haptics";
 import { Redirect, useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useRef, useState } from "react";
-import { AppState, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, View } from "react-native";
+import { AppState, StyleSheet, Text, View } from "react-native";
+import { KeyboardScreen } from "../../components/KeyboardScreen";
 import { OtpInput } from "../../components/OtpInput";
 import { Button, Card, TopBar, Txt } from "../../components/ui";
 import { ApiError } from "../../lib/api/http";
@@ -99,8 +100,7 @@ export default function OtpScreen() {
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
       <TopBar />
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
-        <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+      <KeyboardScreen contentContainerStyle={styles.content}>
           <Txt variant="display">{t("otpTitle")}</Txt>
           <Txt color={colors.muted} style={{ marginTop: space.sm, marginBottom: space.xl }}>
             {t("otpSentTo", { mobile })}{" "}
@@ -138,8 +138,7 @@ export default function OtpScreen() {
               <Button label={t("resend")} variant="ghost" size="md" icon="refresh" onPress={resend} />
             )}
           </View>
-        </ScrollView>
-      </KeyboardAvoidingView>
+      </KeyboardScreen>
     </View>
   );
 }

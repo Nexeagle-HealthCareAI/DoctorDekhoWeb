@@ -59,7 +59,7 @@
         {
           "cameraPermission": "Take a photo of a prescription or report to keep it in your health records.",
           "photosPermission": "Choose a prescription or report photo to keep in your health records.",
-          "microphonePermission": false
+          "microphonePermission": "Doctor Dekho uses the microphone only when you tap Speak to search for a doctor."
         }
       ],
       [

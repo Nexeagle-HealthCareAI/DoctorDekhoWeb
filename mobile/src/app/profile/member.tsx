@@ -1,7 +1,8 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useState } from "react";
-import { Alert, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, View } from "react-native";
+import { Alert, StyleSheet, View } from "react-native";
+import { KeyboardScreen } from "../../components/KeyboardScreen";
 import { Banner, Button, Chip, Field, Label, TopBar } from "../../components/ui";
 import { ApiError } from "../../lib/api/http";
 import { deleteFamilyMember, saveFamilyMember } from "../../lib/api/patient";
@@ -91,9 +92,9 @@ export default function MemberScreen() {
   }
 
   return (
-    <KeyboardAvoidingView style={{ flex: 1, backgroundColor: colors.bg }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
+    <View style={{ flex: 1, backgroundColor: colors.bg }}>
       <TopBar title={existing ? existing.firstName : t("addMember")} back="close" />
-      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+      <KeyboardScreen contentContainerStyle={styles.content}>
         <Label>{t("relation")}</Label>
         <View style={styles.wrap}>
           {RELATIONS.map((r) => (
@@ -127,8 +128,8 @@ export default function MemberScreen() {
         {error ? <Banner tone="danger" icon="alert-circle" text={error} /> : null}
         <Button label={t("save")} icon="checkmark-circle" loading={busy} onPress={save} />
         {existing ? <Button label={t("remove")} variant="danger" icon="trash" onPress={remove} style={{ marginTop: space.sm }} /> : null}
-      </ScrollView>
-    </KeyboardAvoidingView>
+      </KeyboardScreen>
+    </View>
   );
 }
 

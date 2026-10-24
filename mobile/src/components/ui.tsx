@@ -2,7 +2,7 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import * as Haptics from "expo-haptics";
 import { Image } from "expo-image";
 import { useRouter } from "expo-router";
-import { useState, type ComponentProps, type ReactNode } from "react";
+import { useRef, useState, type ComponentProps, type ComponentRef, type ReactNode } from "react";
 import {
   ActivityIndicator,
   Modal,
@@ -18,6 +18,7 @@ import {
   type ViewStyle,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useRevealField } from "./KeyboardScreen";
 import { useTextStyle, type Weight } from "../lib/appearance";
 import { dateParts } from "../lib/format";
 import { useI18n } from "../lib/i18n";
@@ -250,8 +251,10 @@ export function Field({
   ...input
 }: TextInputProps & { label: string; error?: string | null; hint?: string }) {
   const ts = useTextStyle();
+  const box = useRef<ComponentRef<typeof View>>(null);
+  const reveal = useRevealField();
   return (
-    <View style={[{ marginBottom: space.lg }, style as StyleProp<ViewStyle>]}>
+    <View ref={box} style={[{ marginBottom: space.lg }, style as StyleProp<ViewStyle>]}>
       {label ? (
         <Txt variant="smallBold" style={{ fontSize: 15, marginBottom: space.sm }}>
           {label}
@@ -261,6 +264,10 @@ export function Field({
         placeholderTextColor={colors.faint}
         accessibilityLabel={label || undefined}
         {...input}
+        onFocus={(e) => {
+          reveal(box);
+          input.onFocus?.(e);
+        }}
         style={[styles.input, ts(17, "600"), { lineHeight: undefined }, error ? { borderColor: colors.danger } : null]}
       />
       {error ? (
@@ -603,7 +610,10 @@ const styles = StyleSheet.create({
   segItemOn: { backgroundColor: colors.card, shadowColor: colors.ink, shadowOpacity: 0.12, shadowRadius: 2, shadowOffset: { width: 0, height: 1 }, elevation: 1 },
   card: { backgroundColor: colors.card, borderRadius: radius.lg + 2, borderWidth: 1, borderColor: colors.line, padding: space.lg },
   input: {
-    minHeight: BIG,
+    height: BIG,
+    paddingVertical: 0,
+    includeFontPadding: false,
+    textAlignVertical: "center",
     borderWidth: 1.5,
     borderColor: colors.lineStrong,
     borderRadius: radius.md + 2,

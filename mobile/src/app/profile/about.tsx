@@ -1,7 +1,8 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
 import { useState } from "react";
-import { KeyboardAvoidingView, Platform, ScrollView } from "react-native";
+import { View } from "react-native";
+import { KeyboardScreen } from "../../components/KeyboardScreen";
 import { ProfileForm, type ProfileFormValues } from "../../components/ProfileForm";
 import { Loading, TopBar } from "../../components/ui";
 import { ApiError } from "../../lib/api/http";
@@ -35,15 +36,15 @@ export default function AboutScreen() {
   }
 
   return (
-    <KeyboardAvoidingView style={{ flex: 1, backgroundColor: colors.bg }} behavior={Platform.OS === "ios" ? "padding" : undefined} keyboardVerticalOffset={100}>
+    <View style={{ flex: 1, backgroundColor: colors.bg }}>
       <TopBar title={t("personalInfo")} />
-      <ScrollView contentContainerStyle={{ padding: space.xl }} keyboardShouldPersistTaps="handled">
+      <KeyboardScreen contentContainerStyle={{ padding: space.xl }}>
         {profile.isLoading ? (
           <Loading />
         ) : (
           <ProfileForm initial={profile.data} submitLabel={t("save")} busy={busy} serverError={error} onSubmit={submit} />
         )}
-      </ScrollView>
-    </KeyboardAvoidingView>
+      </KeyboardScreen>
+    </View>
   );
 }
