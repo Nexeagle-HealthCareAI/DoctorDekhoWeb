@@ -41,14 +41,15 @@ function markSeen() {
 
 export default function ChatWidget() {
   const { isLoggedIn } = usePatientAuth();
-  const { t } = useTranslation();
+  const { t, locale } = useTranslation();
   const [isOpen, setIsOpen] = useState(false);
   const [hasOpenedOnce, setHasOpenedOnce] = useState(false);
   // null = not checked yet. Only an explicit "not ready" from the server changes the panel; the button
   // is always Vita.
   const [vitaOn, setVitaOn] = useState<boolean | null>(null);
   const [nudge, setNudge] = useState(false);
-  const chat = useVitaChat();
+  // Vita answers in the patient's own language; the site's language is only its first guess.
+  const chat = useVitaChat({ uiLanguage: locale });
 
   useEffect(() => {
     if (isOpen && !hasOpenedOnce) {

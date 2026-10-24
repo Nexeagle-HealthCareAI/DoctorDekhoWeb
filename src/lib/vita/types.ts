@@ -119,4 +119,6 @@ export interface VitaRequest {
   page?: number;
   /** Search with exactly the asks in `text` (a filter chip was removed). */
   new_search?: boolean;
+  /** The site's UI language (en, hi, hinglish, bn): Vita uses it only until the patient's own words show one. */
+  ui_language?: string;
 }

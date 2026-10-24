@@ -96,6 +96,7 @@ export async function POST(req: NextRequest) {
   if (typeof body.hospital_id === "string" && UUID.test(body.hospital_id)) out.hospital_id = body.hospital_id;
   if (typeof body.select_doctor_id === "string" && UUID.test(body.select_doctor_id)) out.select_doctor_id = body.select_doctor_id;
   if (body.new_search === true) out.new_search = true;
+  if (typeof body.ui_language === "string" && /^(en|hi|hinglish|bn)$/.test(body.ui_language)) out.ui_language = body.ui_language;
   if (typeof body.page === "number" && Number.isInteger(body.page) && body.page >= 1 && body.page <= 10) out.page = body.page;
 
   const controller = new AbortController();

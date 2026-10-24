@@ -51,7 +51,7 @@ function writeStore(storage: "local" | "session", key: string, value: string | n
   }
 }
 
-export function useVitaChat(options: { hospitalId?: string } = {}) {
+export function useVitaChat(options: { hospitalId?: string; uiLanguage?: string } = {}) {
   const [entries, setEntries] = useState<VitaEntry[]>([]);
   const [busy, setBusy] = useState(false);
   const location = useSharedLocation();
@@ -81,6 +81,7 @@ export function useVitaChat(options: { hospitalId?: string } = {}) {
         ...(town ? { city: town } : {}),
         ...(at && at.lat !== undefined && at.lng !== undefined ? { lat: at.lat, lng: at.lng } : {}),
         ...(options.hospitalId ? { hospital_id: options.hospitalId } : {}),
+        ...(options.uiLanguage ? { ui_language: options.uiLanguage } : {}),
         ...(opts.select_doctor_id ? { select_doctor_id: opts.select_doctor_id } : {}),
         ...(opts.page && opts.page > 1 ? { page: opts.page } : {}),
         ...(opts.new_search ? { new_search: true } : {}),
@@ -107,7 +108,7 @@ export function useVitaChat(options: { hospitalId?: string } = {}) {
         setBusy(false);
       }
     },
-    [busy, coords, city, options.hospitalId, push],
+    [busy, coords, city, options.hospitalId, options.uiLanguage, push],
   );
 
   const retry = useCallback(() => {
