@@ -137,9 +137,9 @@ describe("Vita chat panel", () => {
     expect(alert).toHaveTextContent("Chest pain");
     expect(alert).toHaveTextContent("Breathlessness");
     expect(alert).not.toHaveTextContent("listed below"); // no doctor list follows in the chat
-    expect(within(alert).getByRole("link")).toHaveAttribute("href", "tel:108");
+    const calls = within(alert).getAllByRole("link").map((l) => l.getAttribute("href"));
+    expect(calls).toEqual(["tel:108", "tel:112", "tel:102"]); // 108 (ambulance) first, then 112 and 102
     expect(screen.queryByRole("button", { name: /^Choose/ })).not.toBeInTheDocument();
-    expect(screen.queryByText(/112/)).not.toBeInTheDocument(); // one emergency number on screen
   });
 
   it("VITA-4: two doctors with one name are told apart, and tapping one chooses it", async () => {
