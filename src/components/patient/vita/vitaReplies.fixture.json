@@ -1,0 +1,513 @@
+{
+ "list": {
+  "session_id": "sess_6ba70773fbf5",
+  "turn": 1,
+  "kind": "doctor_list",
+  "message": "Here are 2 female skin doctors (Dermatologist). Tap Choose to pick one.",
+  "question": null,
+  "card": null,
+  "language": "english",
+  "degraded": [],
+  "clarify": null,
+  "doctors": {
+   "mode": [
+    "specialty",
+    "gender"
+   ],
+   "filters": {
+    "specialtyId": "Dermatologist (Skin)",
+    "gender": "female",
+    "city": "Kolkata"
+   },
+   "items": [
+    {
+     "doctorId": "00000000-0000-0000-0000-000000000003",
+     "name": "Dr. Anita Sen",
+     "degrees": "MBBS, MD (Dermatology)",
+     "specialtyId": "Dermatologist (Skin)",
+     "specialtyName": "Dermatologist (Skin)",
+     "experienceYears": 9,
+     "consultFee": 600,
+     "discountedFee": null,
+     "hospital": {
+      "hospitalId": "11111111-1111-1111-1111-111111111111",
+      "name": "Salt Lake Care",
+      "city": "Kolkata",
+      "lat": 22.58,
+      "lng": 88.41
+     },
+     "availableToday": true,
+     "distanceKm": null,
+     "sameHospital": null,
+     "nameMatchScore": null
+    },
+    {
+     "doctorId": "00000000-0000-0000-0000-000000000005",
+     "name": "Dr. Priya Bose",
+     "degrees": "MBBS, DNB (Dermatology)",
+     "specialtyId": "Dermatologist (Skin)",
+     "specialtyName": "Dermatologist (Skin)",
+     "experienceYears": 4,
+     "consultFee": 400,
+     "discountedFee": null,
+     "hospital": {
+      "hospitalId": "22222222-2222-2222-2222-222222222222",
+      "name": "Howrah General",
+      "city": "Kolkata",
+      "lat": 22.59,
+      "lng": 88.31
+     },
+     "availableToday": true,
+     "distanceKm": null,
+     "sameHospital": null,
+     "nameMatchScore": null
+    }
+   ],
+   "total": 2,
+   "fallbackUsed": false,
+   "source": "1hms-mcp",
+   "lookupMs": 5.1,
+   "specialist": "Dermatologist",
+   "specialtyId": "Dermatologist (Skin)",
+   "doctors": [
+    {
+     "doctorId": "00000000-0000-0000-0000-000000000003",
+     "name": "Dr. Anita Sen",
+     "degrees": "MBBS, MD (Dermatology)",
+     "specialtyId": "Dermatologist (Skin)",
+     "specialtyName": "Dermatologist (Skin)",
+     "experienceYears": 9,
+     "consultFee": 600,
+     "discountedFee": null,
+     "hospital": {
+      "hospitalId": "11111111-1111-1111-1111-111111111111",
+      "name": "Salt Lake Care",
+      "city": "Kolkata",
+      "lat": 22.58,
+      "lng": 88.41
+     },
+     "availableToday": true,
+     "distanceKm": null,
+     "sameHospital": null,
+     "nameMatchScore": null
+    },
+    {
+     "doctorId": "00000000-0000-0000-0000-000000000005",
+     "name": "Dr. Priya Bose",
+     "degrees": "MBBS, DNB (Dermatology)",
+     "specialtyId": "Dermatologist (Skin)",
+     "specialtyName": "Dermatologist (Skin)",
+     "experienceYears": 4,
+     "consultFee": 400,
+     "discountedFee": null,
+     "hospital": {
+      "hospitalId": "22222222-2222-2222-2222-222222222222",
+      "name": "Howrah General",
+      "city": "Kolkata",
+      "lat": 22.59,
+      "lng": 88.31
+     },
+     "availableToday": true,
+     "distanceKm": null,
+     "sameHospital": null,
+     "nameMatchScore": null
+    }
+   ],
+   "page": 1,
+   "hasMore": false
+  }
+ },
+ "selected": {
+  "session_id": "sess_6ba70773fbf5",
+  "turn": 1,
+  "kind": "doctor_selected",
+  "message": "You chose Dr. Anita Sen (Salt Lake Care). Tap 'Book a slot' to pick a time.",
+  "question": null,
+  "card": null,
+  "language": "english",
+  "degraded": [],
+  "clarify": null,
+  "doctor": {
+   "doctorId": "00000000-0000-0000-0000-000000000003",
+   "name": "Dr. Anita Sen",
+   "degrees": "MBBS, MD (Dermatology)",
+   "specialtyId": "Dermatologist (Skin)",
+   "specialtyName": "Dermatologist (Skin)",
+   "experienceYears": 9,
+   "consultFee": 600,
+   "discountedFee": null,
+   "hospital": {
+    "hospitalId": "11111111-1111-1111-1111-111111111111",
+    "name": "Salt Lake Care",
+    "city": "Kolkata",
+    "lat": 22.58,
+    "lng": 88.41
+   },
+   "availableToday": true
+  },
+  "selectedDoctorId": "00000000-0000-0000-0000-000000000003"
+ },
+ "location": {
+  "session_id": "sess_43005e0392ed",
+  "turn": 1,
+  "kind": "follow_up",
+  "message": "Aap kahan hain? Location share karein, area ya pincode likhein, ya apna city use karein.",
+  "question": "Aap kahan hain? Location share karein, area ya pincode likhein, ya apna city use karein.",
+  "card": null,
+  "language": "hinglish",
+  "degraded": [],
+  "clarify": {
+   "kind": "location",
+   "question": "Aap kahan hain? Location share karein, area ya pincode likhein, ya apna city use karein.",
+   "options": [
+    {
+     "id": "share_location",
+     "label": "Share my location"
+    },
+    {
+     "id": "type_area",
+     "label": "Type area or pincode"
+    },
+    {
+     "id": "use_city",
+     "label": "Use my city"
+    }
+   ]
+  }
+ },
+ "emergency": {
+  "session_id": "sess_bcf4f7b5cb90",
+  "turn": 1,
+  "kind": "emergency",
+  "message": "[!] EMERGENCY\nEMERGENCY: Turant 112 par call karein ya nearest ER jaayein. / Call 112 or go to the nearest ER now.\n\nBreathlessness, Chest pain\nAapke symptoms: chest pain + breathlessness\nAfter the ER: Cardiologist, Pulmonologist\n\nYeh sirf margdarshan hai, diagnosis nahi.",
+  "question": null,
+  "card": {
+   "kind": "emergency",
+   "summary": "chest pain + breathlessness",
+   "severity_level": "EMERGENCY",
+   "severity_score": 90,
+   "disposition": "ER / Ambulance NOW",
+   "outputs": [
+    {
+     "role": "EMERGENCY",
+     "specialist": "Emergency Medicine",
+     "confidence": 1.0,
+     "reason": "Emergency red flag detected",
+     "matched_symptoms": [
+      "chest pain",
+      "breathlessness"
+     ],
+     "cluster_id": null
+    }
+   ],
+   "watch_for": [],
+   "alert": "EMERGENCY: Turant 112 par call karein ya nearest ER jaayein. / Call 112 or go to the nearest ER now.",
+   "emergency_reasons": [
+    "Breathlessness",
+    "Chest pain"
+   ],
+   "after_stabilisation": [
+    "Cardiologist",
+    "Pulmonologist"
+   ],
+   "red_flags": [],
+   "low_confidence": false,
+   "disclaimer": "Triage support only - not a diagnosis."
+  },
+  "language": "hinglish",
+  "degraded": []
+ },
+ "which": {
+  "session_id": "sess_d512904e34f9",
+  "turn": 1,
+  "kind": "doctor_list",
+  "message": "Doctors matching 'sharma'. Tap Choose to pick one. Which one do you mean?",
+  "question": "Which one do you mean?",
+  "card": null,
+  "language": "english",
+  "degraded": [],
+  "clarify": {
+   "kind": "which_doctor",
+   "question": "Which one do you mean?",
+   "options": [
+    {
+     "id": "00000000-0000-0000-0000-000000000001",
+     "label": "Dr. Neha Sharma · Salt Lake Care, Kolkata"
+    },
+    {
+     "id": "00000000-0000-0000-0000-000000000002",
+     "label": "Dr. Rakesh Sharma · Howrah General, Kolkata"
+    }
+   ]
+  },
+  "doctors": {
+   "mode": [
+    "name"
+   ],
+   "filters": {
+    "query": "sharma"
+   },
+   "items": [
+    {
+     "doctorId": "00000000-0000-0000-0000-000000000001",
+     "name": "Dr. Neha Sharma",
+     "degrees": "MBBS, MD (Medicine), DM (Cardiology)",
+     "specialtyId": "Cardiologist (Heart)",
+     "specialtyName": "Cardiologist (Heart)",
+     "experienceYears": 14,
+     "consultFee": 900,
+     "discountedFee": null,
+     "hospital": {
+      "hospitalId": "11111111-1111-1111-1111-111111111111",
+      "name": "Salt Lake Care",
+      "city": "Kolkata",
+      "lat": 22.58,
+      "lng": 88.41
+     },
+     "availableToday": true,
+     "distanceKm": null,
+     "sameHospital": null,
+     "nameMatchScore": 1.0
+    },
+    {
+     "doctorId": "00000000-0000-0000-0000-000000000002",
+     "name": "Dr. Rakesh Sharma",
+     "degrees": "MBBS, MS (Ortho)",
+     "specialtyId": "Orthopaedic Surgeon (Bone)",
+     "specialtyName": "Orthopaedic Surgeon (Bone)",
+     "experienceYears": 20,
+     "consultFee": 700,
+     "discountedFee": null,
+     "hospital": {
+      "hospitalId": "22222222-2222-2222-2222-222222222222",
+      "name": "Howrah General",
+      "city": "Kolkata",
+      "lat": 22.59,
+      "lng": 88.31
+     },
+     "availableToday": true,
+     "distanceKm": null,
+     "sameHospital": null,
+     "nameMatchScore": 1.0
+    }
+   ],
+   "total": 2,
+   "fallbackUsed": false,
+   "source": "1hms-mcp",
+   "lookupMs": 1.1,
+   "specialist": null,
+   "specialtyId": null,
+   "doctors": [
+    {
+     "doctorId": "00000000-0000-0000-0000-000000000001",
+     "name": "Dr. Neha Sharma",
+     "degrees": "MBBS, MD (Medicine), DM (Cardiology)",
+     "specialtyId": "Cardiologist (Heart)",
+     "specialtyName": "Cardiologist (Heart)",
+     "experienceYears": 14,
+     "consultFee": 900,
+     "discountedFee": null,
+     "hospital": {
+      "hospitalId": "11111111-1111-1111-1111-111111111111",
+      "name": "Salt Lake Care",
+      "city": "Kolkata",
+      "lat": 22.58,
+      "lng": 88.41
+     },
+     "availableToday": true,
+     "distanceKm": null,
+     "sameHospital": null,
+     "nameMatchScore": 1.0
+    },
+    {
+     "doctorId": "00000000-0000-0000-0000-000000000002",
+     "name": "Dr. Rakesh Sharma",
+     "degrees": "MBBS, MS (Ortho)",
+     "specialtyId": "Orthopaedic Surgeon (Bone)",
+     "specialtyName": "Orthopaedic Surgeon (Bone)",
+     "experienceYears": 20,
+     "consultFee": 700,
+     "discountedFee": null,
+     "hospital": {
+      "hospitalId": "22222222-2222-2222-2222-222222222222",
+      "name": "Howrah General",
+      "city": "Kolkata",
+      "lat": 22.59,
+      "lng": 88.31
+     },
+     "availableToday": true,
+     "distanceKm": null,
+     "sameHospital": null,
+     "nameMatchScore": 1.0
+    }
+   ],
+   "page": 1,
+   "hasMore": false
+  }
+ },
+ "availability": {
+  "session_id": "sess_60009ebf4504",
+  "turn": 1,
+  "kind": "info",
+  "message": "Yes, Dr. Neha Sharma works on Mon 26 Oct (Morning 09:00-13:00). The hospital confirms the exact time. Shall I book an appointment?",
+  "question": "Yes, Dr. Neha Sharma works on Mon 26 Oct (Morning 09:00-13:00). The hospital confirms the exact time. Shall I book an appointment?",
+  "card": null,
+  "language": "english",
+  "degraded": [],
+  "clarify": {
+   "kind": "book_offer",
+   "question": "Yes, Dr. Neha Sharma works on Mon 26 Oct (Morning 09:00-13:00). The hospital confirms the exact time. Shall I book an appointment?",
+   "options": [
+    {
+     "id": "00000000-0000-0000-0000-000000000001",
+     "label": "Yes, book"
+    },
+    {
+     "id": "no",
+     "label": "No, just checking"
+    }
+   ]
+  },
+  "doctor": {
+   "doctorId": "00000000-0000-0000-0000-000000000001",
+   "name": "Dr. Neha Sharma",
+   "degrees": "MBBS, MD (Medicine), DM (Cardiology)",
+   "specialtyId": "Cardiologist (Heart)",
+   "specialtyName": "Cardiologist (Heart)",
+   "experienceYears": 14,
+   "consultFee": 900,
+   "discountedFee": null,
+   "hospital": {
+    "hospitalId": "11111111-1111-1111-1111-111111111111",
+    "name": "Salt Lake Care",
+    "city": "Kolkata",
+    "lat": 22.58,
+    "lng": 88.41
+   },
+   "availableToday": true,
+   "distanceKm": null,
+   "sameHospital": null,
+   "nameMatchScore": 1.0
+  },
+  "availability": {
+   "doctorId": "00000000-0000-0000-0000-000000000001",
+   "days": [
+    {
+     "date": "2026-10-26",
+     "isAvailable": true,
+     "shifts": [
+      {
+       "name": "Morning",
+       "start": "09:00",
+       "end": "13:00"
+      }
+     ]
+    }
+   ],
+   "nextAvailableDate": "2026-10-26",
+   "note": "Working days and shift hours only; the hospital confirms the exact appointment time."
+  }
+ },
+ "handoff": {
+  "session_id": "sess_87d91e151f93",
+  "turn": 1,
+  "kind": "handoff",
+  "message": "Main aapko hamari support team se jod raha hoon. Koi jaldi aapse baat karega.",
+  "question": null,
+  "card": null,
+  "language": "hinglish",
+  "degraded": [],
+  "clarify": null,
+  "handoff": {
+   "reason": "asked"
+  }
+ },
+ "degraded": {
+  "session_id": "sess_46563f45da6c",
+  "turn": 1,
+  "kind": "doctor_list",
+  "message": "Abhi doctors load nahi ho paaye. Thodi der mein dobara try karein, ya Doctor Dekho directory dekhein.",
+  "question": null,
+  "card": null,
+  "language": "hinglish",
+  "degraded": [
+   "doctor_lookup"
+  ],
+  "clarify": null,
+  "searchFilters": {}
+ },
+ "more": {
+  "session_id": "sess_b65d97426fd4",
+  "turn": 1,
+  "kind": "doctor_list",
+  "message": "Here is 1 heart doctor (Cardiologist) (2 in all). Tap Choose to pick one.",
+  "question": null,
+  "card": null,
+  "language": "english",
+  "degraded": [],
+  "clarify": null,
+  "doctors": {
+   "mode": [
+    "specialty"
+   ],
+   "filters": {
+    "specialtyId": "Cardiologist (Heart)",
+    "city": "Kolkata"
+   },
+   "items": [
+    {
+     "doctorId": "00000000-0000-0000-0000-000000000001",
+     "name": "Dr. Neha Sharma",
+     "degrees": "MBBS, MD (Medicine), DM (Cardiology)",
+     "specialtyId": "Cardiologist (Heart)",
+     "specialtyName": "Cardiologist (Heart)",
+     "experienceYears": 14,
+     "consultFee": 900,
+     "discountedFee": null,
+     "hospital": {
+      "hospitalId": "11111111-1111-1111-1111-111111111111",
+      "name": "Salt Lake Care",
+      "city": "Kolkata",
+      "lat": 22.58,
+      "lng": 88.41
+     },
+     "availableToday": true,
+     "distanceKm": null,
+     "sameHospital": null,
+     "nameMatchScore": null
+    }
+   ],
+   "total": 2,
+   "fallbackUsed": false,
+   "source": "1hms-mcp",
+   "lookupMs": 2.9,
+   "specialist": "Cardiologist",
+   "specialtyId": "Cardiologist (Heart)",
+   "doctors": [
+    {
+     "doctorId": "00000000-0000-0000-0000-000000000001",
+     "name": "Dr. Neha Sharma",
+     "degrees": "MBBS, MD (Medicine), DM (Cardiology)",
+     "specialtyId": "Cardiologist (Heart)",
+     "specialtyName": "Cardiologist (Heart)",
+     "experienceYears": 14,
+     "consultFee": 900,
+     "discountedFee": null,
+     "hospital": {
+      "hospitalId": "11111111-1111-1111-1111-111111111111",
+      "name": "Salt Lake Care",
+      "city": "Kolkata",
+      "lat": 22.58,
+      "lng": 88.41
+     },
+     "availableToday": true,
+     "distanceKm": null,
+     "sameHospital": null,
+     "nameMatchScore": null
+    }
+   ],
+   "page": 1,
+   "hasMore": true
+  }
+ }
+}
