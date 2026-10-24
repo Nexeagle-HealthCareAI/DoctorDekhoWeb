@@ -14,12 +14,12 @@ describe("JoinCallout", () => {
     expect(screen.getByRole("heading", { name: "Write for the Health Wiki" })).toBeInTheDocument();
   });
 
-  it("offers the same link in the sidebar form, stacked for a narrow column", () => {
+  it("offers the same link in the sidebar form, as a tall card with Vita", () => {
     flag.on = true;
     const { container } = render(<JoinCallout variant="sidebar" />);
     expect(screen.getByRole("link", { name: "Join as a contributor" })).toHaveAttribute("href", "/contribute/join");
-    // stacked card: no full-width row layout and no big top margin like the banner
-    expect(container.querySelector("section")?.className).toContain("flex-col");
+    // tall picture card: no full-width row layout and no big top margin like the banner
+    expect(container.querySelector("section")?.className).toContain("aspect-[3/4]");
     expect(container.querySelector("section")?.className).not.toContain("mt-12");
   });
 
