@@ -1,7 +1,7 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
-import { Stack, useRouter } from "expo-router";
+import { useRouter } from "expo-router";
 import { FlatList, View } from "react-native";
-import { Button, Card, EmptyState, Loading, Txt } from "../../components/ui";
+import { Button, Card, EmptyState, Loading, TopBar, Txt } from "../../components/ui";
 import { relationLabel } from "../../lib/booking";
 import { useI18n } from "../../lib/i18n";
 import { useFamily } from "../../lib/queries";
@@ -17,7 +17,7 @@ export default function FamilyScreen() {
   if (family.isLoading) return <Loading />;
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
-      <Stack.Screen options={{ title: t("family") }} />
+      <TopBar title={t("family")} />
       <FlatList
         data={members}
         keyExtractor={(m) => m.memberId}

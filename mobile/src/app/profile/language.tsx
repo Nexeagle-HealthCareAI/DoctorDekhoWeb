@@ -1,49 +1,21 @@
-import Ionicons from "@expo/vector-icons/Ionicons";
-import { useQueryClient } from "@tanstack/react-query";
-import { Stack, useRouter } from "expo-router";
-import { Pressable, StyleSheet, Text, View } from "react-native";
-import { saveAppProfile } from "../../lib/api/patient";
+import { useRouter } from "expo-router";
+import { ScrollView, View } from "react-native";
+import { LanguageOptions } from "../../components/LanguagePicker";
+import { TopBar, Txt } from "../../components/ui";
 import { useI18n } from "../../lib/i18n";
-import { LOCALES, toServerLanguage, type Locale } from "../../lib/i18n/types";
-import { keys } from "../../lib/queries";
-import { colors, font, radius, space } from "../../lib/theme";
+import { colors, space } from "../../lib/theme";
 
-/** Language for the app — also saved to the account so WhatsApp reminders use it. */
+/** Me → Language: the same four big choices as the Home sheet. Saved to the account so WhatsApp reminders follow it. */
 export default function LanguageScreen() {
   const router = useRouter();
-  const qc = useQueryClient();
-  const { t, locale, setLocale } = useI18n();
-
-  function pick(l: Locale) {
-    setLocale(l);
-    void saveAppProfile({ preferredLanguage: toServerLanguage(l) })
-      .then((a) => a && qc.setQueryData(keys.appProfile, a))
-      .catch(() => {});
-    router.back();
-  }
-
+  const { t } = useI18n();
   return (
-    <View style={{ flex: 1, backgroundColor: colors.bg, padding: space.lg, gap: space.sm }}>
-      <Stack.Screen options={{ title: t("language") }} />
-      {LOCALES.map((l) => {
-        const selected = l.code === locale;
-        return (
-          <Pressable key={l.code} onPress={() => pick(l.code)} style={[styles.row, selected && styles.selected]} accessibilityRole="radio" accessibilityState={{ selected }}>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.native}>{l.nativeLabel}</Text>
-              {l.englishLabel !== l.nativeLabel ? <Text style={styles.english}>{l.englishLabel}</Text> : null}
-            </View>
-            {selected ? <Ionicons name="checkmark-circle" size={24} color={colors.primary} /> : null}
-          </Pressable>
-        );
-      })}
+    <View style={{ flex: 1, backgroundColor: colors.bg }}>
+      <TopBar title={t("language")} />
+      <ScrollView contentContainerStyle={{ padding: space.lg, gap: space.lg }}>
+        <Txt color={colors.muted}>{t("languageHint")}</Txt>
+        <LanguageOptions onPicked={() => setTimeout(() => router.back(), 200)} />
+      </ScrollView>
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  row: { flexDirection: "row", alignItems: "center", backgroundColor: colors.card, borderWidth: 1, borderColor: colors.line, borderRadius: radius.md, padding: space.lg, minHeight: 64 },
-  selected: { borderColor: colors.primary, backgroundColor: colors.primarySoft },
-  native: { fontSize: font.body + 2, fontWeight: "700", color: colors.ink },
-  english: { fontSize: font.small, color: colors.muted, marginTop: 2 },
-});

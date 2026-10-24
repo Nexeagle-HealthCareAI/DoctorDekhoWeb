@@ -6,8 +6,9 @@ import Constants from "expo-constants";
 import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { SafeAreaProvider } from "react-native-safe-area-context";
+import { AppearanceProvider, useAppearance } from "../lib/appearance";
 import { SessionProvider, useSession } from "../lib/auth/session";
 import { I18nProvider, useI18n } from "../lib/i18n";
 import { colors } from "../lib/theme";
@@ -38,10 +39,12 @@ export default function RootLayout() {
         }}
       >
         <I18nProvider>
-          <SessionProvider>
-            <StatusBar style="dark" />
-            <RootNavigator />
-          </SessionProvider>
+          <AppearanceProvider>
+            <SessionProvider>
+              <StatusBar style="dark" />
+              <RootNavigator />
+            </SessionProvider>
+          </AppearanceProvider>
         </I18nProvider>
       </PersistQueryClientProvider>
     </SafeAreaProvider>
@@ -50,8 +53,15 @@ export default function RootLayout() {
 
 function RootNavigator() {
   const { status, needsProfile } = useSession();
-  const { ready, t } = useI18n();
-  const loading = status === "loading" || !ready;
+  const { ready } = useI18n();
+  const { fontsReady } = useAppearance();
+  // Fonts normally load in well under a second; never hold the splash longer than 3 s for them.
+  const [fontTimeout, setFontTimeout] = useState(false);
+  useEffect(() => {
+    const id = setTimeout(() => setFontTimeout(true), 3000);
+    return () => clearTimeout(id);
+  }, []);
+  const loading = status === "loading" || !ready || (!fontsReady && !fontTimeout);
 
   useEffect(() => {
     if (!loading) SplashScreen.hideAsync().catch(() => {});
@@ -60,40 +70,33 @@ function RootNavigator() {
   if (loading) return null;
 
   const signedIn = status === "signedIn";
+  // Every screen draws its own top bar (back on the left, the Doctor Dekho logo on the right), so native headers are off.
   return (
-    <Stack
-      screenOptions={{
-        headerTintColor: colors.primary,
-        headerTitleStyle: { color: colors.ink, fontWeight: "700" },
-        headerTransparent: false,
-        headerShadowVisible: false,
-        headerStyle: { backgroundColor: colors.bg },
-        contentStyle: { backgroundColor: colors.bg },
-        headerBackButtonDisplayMode: "minimal",
-      }}
-    >
+    <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg } }}>
       {/* 1. Not signed in: WhatsApp OTP only. */}
       <Stack.Protected guard={!signedIn}>
-        <Stack.Screen name="login/index" options={{ headerShown: false }} />
-        <Stack.Screen name="login/otp" options={{ title: "" }} />
+        <Stack.Screen name="login/index" />
+        <Stack.Screen name="login/otp" />
       </Stack.Protected>
 
       {/* 2. Signed in, short profile not saved yet: one "About you" screen. */}
       <Stack.Protected guard={signedIn && needsProfile}>
-        <Stack.Screen name="onboarding" options={{ headerShown: false, gestureEnabled: false }} />
+        <Stack.Screen name="onboarding" options={{ gestureEnabled: false }} />
       </Stack.Protected>
 
       {/* 3. The app. */}
       <Stack.Protected guard={signedIn && !needsProfile}>
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen name="doctors" options={{ title: "" }} />
-        <Stack.Screen name="doctor/[id]" options={{ title: "" }} />
-        <Stack.Screen name="book/[id]" options={{ presentation: "modal", title: "" }} />
-        <Stack.Screen name="reschedule/[id]" options={{ presentation: "modal", title: t("reschedule") }} />
-        <Stack.Screen name="profile/about" options={{ title: t("personalInfo") }} />
-        <Stack.Screen name="profile/family" options={{ title: t("family") }} />
-        <Stack.Screen name="profile/member" options={{ presentation: "modal", title: "" }} />
-        <Stack.Screen name="profile/language" options={{ title: t("language") }} />
+        <Stack.Screen name="(tabs)" />
+        <Stack.Screen name="doctors" />
+        <Stack.Screen name="doctor/[id]" />
+        <Stack.Screen name="book/[id]" options={{ presentation: "modal" }} />
+        <Stack.Screen name="reschedule/[id]" options={{ presentation: "modal" }} />
+        <Stack.Screen name="profile/about" />
+        <Stack.Screen name="profile/family" />
+        <Stack.Screen name="profile/member" options={{ presentation: "modal" }} />
+        <Stack.Screen name="profile/language" />
+        <Stack.Screen name="route/[id]" />
+        <Stack.Screen name="area" />
       </Stack.Protected>
     </Stack>
   );

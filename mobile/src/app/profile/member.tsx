@@ -1,11 +1,12 @@
 import { useQueryClient } from "@tanstack/react-query";
-import { Stack, useLocalSearchParams, useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import { useState } from "react";
-import { Alert, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, View } from "react-native";
-import { Banner, Button, Chip, Field, Label } from "../../components/ui";
+import { Alert, StyleSheet, View } from "react-native";
+import { KeyboardScreen } from "../../components/KeyboardScreen";
+import { Banner, Button, Chip, Field, Label, TopBar } from "../../components/ui";
 import { ApiError } from "../../lib/api/http";
 import { deleteFamilyMember, saveFamilyMember } from "../../lib/api/patient";
-import type { AgeUnit, Sex } from "../../lib/api/types";
+import type { AgeUnit, FamilyResponse, Sex } from "../../lib/api/types";
 import { RELATIONS, relationLabel } from "../../lib/booking";
 import { useI18n } from "../../lib/i18n";
 import { keys, useFamily } from "../../lib/queries";
@@ -60,7 +61,17 @@ export default function MemberScreen() {
         existing?.memberId,
       );
       if (!r.success) throw new ApiError(r.message || t("retry"), 400, r);
-      qc.setQueryData(keys.family, r);
+      // The save reply carries only the saved member (its list is empty), so merge it into the cached list
+      // rather than replacing the list with the reply, then reload the list from the server.
+      const saved = r.member;
+      if (saved) {
+        qc.setQueryData<FamilyResponse>(keys.family, (old) => {
+          const members = old?.members ?? [];
+          const i = members.findIndex((m) => m.memberId === saved.memberId);
+          return { ...(old ?? { success: true }), members: i >= 0 ? members.map((m, j) => (j === i ? saved : m)) : [...members, saved] };
+        });
+      }
+      void qc.invalidateQueries({ queryKey: keys.family });
       router.back();
     } catch (e) {
       setError(e instanceof ApiError && !e.isNetwork ? e.message : t("retry"));
@@ -79,7 +90,10 @@ export default function MemberScreen() {
         onPress: async () => {
           try {
             const r = await deleteFamilyMember(existing.memberId);
-            qc.setQueryData(keys.family, r);
+            if (!r.success) throw new Error(r.message || t("retry"));
+            // The delete reply has no list either: drop the member locally, then reload.
+            qc.setQueryData<FamilyResponse>(keys.family, (old) => (old ? { ...old, members: (old.members ?? []).filter((m) => m.memberId !== existing.memberId) } : old));
+            void qc.invalidateQueries({ queryKey: keys.family });
             void qc.invalidateQueries({ queryKey: keys.locker });
             router.back();
           } catch (e) {
@@ -91,9 +105,9 @@ export default function MemberScreen() {
   }
 
   return (
-    <KeyboardAvoidingView style={{ flex: 1, backgroundColor: colors.bg }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
-      <Stack.Screen options={{ title: existing ? existing.firstName : t("addMember") }} />
-      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+    <View style={{ flex: 1, backgroundColor: colors.bg }}>
+      <TopBar title={existing ? existing.firstName : t("addMember")} back="close" />
+      <KeyboardScreen contentContainerStyle={styles.content}>
         <Label>{t("relation")}</Label>
         <View style={styles.wrap}>
           {RELATIONS.map((r) => (
@@ -127,8 +141,8 @@ export default function MemberScreen() {
         {error ? <Banner tone="danger" icon="alert-circle" text={error} /> : null}
         <Button label={t("save")} icon="checkmark-circle" loading={busy} onPress={save} />
         {existing ? <Button label={t("remove")} variant="danger" icon="trash" onPress={remove} style={{ marginTop: space.sm }} /> : null}
-      </ScrollView>
-    </KeyboardAvoidingView>
+      </KeyboardScreen>
+    </View>
   );
 }
 

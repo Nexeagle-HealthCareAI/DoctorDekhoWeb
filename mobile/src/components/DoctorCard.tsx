@@ -1,107 +1,148 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
-import { Image } from "expo-image";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, View } from "react-native";
 import { effectiveFee, type Doctor } from "../lib/api/doctors";
 import { rupees } from "../lib/format";
+import { openState } from "../lib/hours";
 import { useI18n } from "../lib/i18n";
-import { specialtyName } from "../lib/specialties";
-import { colors, font, radius, space } from "../lib/theme";
+import { useReadAloud } from "../lib/speech";
+import { plainSpecialty } from "../lib/specialties";
+import { colors, space, TINT_ORDER, type Tint } from "../lib/theme";
+import { LiveDot } from "./Motion";
+import { Avatar, Button, Txt } from "./ui";
 
-const AVATAR_TINTS = ["#0F766E", "#B45309", "#7C3AED", "#BE185D", "#1D4ED8", "#15803D"];
+/** A stable tint per doctor so the same doctor keeps the same colour everywhere. */
+export function tintFor(id: string): Tint {
+  let h = 0;
+  for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) >>> 0;
+  return TINT_ORDER[h % TINT_ORDER.length];
+}
 
-export function Avatar({ doctor, size = 56 }: { doctor: Pick<Doctor, "id" | "photo" | "initials" | "isOnlineNow">; size?: number }) {
-  const tint = AVATAR_TINTS[[...doctor.id].reduce((a, c) => a + c.charCodeAt(0), 0) % AVATAR_TINTS.length];
+export function DoctorAvatar({ doctor, size = 56 }: { doctor: Pick<Doctor, "id" | "photo" | "initials" | "isOnlineNow">; size?: number }) {
   return (
-    <View style={{ width: size, height: size }}>
-      {doctor.photo ? (
-        <Image source={{ uri: doctor.photo }} style={{ width: size, height: size, borderRadius: size / 2 }} contentFit="cover" transition={150} />
-      ) : (
-        <View style={[styles.initials, { width: size, height: size, borderRadius: size / 2, backgroundColor: tint }]}>
-          <Text style={{ color: "#fff", fontWeight: "700", fontSize: size * 0.36 }}>{doctor.initials}</Text>
-        </View>
-      )}
-      {doctor.isOnlineNow ? <View style={[styles.online, { right: 0, bottom: 0 }]} /> : null}
+    <View>
+      <Avatar initials={doctor.initials} tint={tintFor(doctor.id)} size={size} photo={doctor.photo} />
+      {doctor.isOnlineNow ? <View style={[styles.online, { width: size * 0.26, height: size * 0.26, borderRadius: size * 0.13 }]} /> : null}
     </View>
   );
 }
 
-export function DoctorCard({ doctor, onPress, onBook }: { doctor: Doctor; onPress: () => void; onBook: () => void }) {
+/**
+ * Doctor card (Home and Search): who, where, and a quiet line of checked facts — registration checked (only when
+ * the directory says so), the full fee, languages and distance — so nothing is hidden until later. "Open today"
+ * breathes because it is live; Listen reads the card aloud; one Book button. Tapping the top opens the doctor.
+ */
+export function DoctorCard({ doctor, onPress, onBook, why }: { doctor: Doctor; onPress: () => void; onBook: () => void; why?: string }) {
   const { t, locale } = useI18n();
+  const { speaking, toggle } = useReadAloud(locale);
   const fee = effectiveFee(doctor);
-  const place = [doctor.hospitalName, doctor.city].filter(Boolean).join(", ");
+  const kind = plainSpecialty(doctor.specialtyId, locale);
+  const km = doctor.distanceKm != null ? `${doctor.distanceKm < 10 ? doctor.distanceKm.toFixed(1) : Math.round(doctor.distanceKm)} km` : null;
+  const langs = doctor.languages.slice(0, 2).join(", ");
+  const spoken = [doctor.name, kind, doctor.hospitalName, fee != null ? t("fullFee", { fee: rupees(fee) }) : null, doctor.isAvailableToday ? t("availableToday") : null].filter(Boolean).join(". ");
+
   return (
-    <Pressable onPress={onPress} style={({ pressed }) => [styles.card, pressed && { opacity: 0.92 }]} accessibilityRole="button" accessibilityLabel={doctor.name}>
+    <View style={styles.card}>
       <View style={styles.top}>
-        <Avatar doctor={doctor} />
-        <View style={{ flex: 1, marginLeft: space.md }}>
-          <View style={styles.nameRow}>
-            <Text style={styles.name} numberOfLines={1}>
+        <Pressable onPress={onPress} accessibilityRole="button" accessibilityLabel={`${doctor.name}, ${kind}`} style={({ pressed }) => [{ flex: 1, minWidth: 0, flexDirection: "row", gap: space.md, alignItems: "center" }, pressed && { opacity: 0.8 }]}>
+          <DoctorAvatar doctor={doctor} size={52} />
+          <View style={{ flex: 1, minWidth: 0 }}>
+            <Txt variant="subheading" numberOfLines={1}>
               {doctor.name}
-            </Text>
-            {doctor.verified ? <Ionicons name="checkmark-circle" size={16} color={colors.primary} style={{ marginLeft: 4 }} /> : null}
+            </Txt>
+            <Txt variant="small" color={colors.muted} numberOfLines={1}>
+              {[kind, doctor.hospitalName ?? doctor.city].filter(Boolean).join(" · ")}
+            </Txt>
           </View>
-          <Text style={styles.specialty} numberOfLines={1}>
-            {specialtyName(doctor.specialtyId, locale) || doctor.specialty}
-            {doctor.experienceYears ? ` · ${t("experience", { years: doctor.experienceYears })}` : ""}
-          </Text>
-          {place ? (
-            <Text style={styles.place} numberOfLines={1}>
-              {place}
-              {doctor.distanceKm != null ? ` · ${doctor.distanceKm < 1 ? "<1" : Math.round(doctor.distanceKm)} km` : ""}
-            </Text>
-          ) : null}
-        </View>
-      </View>
-      <View style={styles.bottom}>
-        <View style={{ flex: 1, gap: 4 }}>
-          <View style={styles.metaRow}>
-            {doctor.rating ? (
-              <View style={styles.meta}>
-                <Ionicons name="star" size={14} color={colors.accent} />
-                <Text style={styles.metaText}>
-                  {doctor.rating.toFixed(1)}
-                  {doctor.reviewCount ? ` (${doctor.reviewCount})` : ""}
-                </Text>
-              </View>
-            ) : null}
-            {doctor.isAvailableToday != null ? (
-              <Text style={[styles.metaText, { color: doctor.isAvailableToday ? colors.success : colors.muted }]}>
-                {doctor.isAvailableToday ? t("availableToday") : t("notAvailableToday")}
-              </Text>
-            ) : null}
-          </View>
-          {fee != null ? (
-            <Text style={styles.fee}>
-              {rupees(fee)}
-              {doctor.discountedFee != null && doctor.fee != null && doctor.fee > doctor.discountedFee ? (
-                <Text style={styles.strike}> {rupees(doctor.fee)}</Text>
-              ) : null}
-            </Text>
-          ) : null}
-        </View>
-        <Pressable onPress={onBook} style={({ pressed }) => [styles.book, pressed && { opacity: 0.85 }]} accessibilityRole="button">
-          <Text style={styles.bookText}>{t("bookAppointment")}</Text>
+        </Pressable>
+        <Pressable onPress={() => toggle(spoken)} accessibilityRole="button" accessibilityLabel={speaking ? t("stop") : t("listen")} hitSlop={6} style={({ pressed }) => [styles.listen, pressed && { transform: [{ scale: 0.94 }] }]}>
+          <Ionicons name={speaking ? "stop" : "volume-high"} size={19} color={colors.ink} />
         </Pressable>
       </View>
-    </Pressable>
+
+      <View style={styles.facts} accessibilityLabel={t("checkedDetails")}>
+        {doctor.verified ? (
+          <View style={[styles.fact, { backgroundColor: colors.successSoft }]}>
+            <Ionicons name="checkmark" size={13} color={colors.success} />
+            <Txt variant="tinyBold" color={colors.success} style={{ marginLeft: 3 }}>
+              {t("registrationChecked")}
+            </Txt>
+          </View>
+        ) : null}
+        {fee != null ? (
+          <View style={styles.fact}>
+            <Txt variant="tinyBold">{t("fullFee", { fee: rupees(fee) })}</Txt>
+          </View>
+        ) : null}
+        {langs ? (
+          <View style={styles.fact}>
+            <Txt variant="tinyBold">{langs}</Txt>
+          </View>
+        ) : null}
+        {km ? (
+          <View style={[styles.fact, { backgroundColor: "#EEF3FC" }]}>
+            <Txt variant="tinyBold" color="#17468F">
+              {km}
+            </Txt>
+          </View>
+        ) : null}
+      </View>
+
+      <View style={styles.bottom}>
+        <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
+          <OpenLine doctor={doctor} />
+          {why ? (
+            <Txt variant="small" color={colors.text} numberOfLines={1}>
+              {t("whyThis", { why })}
+            </Txt>
+          ) : null}
+        </View>
+        <Button label={t("book")} size="md" onPress={onBook} style={{ paddingHorizontal: space.xl }} accessibilityLabel={`${t("book")} ${doctor.name}`} />
+      </View>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  card: { backgroundColor: colors.card, borderRadius: radius.lg, padding: space.lg, borderWidth: 1, borderColor: colors.line, marginBottom: space.md },
-  top: { flexDirection: "row", alignItems: "center" },
-  nameRow: { flexDirection: "row", alignItems: "center" },
-  name: { fontSize: font.body + 1, fontWeight: "700", color: colors.ink, flexShrink: 1 },
-  specialty: { fontSize: font.small, color: colors.primaryDark, marginTop: 2 },
-  place: { fontSize: font.tiny + 1, color: colors.muted, marginTop: 2 },
-  bottom: { flexDirection: "row", alignItems: "center", marginTop: space.md, paddingTop: space.md, borderTopWidth: 1, borderTopColor: colors.line },
-  metaRow: { flexDirection: "row", alignItems: "center", gap: space.md },
-  meta: { flexDirection: "row", alignItems: "center", gap: 3 },
-  metaText: { fontSize: font.tiny + 1, color: colors.text, fontWeight: "500" },
-  fee: { fontSize: font.body, fontWeight: "700", color: colors.ink },
-  strike: { fontSize: font.small, color: colors.faint, textDecorationLine: "line-through", fontWeight: "400" },
-  book: { backgroundColor: colors.primary, borderRadius: radius.md, paddingHorizontal: space.lg, minHeight: 44, justifyContent: "center" },
-  bookText: { color: "#fff", fontWeight: "700", fontSize: font.small },
-  initials: { alignItems: "center", justifyContent: "center" },
-  online: { position: "absolute", width: 14, height: 14, borderRadius: 7, backgroundColor: colors.success, borderWidth: 2, borderColor: "#fff" },
+  card: { backgroundColor: colors.card, borderRadius: 20, borderWidth: 1, borderColor: colors.line, padding: space.lg },
+  top: { flexDirection: "row", gap: space.sm, alignItems: "center" },
+  listen: { width: 44, height: 44, borderRadius: 22, borderWidth: 1, borderColor: colors.lineStrong, alignItems: "center", justifyContent: "center", backgroundColor: colors.card },
+  facts: { flexDirection: "row", flexWrap: "wrap", gap: 6, marginTop: space.md },
+  fact: { flexDirection: "row", alignItems: "center", paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8, backgroundColor: colors.segment },
+  bottom: { flexDirection: "row", alignItems: "center", gap: space.md, marginTop: space.md },
+  online: { position: "absolute", right: 0, bottom: 0, backgroundColor: colors.successStrong, borderWidth: 2, borderColor: "#fff" },
 });
+
+/**
+ * Today's status from the doctor's real shifts: "Open now · till 8 PM" (live dot), "Opens today at 5 PM",
+ * "Done for today" — or, when the server sent no hours, the plain "Available today" / "Not available today".
+ */
+export function OpenLine({ doctor, big }: { doctor: Pick<Doctor, "isAvailableToday" | "todayHours">; big?: boolean }) {
+  const { t } = useI18n();
+  const st = openState(doctor);
+  const variant = big ? "bodyBold" : "smallBold";
+  if (st?.kind === "open" || (!st && doctor.isAvailableToday))
+    return (
+      <View style={{ flexDirection: "row", alignItems: "center", gap: 8, flexShrink: 1 }}>
+        <LiveDot size={big ? 12 : 10} color={colors.success} />
+        <Txt variant={variant} color={colors.success} numberOfLines={1} style={{ flexShrink: 1 }}>
+          {st?.kind === "open" ? t("openNowUntil", { time: st.until }) : t("availableToday")}
+        </Txt>
+      </View>
+    );
+  if (st?.kind === "later")
+    return (
+      <View style={{ flexDirection: "row", alignItems: "center", gap: 6, flexShrink: 1 }}>
+        <Ionicons name="time-outline" size={big ? 18 : 15} color={colors.primaryDark} />
+        <Txt variant={variant} color={colors.primaryDark} numberOfLines={1} style={{ flexShrink: 1 }}>
+          {t("opensTodayAt", { time: st.at })}
+        </Txt>
+      </View>
+    );
+  if (st?.kind === "done" || doctor.isAvailableToday === false)
+    return (
+      <Txt variant={big ? "body" : "small"} color={colors.muted} numberOfLines={1}>
+        {st?.kind === "done" ? t("doneForToday") : t("notAvailableToday")}
+      </Txt>
+    );
+  return null;
+}

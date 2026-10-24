@@ -147,3 +147,53 @@ export function specialtyName(id: string, locale: Locale): string {
   if (locale === "en") return en;
   return SPECIALTY_NAMES[locale]?.[id] ?? en;
 }
+
+// ── Plain words ──────────────────────────────────────────────────────────────────────────────────
+// Patients think "child doctor", not "Paediatrician". These names are shown on cards and search results;
+// the formal specialty stays on the doctor's own page in brackets. Unlisted ids fall back to specialtyName().
+
+const PLAIN: Record<string, Record<Locale, string>> = {
+  general: { en: "General doctor", hi: "सामान्य डॉक्टर", bn: "সাধারণ ডাক্তার", hinglish: "General doctor" },
+  pediatrics: { en: "Child doctor", hi: "बच्चों के डॉक्टर", bn: "শিশু ডাক্তার", hinglish: "Bachchon ke doctor" },
+  gynecology: { en: "Women's doctor", hi: "महिला रोग डॉक्टर", bn: "স্ত্রীরোগ ডাক্তার", hinglish: "Mahila doctor" },
+  dermatology: { en: "Skin doctor", hi: "त्वचा के डॉक्टर", bn: "চর্মরোগ ডাক্তার", hinglish: "Skin doctor" },
+  orthopedics: { en: "Bone and joint doctor", hi: "हड्डी के डॉक्टर", bn: "হাড়ের ডাক্তার", hinglish: "Haddi ke doctor" },
+  dentistry: { en: "Dentist", hi: "दाँतों के डॉक्टर", bn: "দাঁতের ডাক্তার", hinglish: "Daant ke doctor" },
+  ent: { en: "Ear, nose, throat doctor", hi: "नाक-कान-गला डॉक्टर", bn: "নাক-কান-গলা ডাক্তার", hinglish: "Naak-kaan-gala doctor" },
+  cardiology: { en: "Heart doctor", hi: "दिल के डॉक्टर", bn: "হৃদরোগ ডাক্তার", hinglish: "Dil ke doctor" },
+  ophthalmology: { en: "Eye doctor", hi: "आँखों के डॉक्टर", bn: "চোখের ডাক্তার", hinglish: "Aankh ke doctor" },
+  gastroenterology: { en: "Stomach specialist", hi: "पेट के डॉक्टर", bn: "পেটের ডাক্তার", hinglish: "Pet ke doctor" },
+  neurology: { en: "Brain and nerve doctor", hi: "दिमाग-नस के डॉक्टर", bn: "স্নায়ু ডাক্তার", hinglish: "Nas ke doctor" },
+  psychiatry: { en: "Mental health doctor", hi: "मानसिक स्वास्थ्य डॉक्टर", bn: "মানসিক স্বাস্থ্য ডাক্তার", hinglish: "Mental health doctor" },
+  urology: { en: "Urine and kidney doctor", hi: "मूत्र रोग डॉक्टर", bn: "মূত্ররোগ ডাক্তার", hinglish: "Peshab rog doctor" },
+  pulmonology: { en: "Lung doctor", hi: "फेफड़ों के डॉक्टर", bn: "ফুসফুসের ডাক্তার", hinglish: "Phephde ke doctor" },
+  physiotherapy: { en: "Physiotherapist", hi: "फिज़ियोथेरेपिस्ट", bn: "ফিজিওথেরাপিস্ট", hinglish: "Physiotherapist" },
+};
+
+/** "General doctor" rather than "General Physician", in the patient's language. */
+export function plainSpecialty(id: string, locale: Locale): string {
+  return PLAIN[id]?.[locale] ?? specialtyName(id, locale);
+}
+
+/** True when the plain name differs from the formal one, so the doctor page can show "(General Physician)". */
+export const hasPlainName = (id: string) => id in PLAIN;
+
+// ── Symptom tiles on Home ────────────────────────────────────────────────────────────────────────
+
+export interface Symptom {
+  id: string;
+  icon: "thermometer-outline" | "nutrition-outline" | "happy-outline" | "female-outline" | "sparkles-outline" | "body-outline";
+  tint: "red" | "amber" | "teal" | "purple" | "blue" | "gray";
+  label: Record<Locale, string>;
+  /** Specialties to show, best first. */
+  specialtyIds: string[];
+}
+
+export const SYMPTOMS: Symptom[] = [
+  { id: "fever", icon: "thermometer-outline", tint: "red", specialtyIds: ["general"], label: { en: "Fever, cold", hi: "बुखार, सर्दी", bn: "জ্বর, সর্দি", hinglish: "Bukhar, sardi" } },
+  { id: "stomach", icon: "nutrition-outline", tint: "amber", specialtyIds: ["general", "gastroenterology"], label: { en: "Stomach", hi: "पेट दर्द", bn: "পেটের সমস্যা", hinglish: "Pet dard" } },
+  { id: "child", icon: "happy-outline", tint: "teal", specialtyIds: ["pediatrics"], label: { en: "Child health", hi: "बच्चों की सेहत", bn: "শিশুর স্বাস্থ্য", hinglish: "Bachchon ki sehat" } },
+  { id: "women", icon: "female-outline", tint: "purple", specialtyIds: ["gynecology"], label: { en: "Women's health", hi: "महिलाओं की सेहत", bn: "মহিলাদের স্বাস্থ্য", hinglish: "Mahilaon ki sehat" } },
+  { id: "skin", icon: "sparkles-outline", tint: "blue", specialtyIds: ["dermatology"], label: { en: "Skin, hair", hi: "त्वचा, बाल", bn: "ত্বক, চুল", hinglish: "Skin, baal" } },
+  { id: "bones", icon: "body-outline", tint: "gray", specialtyIds: ["orthopedics", "physiotherapy"], label: { en: "Bones, joints", hi: "हड्डी, जोड़", bn: "হাড়, গাঁট", hinglish: "Haddi, jod" } },
+];

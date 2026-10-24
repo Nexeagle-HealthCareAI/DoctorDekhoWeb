@@ -1,9 +1,9 @@
 import { useQueryClient } from "@tanstack/react-query";
-import { Stack, useLocalSearchParams, useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import { useState } from "react";
 import { ScrollView, StyleSheet, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { Banner, Button, Chip, Txt } from "../../components/ui";
+import { Banner, Button, Chip, TopBar, Txt } from "../../components/ui";
 import { ApiError } from "../../lib/api/http";
 import { rescheduleAppointment } from "../../lib/api/patient";
 import { useSession } from "../../lib/auth/session";
@@ -43,7 +43,7 @@ export default function RescheduleScreen() {
 
   return (
     <SafeAreaView edges={["bottom"]} style={{ flex: 1, backgroundColor: colors.bg }}>
-      <Stack.Screen options={{ title: t("reschedule") }} />
+      <TopBar title={t("reschedule")} back="close" />
       <ScrollView contentContainerStyle={styles.content}>
         {doctor ? <Txt variant="heading">{doctor}</Txt> : null}
         {current ? <Txt color={colors.muted}>{formatShortDate(current, locale)}</Txt> : null}

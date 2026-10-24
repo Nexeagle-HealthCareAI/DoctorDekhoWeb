@@ -13,6 +13,8 @@ export interface HomePlace {
   state: string | null;
   lat?: number;
   lng?: number;
+  /** Neighbourhood picked on the map ("Line Bazar"), shown before the city. Kept on the phone only. */
+  area?: string | null;
 }
 
 export interface CityOption {

@@ -12,6 +12,8 @@ export const config = {
   siteUrl: trimSlash(process.env.EXPO_PUBLIC_SITE_URL ?? "https://doctordekho.nexeagle.com"),
   businessUrl: trimSlash(process.env.EXPO_PUBLIC_BUSINESS_URL ?? "https://nexeagle.com"),
   whatsappNumber: process.env.EXPO_PUBLIC_WHATSAPP_NUMBER ?? "919060112765",
+  /** Number the Help button and "Call and we'll book for you" dial. Set EXPO_PUBLIC_SUPPORT_PHONE to a staffed line. */
+  supportPhone: process.env.EXPO_PUBLIC_SUPPORT_PHONE ?? "+919060112765",
   supportEmail: "info@nexeagle.com",
   requestTimeoutMs: 15000,
 } as const;

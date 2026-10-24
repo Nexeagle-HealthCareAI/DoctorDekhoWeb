@@ -16,10 +16,9 @@
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#0F766E",
         "foregroundImage": "./assets/android-icon-foreground.png",
-        "backgroundImage": "./assets/android-icon-background.png",
-        "monochromeImage": "./assets/android-icon-monochrome.png"
+        "monochromeImage": "./assets/android-icon-monochrome.png",
+        "backgroundColor": "#FFFFFF"
       },
       "predictiveBackGestureEnabled": false,
       "package": "com.nexeagle.doctordekho",
@@ -28,10 +27,8 @@
         "ACCESS_COARSE_LOCATION",
         "ACCESS_FINE_LOCATION",
         "CAMERA",
-        "POST_NOTIFICATIONS"
-      ],
-      "blockedPermissions": [
-        "android.permission.RECORD_AUDIO"
+        "POST_NOTIFICATIONS",
+        "RECORD_AUDIO"
       ]
     },
     "web": {
@@ -46,15 +43,15 @@
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#0F766E",
+          "backgroundColor": "#FFFFFF",
           "image": "./assets/splash-icon.png",
-          "imageWidth": 160
+          "imageWidth": 180
         }
       ],
       [
         "expo-location",
         {
-          "locationWhenInUsePermission": "Doctor Dekho uses your location once to show doctors in your city."
+          "locationWhenInUsePermission": "Doctor Dekho uses your location to show doctors near you and the way to the hospital."
         }
       ],
       [
@@ -62,7 +59,7 @@
         {
           "cameraPermission": "Take a photo of a prescription or report to keep it in your health records.",
           "photosPermission": "Choose a prescription or report photo to keep in your health records.",
-          "microphonePermission": false
+          "microphonePermission": "Doctor Dekho uses the microphone only when you tap Speak to search for a doctor."
         }
       ],
       [
@@ -71,7 +68,15 @@
           "color": "#0F766E"
         }
       ],
-      "expo-document-picker"
+      "expo-document-picker",
+      [
+        "expo-speech-recognition",
+        {
+          "microphonePermission": "Doctor Dekho uses the microphone only when you tap Speak to search for a doctor.",
+          "speechRecognitionPermission": "Doctor Dekho turns what you say into a search when you tap Speak."
+        }
+      ],
+      "@rnmapbox/maps"
     ],
     "scheme": "doctordekho",
     "newArchEnabled": true,
