@@ -16,10 +16,9 @@
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#0F766E",
         "foregroundImage": "./assets/android-icon-foreground.png",
-        "backgroundImage": "./assets/android-icon-background.png",
-        "monochromeImage": "./assets/android-icon-monochrome.png"
+        "monochromeImage": "./assets/android-icon-monochrome.png",
+        "backgroundColor": "#FFFFFF"
       },
       "predictiveBackGestureEnabled": false,
       "package": "com.nexeagle.doctordekho",
@@ -28,10 +27,8 @@
         "ACCESS_COARSE_LOCATION",
         "ACCESS_FINE_LOCATION",
         "CAMERA",
-        "POST_NOTIFICATIONS"
-      ],
-      "blockedPermissions": [
-        "android.permission.RECORD_AUDIO"
+        "POST_NOTIFICATIONS",
+        "RECORD_AUDIO"
       ]
     },
     "web": {
@@ -46,9 +43,9 @@
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#0F766E",
+          "backgroundColor": "#FFFFFF",
           "image": "./assets/splash-icon.png",
-          "imageWidth": 160
+          "imageWidth": 180
         }
       ],
       [
@@ -71,7 +68,14 @@
           "color": "#0F766E"
         }
       ],
-      "expo-document-picker"
+      "expo-document-picker",
+      [
+        "expo-speech-recognition",
+        {
+          "microphonePermission": "Doctor Dekho uses the microphone only when you tap Speak to search for a doctor.",
+          "speechRecognitionPermission": "Doctor Dekho turns what you say into a search when you tap Speak."
+        }
+      ]
     ],
     "scheme": "doctordekho",
     "newArchEnabled": true,

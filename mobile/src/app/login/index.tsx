@@ -1,21 +1,22 @@
-import Ionicons from "@expo/vector-icons/Ionicons";
 import { useRouter } from "expo-router";
 import { useState } from "react";
-import { KeyboardAvoidingView, Linking, Platform, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { KeyboardAvoidingView, Linking, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { Button, Chip, Txt } from "../../components/ui";
+import { Button, Logo, Txt } from "../../components/ui";
 import { ApiError } from "../../lib/api/http";
 import { sendOtp } from "../../lib/api/patient";
+import { useTextStyle } from "../../lib/appearance";
 import { config } from "../../lib/config";
 import { cleanMobile, isValidMobile } from "../../lib/format";
 import { useI18n } from "../../lib/i18n";
 import { LOCALES } from "../../lib/i18n/types";
-import { colors, font, radius, space } from "../../lib/theme";
+import { BIG, colors, radius, space } from "../../lib/theme";
 
-/** First screen: pick a language (pre-selected from the phone) and enter the WhatsApp number. One button. */
+/** First screen: the logo and name, four big language buttons in their own script, one phone field, one button. */
 export default function LoginScreen() {
   const router = useRouter();
   const { t, locale, setLocale } = useI18n();
+  const ts = useTextStyle();
   const [mobile, setMobile] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -47,32 +48,44 @@ export default function LoginScreen() {
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
         <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
           <View style={styles.brand}>
-            <View style={styles.logo}>
-              <Ionicons name="medkit" size={34} color="#fff" />
-            </View>
-            <Txt variant="title">{t("welcomeTitle")}</Txt>
-            <Txt color={colors.muted} style={{ marginTop: space.xs, textAlign: "center" }}>
+            <Logo height={74} accessible={false} />
+            <Txt variant="display" style={{ marginTop: space.md, fontSize: 30 }}>
+              {t("welcomeTitle")}
+            </Txt>
+            <Txt color={colors.muted} center style={{ marginTop: space.xs }}>
               {t("welcomeSubtitle")}
             </Txt>
           </View>
 
-          <Txt variant="smallBold" style={{ marginBottom: space.sm }}>
+          <Txt variant="smallBold" color={colors.muted} style={{ fontSize: 15, marginBottom: space.sm }}>
             {t("chooseLanguage")}
           </Txt>
           <View style={styles.langs}>
-            {LOCALES.map((l) => (
-              <Chip key={l.code} label={l.nativeLabel} selected={locale === l.code} onPress={() => setLocale(l.code)} style={{ flexGrow: 1 }} />
-            ))}
+            {LOCALES.map((l) => {
+              const on = locale === l.code;
+              return (
+                <Pressable
+                  key={l.code}
+                  onPress={() => setLocale(l.code)}
+                  accessibilityRole="radio"
+                  accessibilityState={{ selected: on }}
+                  accessibilityLabel={l.englishLabel}
+                  style={[styles.lang, on && styles.langOn]}
+                >
+                  {/* Each name in its own script, in the system font, so हिंदी and বাংলা render before any font loads. */}
+                  <Text style={[styles.langText, on && { color: colors.primaryDark }]}>{l.nativeLabel}</Text>
+                </Pressable>
+              );
+            })}
           </View>
 
-          <Txt variant="heading" style={{ marginTop: space.xxl }}>
+          <Txt variant="smallBold" color={colors.muted} style={{ fontSize: 15, marginTop: space.xl, marginBottom: space.sm }}>
             {t("phoneTitle")}
           </Txt>
-          <Txt color={colors.muted} style={{ marginTop: space.xs, marginBottom: space.lg }}>
-            {t("phoneHint")}
-          </Txt>
           <View style={[styles.phoneBox, error ? { borderColor: colors.danger } : null]}>
-            <Text style={styles.prefix}>+91</Text>
+            <Txt variant="subheading" style={styles.prefix}>
+              +91
+            </Txt>
             <TextInput
               value={mobile}
               onChangeText={(v) => {
@@ -85,27 +98,35 @@ export default function LoginScreen() {
               textContentType="telephoneNumber"
               autoComplete="tel"
               maxLength={14}
-              autoFocus
               returnKeyType="done"
               onSubmitEditing={submit}
-              style={styles.phoneInput}
+              style={[styles.phoneInput, ts(20, "700"), { lineHeight: undefined }]}
               accessibilityLabel={t("phoneTitle")}
             />
           </View>
-          {error ? <Text style={styles.error}>{error}</Text> : null}
+          {error ? (
+            <Txt variant="small" color={colors.danger} style={{ marginTop: space.sm }}>
+              {error}
+            </Txt>
+          ) : (
+            <Txt variant="small" color={colors.muted} style={{ marginTop: space.sm }}>
+              {t("phoneHint")}
+            </Txt>
+          )}
 
-          <Button label={busy ? t("sending") : t("sendCode")} icon="logo-whatsapp" variant="whatsapp" onPress={submit} loading={busy} disabled={!valid} style={{ marginTop: space.xl }} />
+          <View style={{ flex: 1, minHeight: space.xl }} />
+          <Button label={busy ? t("sending") : t("sendCode")} icon="logo-whatsapp" onPress={submit} loading={busy} disabled={!valid} />
 
-          <Text style={styles.consent}>
+          <Txt variant="tiny" color={colors.muted} center style={{ marginTop: space.lg, fontWeight: undefined }}>
             {t("consentLine")}{" "}
-            <Text style={styles.link} onPress={() => Linking.openURL(`${config.businessUrl}/terms`)}>
-              {t("terms")}
-            </Text>
+            <Txt variant="tinyBold" color={colors.primary} style={{ textDecorationLine: "underline" }}>
+              <Text onPress={() => Linking.openURL(`${config.businessUrl}/terms`)}>{t("terms")}</Text>
+            </Txt>
             {" · "}
-            <Text style={styles.link} onPress={() => Linking.openURL(`${config.businessUrl}/privacy`)}>
-              {t("privacy")}
-            </Text>
-          </Text>
+            <Txt variant="tinyBold" color={colors.primary} style={{ textDecorationLine: "underline" }}>
+              <Text onPress={() => Linking.openURL(`${config.businessUrl}/privacy`)}>{t("privacy")}</Text>
+            </Txt>
+          </Txt>
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -115,12 +136,11 @@ export default function LoginScreen() {
 const styles = StyleSheet.create({
   content: { padding: space.xl, paddingTop: space.xxl, flexGrow: 1 },
   brand: { alignItems: "center", marginBottom: space.xxl },
-  logo: { width: 72, height: 72, borderRadius: 20, backgroundColor: colors.primary, alignItems: "center", justifyContent: "center", marginBottom: space.md },
-  langs: { flexDirection: "row", flexWrap: "wrap", gap: space.sm },
-  phoneBox: { flexDirection: "row", alignItems: "center", borderWidth: 1.5, borderColor: colors.line, borderRadius: radius.md, backgroundColor: colors.card, minHeight: 56 },
-  prefix: { fontSize: 18, fontWeight: "600", color: colors.ink, paddingHorizontal: space.lg, borderRightWidth: 1, borderRightColor: colors.line },
-  phoneInput: { flex: 1, fontSize: 20, paddingHorizontal: space.lg, color: colors.ink, letterSpacing: 1 },
-  error: { color: colors.danger, marginTop: space.sm, fontSize: font.small },
-  consent: { color: colors.muted, fontSize: font.tiny, marginTop: space.lg, lineHeight: 18, textAlign: "center" },
-  link: { color: colors.primary, fontWeight: "600" },
+  langs: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
+  lang: { flexBasis: "47%", flexGrow: 1, minHeight: BIG, borderRadius: radius.md + 2, borderWidth: 1.5, borderColor: colors.lineStrong, backgroundColor: colors.card, alignItems: "center", justifyContent: "center" },
+  langOn: { backgroundColor: colors.primarySoft, borderColor: colors.primary },
+  langText: { fontSize: 18, fontWeight: "700", color: colors.ink },
+  phoneBox: { flexDirection: "row", alignItems: "center", borderWidth: 2, borderColor: colors.primary, borderRadius: radius.md + 2, backgroundColor: colors.card, minHeight: 60, overflow: "hidden" },
+  prefix: { paddingHorizontal: space.md + 2, alignSelf: "stretch", textAlignVertical: "center", lineHeight: 60, borderRightWidth: 1, borderRightColor: colors.line, backgroundColor: colors.bg },
+  phoneInput: { flex: 1, paddingHorizontal: space.md + 2, color: colors.ink, letterSpacing: 1 },
 });

@@ -1,15 +1,15 @@
 import * as Clipboard from "expo-clipboard";
 import * as Haptics from "expo-haptics";
-import { useLocalSearchParams, useRouter } from "expo-router";
+import { Redirect, useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useRef, useState } from "react";
 import { AppState, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, View } from "react-native";
 import { OtpInput } from "../../components/OtpInput";
-import { Button, Txt } from "../../components/ui";
+import { Button, Card, TopBar, Txt } from "../../components/ui";
 import { ApiError } from "../../lib/api/http";
 import { sendOtp, verifyOtp } from "../../lib/api/patient";
 import { useSession } from "../../lib/auth/session";
 import { useI18n } from "../../lib/i18n";
-import { colors, font, space } from "../../lib/theme";
+import { colors, space } from "../../lib/theme";
 
 const RESEND_SECONDS = 30;
 
@@ -93,44 +93,57 @@ export default function OtpScreen() {
     }
   }
 
+  // Opened without a number (a cold start signed out lands on the first open screen): go to the number screen.
+  if (!mobile) return <Redirect href="/login" />;
+
   return (
-    <KeyboardAvoidingView style={{ flex: 1, backgroundColor: colors.bg }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
-      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-        <Txt variant="title">{t("otpTitle")}</Txt>
-        <Txt color={colors.muted} style={{ marginTop: space.xs, marginBottom: space.xl }}>
-          {t("otpSentTo", { mobile })}
-        </Txt>
+    <View style={{ flex: 1, backgroundColor: colors.bg }}>
+      <TopBar />
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
+        <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+          <Txt variant="display">{t("otpTitle")}</Txt>
+          <Txt color={colors.muted} style={{ marginTop: space.sm, marginBottom: space.xl }}>
+            {t("otpSentTo", { mobile })}{" "}
+            <Txt variant="bodyBold" color={colors.primary}>
+              <Text onPress={() => router.back()}>{t("changeNumber")}</Text>
+            </Txt>
+          </Txt>
 
-        <OtpInput value={code} onChange={(v) => { setCode(v); setError(null); }} onComplete={verify} error={!!error} />
-        {error ? <Text style={styles.error}>{error}</Text> : null}
+          <OtpInput value={code} onChange={(v) => { setCode(v); setError(null); }} onComplete={verify} error={!!error} />
+          {error ? (
+            <Txt variant="smallBold" color={colors.danger} style={{ marginTop: space.md }}>
+              {error}
+            </Txt>
+          ) : null}
 
-        {hasClip && code.length < 6 && !busy ? (
-          <Button label={t("pasteCode")} variant="secondary" icon="clipboard-outline" onPress={pasteFromClipboard} style={{ marginTop: space.xl }} />
-        ) : null}
+          {busy ? (
+            <Button label={t("verifying")} onPress={() => {}} loading style={{ marginTop: space.xl }} />
+          ) : code.length < 6 ? (
+            <Button label={t("pasteCode")} variant="secondary" icon="clipboard-outline" onPress={pasteFromClipboard} style={{ marginTop: space.xl }} accessibilityLabel={hasClip ? t("pasteCode") : t("pasteCode")} />
+          ) : null}
 
-        {busy ? <Button label={t("verifying")} onPress={() => {}} loading style={{ marginTop: space.xl }} /> : null}
+          <Card style={{ marginTop: space.xl }}>
+            <Txt variant="bodyBold" style={{ fontSize: 15 }}>
+              {t("otpWhereTitle")}
+            </Txt>
+            <Txt variant="small" color={colors.muted} style={{ marginTop: space.xs }}>
+              {t("otpWhereBody")}
+            </Txt>
+          </Card>
 
-        <View style={styles.links}>
-          <Text style={styles.link} onPress={() => router.back()}>
-            {t("changeNumber")}
-          </Text>
-          {left > 0 ? (
-            <Text style={styles.muted}>{t("resendIn", { seconds: left })}</Text>
-          ) : (
-            <Text style={styles.link} onPress={resend}>
-              {t("resend")}
-            </Text>
-          )}
-        </View>
-      </ScrollView>
-    </KeyboardAvoidingView>
+          <View style={{ alignItems: "center", marginTop: space.xl }}>
+            {left > 0 ? (
+              <Txt color={colors.muted}>{t("resendIn", { seconds: left })}</Txt>
+            ) : (
+              <Button label={t("resend")} variant="ghost" size="md" icon="refresh" onPress={resend} />
+            )}
+          </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  content: { padding: space.xl },
-  error: { color: colors.danger, marginTop: space.md, fontSize: font.small },
-  links: { flexDirection: "row", justifyContent: "space-between", marginTop: space.xxl },
-  link: { color: colors.primary, fontWeight: "600", fontSize: font.small, padding: space.xs },
-  muted: { color: colors.muted, fontSize: font.small, padding: space.xs },
+  content: { padding: space.xl, paddingTop: space.md },
 });

@@ -80,3 +80,23 @@ export const RELATIONS = ["Son", "Daughter", "Spouse", "Father", "Mother", "Brot
 export function relationLabel(t: (k: StringKey) => string, relation: string): string {
   return (RELATIONS as readonly string[]).includes(relation) ? t(`rel_${relation}` as StringKey) : relation;
 }
+
+/** Tap-to-pick reasons (typing is the hardest step for first-time users). Sent to the hospital in English. */
+export const REASONS = [
+  { id: "fever", key: "reasonFever", en: "Fever" },
+  { id: "pain", key: "reasonPain", en: "Pain" },
+  { id: "checkup", key: "reasonCheckup", en: "Check-up" },
+  { id: "reports", key: "reasonReports", en: "Show reports" },
+] as const satisfies readonly { id: string; key: StringKey; en: string }[];
+
+export type VisitKind = "pending" | "confirmed" | "cancelled" | "completed";
+
+/** EasyHMS status → one of four plain states. "Pending Confirmation" must read as pending, so pending is checked first. */
+export function visitKind(a: { status: string; statusCode: string }): VisitKind {
+  const s = `${a.statusCode} ${a.status}`.toLowerCase();
+  if (s.includes("cancel")) return "cancelled";
+  if (s.includes("complet") || s.includes("closed") || s.includes("visited")) return "completed";
+  if (s.includes("pending") || s.includes("request")) return "pending";
+  if (s.includes("confirm")) return "confirmed";
+  return "pending";
+}

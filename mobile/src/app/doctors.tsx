@@ -1,40 +1,66 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
-import { Stack, useLocalSearchParams, useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
-import { FlatList, ScrollView, StyleSheet, TextInput, View } from "react-native";
+import { FlatList, Pressable, ScrollView, StyleSheet, TextInput, View } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { CityPicker } from "../components/CityPicker";
 import { DoctorCard } from "../components/DoctorCard";
-import { Banner, Chip, EmptyState, Loading, Txt } from "../components/ui";
-import { parseSearch } from "../lib/api/doctors";
+import { Banner, Button, Chip, EmptyState, IconButton, Loading, Logo, Txt } from "../components/ui";
+import { effectiveFee, parseSearch } from "../lib/api/doctors";
 import type { SearchParseResult } from "../lib/api/types";
+import { useTextStyle } from "../lib/appearance";
 import { useI18n } from "../lib/i18n";
 import { useHomePlace } from "../lib/location";
 import { useDoctors } from "../lib/queries";
 import { filterDoctors } from "../lib/search";
-import { SPECIALTIES, specialtyName } from "../lib/specialties";
-import { colors, font, radius, space } from "../lib/theme";
+import { useVoiceSearch } from "../lib/speech";
+import { plainSpecialty, POPULAR_SPECIALTY_IDS, SPECIALTIES, SYMPTOMS } from "../lib/specialties";
+import { contactSupport } from "../lib/support";
+import { colors, radius, space } from "../lib/theme";
 
 /**
- * Search results. Instant keyword filtering on the phone; when a symptom-like query finds nothing,
- * ask the Doctor Dekho router which specialty fits ("pet dard" → General Physician / Gastro).
+ * Search. Words filter the on-phone directory instantly; a symptom that matches nobody ("pet dard") is sent to the
+ * Doctor Dekho router, which answers with the right specialty. Opened from a Home tile it starts on that symptom;
+ * opened from "Speak" it starts listening.
  */
 export default function DoctorsScreen() {
   const router = useRouter();
-  const params = useLocalSearchParams<{ q?: string; specialty?: string }>();
+  const params = useLocalSearchParams<{ q?: string; specialty?: string; symptom?: string; voice?: string }>();
   const { t, locale } = useI18n();
+  const ts = useTextStyle();
   const doctors = useDoctors();
   const { place, setPlace, locate, locating, cities } = useHomePlace();
   const [query, setQuery] = useState(params.q ?? "");
+  const symptom = SYMPTOMS.find((s) => s.id === params.symptom);
   const [specialty, setSpecialty] = useState<string | null>(params.specialty ?? null);
+  const [symptomOn, setSymptomOn] = useState(!!symptom);
+  const [todayOnly, setTodayOnly] = useState(false);
+  const [cheapest, setCheapest] = useState(false);
   const [pickCity, setPickCity] = useState(false);
   const [ai, setAi] = useState<{ query: string; result: SearchParseResult } | null>(null);
+  const voice = useVoiceSearch(locale, (text) => setQuery(text));
+
+  useEffect(() => {
+    if (params.voice === "1" && voice.available) void voice.start();
+    // Only on arrival from the Home "Speak" button.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const specialtyIds = specialty ? [specialty] : symptomOn && symptom ? symptom.specialtyIds : undefined;
+
+  const refine = (list: ReturnType<typeof filterDoctors>) => {
+    let out = todayOnly ? list.filter((d) => d.isAvailableToday) : list;
+    if (cheapest) out = [...out].sort((a, b) => (effectiveFee(a) ?? 1e9) - (effectiveFee(b) ?? 1e9));
+    return out;
+  };
 
   const direct = useMemo(
-    () => filterDoctors(doctors.data ?? [], { query, specialtyIds: specialty ? [specialty] : undefined, place }),
-    [doctors.data, query, specialty, place],
+    () => refine(filterDoctors(doctors.data ?? [], { query, specialtyIds, place })),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [doctors.data, query, specialty, symptomOn, place, todayOnly, cheapest],
   );
 
-  // Debounced AI fallback, only when the typed words match nobody.
+  // Ask the router only when typed words match nobody (debounced).
   const q = query.trim();
   useEffect(() => {
     if (q.length < 4 || direct.length > 0 || !doctors.data) {
@@ -44,9 +70,7 @@ export default function DoctorsScreen() {
     let live = true;
     const timer = setTimeout(() => {
       parseSearch(q)
-        .then((result) => {
-          if (live) setAi({ query: q, result });
-        })
+        .then((result) => live && setAi({ query: q, result }))
         .catch(() => {});
     }, 450);
     return () => {
@@ -60,38 +84,65 @@ export default function DoctorsScreen() {
     const ids = ai.result.specialtyIds?.length ? ai.result.specialtyIds : ai.result.specialtyId ? [ai.result.specialtyId] : [];
     return ids.filter((id) => id !== "unclear");
   }, [ai, q]);
-
   const aiList = useMemo(
-    () => (direct.length || !aiIds.length ? [] : filterDoctors(doctors.data ?? [], { specialtyIds: aiIds, place })),
-    [direct.length, aiIds, doctors.data, place],
+    () => (direct.length || !aiIds.length ? [] : refine(filterDoctors(doctors.data ?? [], { specialtyIds: aiIds, place }))),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [direct.length, aiIds, doctors.data, place, todayOnly, cheapest],
   );
   const list = direct.length ? direct : aiList;
 
+  const chipIds = useMemo(() => [...POPULAR_SPECIALTY_IDS, ...SPECIALTIES.map((s) => s.id).filter((id) => !POPULAR_SPECIALTY_IDS.includes(id))], []);
+
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
-      <Stack.Screen options={{ title: t("findDoctor") }} />
-      <View style={styles.head}>
-        <View style={styles.searchBox}>
-          <Ionicons name="search" size={20} color={colors.muted} />
-          <TextInput
-            value={query}
-            onChangeText={setQuery}
-            placeholder={t("searchPlaceholder")}
-            placeholderTextColor={colors.faint}
-            returnKeyType="search"
-            autoFocus={!params.specialty && !params.q}
-            style={styles.searchInput}
-            clearButtonMode="while-editing"
-          />
+      <SafeAreaView edges={["top"]} style={styles.head}>
+        <View style={styles.searchRow}>
+          <IconButton icon="chevron-back" label={t("back")} onPress={() => router.back()} />
+          <View style={[styles.searchBox, voice.listening && { borderColor: colors.danger }]}>
+            <Ionicons name="search" size={20} color={colors.ink} />
+            <TextInput
+              value={query}
+              onChangeText={(v) => {
+                setQuery(v);
+                if (v) setSymptomOn(false);
+              }}
+              placeholder={voice.listening ? t("listening") : t("searchPlaceholder")}
+              placeholderTextColor={voice.listening ? colors.danger : colors.faint}
+              returnKeyType="search"
+              autoFocus={!params.specialty && !params.symptom && !params.q && params.voice !== "1"}
+              style={[styles.searchInput, ts(16, "600"), { lineHeight: undefined }]}
+              clearButtonMode="while-editing"
+              accessibilityLabel={t("searchPlaceholder")}
+            />
+            {voice.available ? (
+              <Pressable onPress={voice.listening ? voice.stop : voice.start} accessibilityRole="button" accessibilityLabel={voice.listening ? t("stopListening") : t("speak")} style={[styles.mic, voice.listening && { backgroundColor: colors.dangerSoft }]}>
+                <Ionicons name={voice.listening ? "stop" : "mic"} size={20} color={voice.listening ? colors.danger : colors.primaryDark} />
+              </Pressable>
+            ) : null}
+          </View>
+          <View style={{ marginLeft: space.sm }}>
+            <Logo height={30} />
+          </View>
         </View>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips} keyboardShouldPersistTaps="handled">
-          <Chip label={place?.city ?? t("allIndia")} icon="location" onPress={() => setPickCity(true)} />
-          <Chip label={t("allSpecialties")} selected={!specialty} onPress={() => setSpecialty(null)} />
-          {SPECIALTIES.map((s) => (
-            <Chip key={s.id} label={specialtyName(s.id, locale)} selected={specialty === s.id} onPress={() => setSpecialty(specialty === s.id ? null : s.id)} />
+          <Chip label={place?.city ?? t("allIndia")} icon="location" selected onPress={() => setPickCity(true)} />
+          <Chip label={t("availableToday")} selected={todayOnly} onPress={() => setTodayOnly(!todayOnly)} tone="ink" />
+          <Chip label={t("lowestFee")} selected={cheapest} onPress={() => setCheapest(!cheapest)} tone="ink" />
+        </ScrollView>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={[styles.chips, { paddingTop: 0 }]} keyboardShouldPersistTaps="handled">
+          {chipIds.map((id) => (
+            <Chip
+              key={id}
+              label={plainSpecialty(id, locale)}
+              selected={specialty === id}
+              onPress={() => {
+                setSpecialty(specialty === id ? null : id);
+                setSymptomOn(false);
+              }}
+            />
           ))}
         </ScrollView>
-      </View>
+      </SafeAreaView>
 
       {doctors.isLoading ? (
         <Loading />
@@ -104,28 +155,31 @@ export default function DoctorsScreen() {
           keyboardDismissMode="on-drag"
           initialNumToRender={8}
           ListHeaderComponent={
-            <View style={{ gap: space.sm }}>
+            <View style={{ gap: space.md }}>
+              {voice.error === "permission" ? <Banner tone="warning" icon="mic-off" text={t("micPermission")} /> : null}
+              {symptomOn && symptom && !specialty ? (
+                <Pressable onPress={() => setSymptomOn(false)} accessibilityRole="button" accessibilityHint={t("clearFilter")}>
+                  <Banner icon="medkit" text={t("symptomMatched", { symptom: symptom.label[locale], doctors: symptom.specialtyIds.map((id) => plainSpecialty(id, locale)).join(", ") })} />
+                </Pressable>
+              ) : null}
               {!direct.length && aiList.length ? (
-                <Banner icon="sparkles" text={t("aiMatched", { specialty: specialtyName(aiIds[0], locale), query: q })} />
+                <Banner icon="sparkles" text={t("aiMatched", { specialty: aiIds.map((id) => plainSpecialty(id, locale)).join(", "), query: q })} />
               ) : null}
               {list.length ? (
-                <Txt variant="small" color={colors.muted}>
+                <Txt variant="smallBold" color={colors.muted}>
                   {t("doctorsCount", { count: list.length })}
+                  {place?.city ? ` · ${place.city}` : ""}
                 </Txt>
               ) : null}
             </View>
           }
           ListEmptyComponent={
-            <EmptyState
-              icon="search"
-              title={t("noDoctors")}
-              action={place?.city ? t("allIndia") : undefined}
-              onAction={() => void setPlace({ city: null, state: null })}
-            />
+            <View>
+              <EmptyState icon="search" title={t("noDoctors")} action={place?.city ? t("searchAllIndia") : undefined} onAction={() => void setPlace({ city: null, state: null })} />
+              <Button label={t("callToBook")} icon="call" variant="secondary" onPress={() => contactSupport("whatsapp", t("callToBookMessage", { need: q || symptom?.label[locale] || "" }))} style={{ marginHorizontal: space.xl }} />
+            </View>
           }
-          renderItem={({ item }) => (
-            <DoctorCard doctor={item} onPress={() => router.push(`/doctor/${item.id}`)} onBook={() => router.push(`/book/${item.id}`)} />
-          )}
+          renderItem={({ item }) => <DoctorCard doctor={item} onPress={() => router.push(`/doctor/${item.id}`)} onBook={() => router.push(`/book/${item.id}`)} />}
         />
       )}
 
@@ -148,19 +202,10 @@ export default function DoctorsScreen() {
 }
 
 const styles = StyleSheet.create({
-  head: { backgroundColor: colors.bg, paddingTop: space.md, borderBottomWidth: 1, borderBottomColor: colors.line },
-  searchBox: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginHorizontal: space.lg,
-    backgroundColor: colors.card,
-    borderRadius: radius.lg,
-    borderWidth: 1,
-    borderColor: colors.line,
-    paddingHorizontal: space.lg,
-    minHeight: 52,
-  },
-  searchInput: { flex: 1, fontSize: font.body, color: colors.ink, paddingHorizontal: space.sm, minHeight: 48 },
+  head: { backgroundColor: colors.card, borderBottomWidth: 1, borderBottomColor: colors.line },
+  searchRow: { flexDirection: "row", alignItems: "center", paddingHorizontal: space.md, paddingTop: space.sm, gap: 6 },
+  searchBox: { flex: 1, minWidth: 0, overflow: "hidden", flexDirection: "row", alignItems: "center", minHeight: 52, borderWidth: 2, borderColor: colors.primary, borderRadius: radius.md + 2, paddingLeft: space.md, paddingRight: 4, backgroundColor: colors.card },
+  searchInput: { flex: 1, minWidth: 0, minHeight: 48, paddingHorizontal: space.sm, color: colors.ink },
+  mic: { width: 42, height: 42, borderRadius: 12, alignItems: "center", justifyContent: "center", backgroundColor: colors.primarySoft },
   chips: { gap: space.sm, paddingHorizontal: space.lg, paddingVertical: space.md },
 });
-

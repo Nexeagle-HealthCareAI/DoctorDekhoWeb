@@ -1,8 +1,8 @@
 import { useQueryClient } from "@tanstack/react-query";
-import { Stack, useLocalSearchParams, useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import { useState } from "react";
 import { Alert, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, View } from "react-native";
-import { Banner, Button, Chip, Field, Label } from "../../components/ui";
+import { Banner, Button, Chip, Field, Label, TopBar } from "../../components/ui";
 import { ApiError } from "../../lib/api/http";
 import { deleteFamilyMember, saveFamilyMember } from "../../lib/api/patient";
 import type { AgeUnit, Sex } from "../../lib/api/types";
@@ -92,7 +92,7 @@ export default function MemberScreen() {
 
   return (
     <KeyboardAvoidingView style={{ flex: 1, backgroundColor: colors.bg }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
-      <Stack.Screen options={{ title: existing ? existing.firstName : t("addMember") }} />
+      <TopBar title={existing ? existing.firstName : t("addMember")} back="close" />
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         <Label>{t("relation")}</Label>
         <View style={styles.wrap}>

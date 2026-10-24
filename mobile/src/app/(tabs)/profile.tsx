@@ -2,16 +2,22 @@ import { useQueryClient } from "@tanstack/react-query";
 import Constants from "expo-constants";
 import { useRouter } from "expo-router";
 import { useState } from "react";
-import { Alert, Linking, ScrollView, StyleSheet, Switch, View } from "react-native";
-import { Card, ListRow, Txt } from "../../components/ui";
-import { saveAppProfile } from "../../lib/api/patient";
+import Ionicons from "@expo/vector-icons/Ionicons";
+import { Alert, Linking, Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { Avatar, Button, Card, ListGroup, ListRow, Logo, ToggleRow, Txt } from "../../components/ui";
+import { ApiError } from "../../lib/api/http";
+import { deleteAccount, saveAppProfile } from "../../lib/api/patient";
+import { useAppearance } from "../../lib/appearance";
 import { useSession } from "../../lib/auth/session";
+import { relationLabel } from "../../lib/booking";
 import { config } from "../../lib/config";
 import { syncDevice } from "../../lib/device";
 import { useI18n } from "../../lib/i18n";
 import { LOCALES } from "../../lib/i18n/types";
 import { keys, useAppProfile, useFamily, useProfile } from "../../lib/queries";
-import { colors, space } from "../../lib/theme";
+import { contactSupport } from "../../lib/support";
+import { colors, space, TINT_ORDER } from "../../lib/theme";
 
 export default function ProfileScreen() {
   const router = useRouter();
@@ -22,12 +28,13 @@ export default function ProfileScreen() {
   const app = useAppProfile();
   const family = useFamily();
   const [reminders, setReminders] = useState<boolean | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const { bigText, setBigText } = useAppearance();
   const remindersOn = reminders ?? app.data?.remindersOptIn ?? false;
 
   const p = profile.data;
   const name = [p?.firstName, p?.lastName].filter(Boolean).join(" ") || p?.fullName || "";
   const ageSex = [p?.age != null ? `${p.age}${p.ageUnit && p.ageUnit !== "Y" ? p.ageUnit.toLowerCase() : ""}` : "", p?.sex].filter(Boolean).join(" · ");
-  const memberCount = family.data?.members?.length ?? 0;
 
   async function toggleReminders(on: boolean) {
     setReminders(on);
@@ -43,64 +50,115 @@ export default function ProfileScreen() {
     ]);
   }
 
+  // Two steps on purpose: the row, then a sheet that says exactly what goes and what stays.
+  function confirmDelete() {
+    Alert.alert(t("deleteAccount"), t("deleteAccountConfirm"), [
+      { text: t("cancel"), style: "cancel" },
+      {
+        text: t("deleteAccountFinal"),
+        style: "destructive",
+        onPress: async () => {
+          setDeleting(true);
+          try {
+            await deleteAccount();
+            await signOut({ serverRevoked: true });
+          } catch (e) {
+            const tooMany = e instanceof ApiError && e.status === 429;
+            Alert.alert(t("deleteAccount"), tooMany ? (e as ApiError).message : t("deleteAccountFailed"));
+          } finally {
+            setDeleting(false);
+          }
+        },
+      },
+    ]);
+  }
+
+  const members = family.data?.members ?? [];
+  const max = family.data?.max ?? 10;
+
   return (
-    <ScrollView style={{ backgroundColor: colors.bg }} contentContainerStyle={styles.content}>
-      <Card onPress={() => router.push("/profile/about")} style={styles.me}>
-        <View style={styles.avatar}>
-          <Txt variant="title" color="#fff">
-            {(name[0] ?? "?").toUpperCase()}
-          </Txt>
+    <SafeAreaView edges={["top"]} style={{ flex: 1, backgroundColor: colors.bg }}>
+      <ScrollView contentContainerStyle={styles.content}>
+        <View style={{ alignItems: "flex-end" }}>
+          <Logo height={30} />
         </View>
-        <View style={{ flex: 1, marginLeft: space.md }}>
-          <Txt variant="heading" numberOfLines={1}>
-            {name || t("personalInfo")}
-          </Txt>
-          <Txt color={colors.muted}>{[mobile ? `+91 ${mobile}` : "", ageSex].filter(Boolean).join(" · ")}</Txt>
+
+        <View style={styles.me}>
+          <Avatar initials={(name[0] ?? "?").toUpperCase()} size={64} tint="teal" />
+          <View style={{ flex: 1, minWidth: 0 }}>
+            <Txt variant="title" numberOfLines={1} style={{ fontSize: 22 }}>
+              {name || t("personalInfo")}
+            </Txt>
+            <Txt variant="small" color={colors.muted} numberOfLines={2}>
+              {[mobile ? `+91 ${mobile}` : "", ageSex].filter(Boolean).join(" · ")}
+            </Txt>
+          </View>
+          <Button label={t("edit")} variant="secondary" size="sm" onPress={() => router.push("/profile/about")} />
         </View>
-      </Card>
 
-      <View style={styles.group}>
-        <ListRow icon="person" label={t("personalInfo")} onPress={() => router.push("/profile/about")} />
-        <ListRow icon="people" label={t("family")} value={memberCount ? String(memberCount) : undefined} onPress={() => router.push("/profile/family")} />
-        <ListRow icon="language" label={t("language")} value={LOCALES.find((l) => l.code === locale)?.nativeLabel} onPress={() => router.push("/profile/language")} />
-      </View>
-
-      <Card style={styles.switchRow}>
-        <View style={{ flex: 1, marginRight: space.md }}>
-          <Txt variant="bodyBold">{t("reminders")}</Txt>
-          <Txt variant="small" color={colors.muted}>
-            {t("remindersHint")}
+        <Card style={{ gap: space.md }}>
+          <View style={{ flexDirection: "row", alignItems: "baseline", justifyContent: "space-between", gap: space.sm }}>
+            <Txt variant="subheading">{t("family")}</Txt>
+            <Pressable onPress={() => router.push("/profile/family")} hitSlop={10} accessibilityRole="button">
+              <Txt variant="smallBold" color={colors.primary}>
+                {t("manage")}
+              </Txt>
+            </Pressable>
+          </View>
+          <Txt variant="small" color={colors.muted} style={{ marginTop: -space.sm, fontSize: 13 }}>
+            {t("familyHint")}
           </Txt>
-        </View>
-        <Switch value={remindersOn} onValueChange={toggleReminders} trackColor={{ true: colors.primary, false: colors.line }} thumbColor="#fff" />
-      </Card>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: space.md }}>
+            {members.map((m, i) => (
+              <Pressable key={m.memberId} onPress={() => router.push({ pathname: "/profile/member", params: { id: m.memberId } })} accessibilityRole="button" style={styles.member}>
+                <Avatar initials={(m.firstName[0] ?? "?").toUpperCase()} tint={TINT_ORDER[(i + 1) % TINT_ORDER.length]} size={56} />
+                <Txt variant="smallBold" numberOfLines={1}>
+                  {m.firstName}
+                </Txt>
+                <Txt variant="tiny" color={colors.muted} numberOfLines={1}>
+                  {relationLabel(t, m.relation)}
+                </Txt>
+              </Pressable>
+            ))}
+            {members.length < max ? (
+              <Pressable onPress={() => router.push("/profile/member")} accessibilityRole="button" accessibilityLabel={t("addMember")} style={styles.member}>
+                <View style={styles.addCircle}>
+                  <Ionicons name="add" size={24} color={colors.primary} />
+                </View>
+                <Txt variant="smallBold" color={colors.primary}>
+                  {t("add")}
+                </Txt>
+              </Pressable>
+            ) : null}
+          </ScrollView>
+        </Card>
 
-      <View style={styles.group}>
-        <ListRow
-          icon="logo-whatsapp"
-          label={t("chatOnWhatsApp")}
-          onPress={() => void Linking.openURL(`https://wa.me/${config.whatsappNumber}?text=${encodeURIComponent("Hi Doctor Dekho")}`)}
-        />
-        <ListRow icon="mail" label={t("helpSupport")} value={config.supportEmail} onPress={() => void Linking.openURL(`mailto:${config.supportEmail}`)} />
-        <ListRow icon="shield-checkmark" label={t("privacy")} onPress={() => void Linking.openURL(`${config.businessUrl}/privacy`)} />
-        <ListRow icon="document-text" label={t("terms")} onPress={() => void Linking.openURL(`${config.businessUrl}/terms`)} />
-      </View>
+        <ListGroup>
+          <ListRow first icon="language-outline" label={t("language")} value={LOCALES.find((l) => l.code === locale)?.nativeLabel} onPress={() => router.push("/profile/language")} />
+          <ToggleRow icon="notifications-outline" label={t("visitReminders")} value={remindersOn} onChange={toggleReminders} />
+          <ToggleRow icon="text-outline" label={t("biggerText")} value={bigText} onChange={setBigText} />
+          <ListRow icon="logo-whatsapp" label={t("helpOnWhatsApp")} onPress={() => contactSupport("whatsapp", t("helpMessage"))} />
+          <ListRow icon="call-outline" label={t("callUs")} onPress={() => contactSupport("call")} />
+          <ListRow icon="shield-checkmark-outline" label={t("privacy")} onPress={() => void Linking.openURL(`${config.businessUrl}/privacy`)} />
+          <ListRow icon="document-text-outline" label={t("terms")} onPress={() => void Linking.openURL(`${config.businessUrl}/terms`)} />
+        </ListGroup>
 
-      <View style={styles.group}>
-        <ListRow icon="log-out" label={t("signOut")} danger onPress={confirmSignOut} />
-      </View>
+        <ListGroup>
+          <ListRow first icon="log-out-outline" label={t("signOut")} onPress={confirmSignOut} />
+          <ListRow icon="trash-outline" label={deleting ? t("loading") : t("deleteAccount")} danger onPress={deleting ? undefined : confirmDelete} />
+        </ListGroup>
 
-      <Txt variant="tiny" color={colors.faint} style={{ textAlign: "center" }}>
-        {t("appVersion", { version: Constants.expoConfig?.version ?? "1.0.0" })}
-      </Txt>
-    </ScrollView>
+        <Txt variant="tiny" color={colors.muted} center>
+          {t("appVersion", { version: Constants.expoConfig?.version ?? "1.0.0" })}
+        </Txt>
+      </ScrollView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  content: { padding: space.lg, gap: space.lg, paddingBottom: space.xxl },
-  me: { flexDirection: "row", alignItems: "center" },
-  avatar: { width: 56, height: 56, borderRadius: 28, backgroundColor: colors.primary, alignItems: "center", justifyContent: "center" },
-  group: { backgroundColor: colors.card, borderRadius: 16, borderWidth: 1, borderColor: colors.line, overflow: "hidden" },
-  switchRow: { flexDirection: "row", alignItems: "center" },
+  content: { padding: space.lg, paddingTop: space.md, gap: space.lg, paddingBottom: space.xxl },
+  me: { flexDirection: "row", alignItems: "center", gap: space.md + 2, paddingHorizontal: 4 },
+  member: { width: 72, alignItems: "center", gap: 4 },
+  addCircle: { width: 56, height: 56, borderRadius: 28, borderWidth: 1.5, borderStyle: "dashed", borderColor: "#9FB0A8", alignItems: "center", justifyContent: "center" },
 });
