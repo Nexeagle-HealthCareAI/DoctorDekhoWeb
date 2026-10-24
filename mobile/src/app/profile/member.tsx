@@ -6,7 +6,7 @@ import { KeyboardScreen } from "../../components/KeyboardScreen";
 import { Banner, Button, Chip, Field, Label, TopBar } from "../../components/ui";
 import { ApiError } from "../../lib/api/http";
 import { deleteFamilyMember, saveFamilyMember } from "../../lib/api/patient";
-import type { AgeUnit, Sex } from "../../lib/api/types";
+import type { AgeUnit, FamilyResponse, Sex } from "../../lib/api/types";
 import { RELATIONS, relationLabel } from "../../lib/booking";
 import { useI18n } from "../../lib/i18n";
 import { keys, useFamily } from "../../lib/queries";
@@ -61,7 +61,17 @@ export default function MemberScreen() {
         existing?.memberId,
       );
       if (!r.success) throw new ApiError(r.message || t("retry"), 400, r);
-      qc.setQueryData(keys.family, r);
+      // The save reply carries only the saved member (its list is empty), so merge it into the cached list
+      // rather than replacing the list with the reply, then reload the list from the server.
+      const saved = r.member;
+      if (saved) {
+        qc.setQueryData<FamilyResponse>(keys.family, (old) => {
+          const members = old?.members ?? [];
+          const i = members.findIndex((m) => m.memberId === saved.memberId);
+          return { ...(old ?? { success: true }), members: i >= 0 ? members.map((m, j) => (j === i ? saved : m)) : [...members, saved] };
+        });
+      }
+      void qc.invalidateQueries({ queryKey: keys.family });
       router.back();
     } catch (e) {
       setError(e instanceof ApiError && !e.isNetwork ? e.message : t("retry"));
@@ -80,7 +90,10 @@ export default function MemberScreen() {
         onPress: async () => {
           try {
             const r = await deleteFamilyMember(existing.memberId);
-            qc.setQueryData(keys.family, r);
+            if (!r.success) throw new Error(r.message || t("retry"));
+            // The delete reply has no list either: drop the member locally, then reload.
+            qc.setQueryData<FamilyResponse>(keys.family, (old) => (old ? { ...old, members: (old.members ?? []).filter((m) => m.memberId !== existing.memberId) } : old));
+            void qc.invalidateQueries({ queryKey: keys.family });
             void qc.invalidateQueries({ queryKey: keys.locker });
             router.back();
           } catch (e) {
