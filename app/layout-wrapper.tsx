@@ -4,6 +4,7 @@ import { usePathname } from "next/navigation";
 import PatientBottomNav from "@/components/patient/PatientBottomNav";
 import InstallPrompt from "@/components/patient/InstallPrompt";
 import ChatWidget from "@/components/patient/ChatWidget";
+import LocationDetector from "@/components/patient/LocationDetector";
 import ConsentBanner from "@/components/ConsentBanner";
 
 // Every route on this site is the patient portal, and each page renders its own PatientTopBar /
@@ -27,6 +28,8 @@ export default function LayoutWrapper({
       {!pathname.startsWith("/admin") && <ConsentBanner />}
       {!isBare && (
         <>
+          {/* Takes the location by default for the whole site; the home page and Vita share it. */}
+          <LocationDetector />
           <PatientBottomNav />
           <InstallPrompt />
           <ChatWidget />

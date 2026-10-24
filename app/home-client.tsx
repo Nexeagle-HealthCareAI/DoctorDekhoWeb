@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { useCallback, useMemo, useState, type ReactNode } from "react";
 import { MessageCircle } from "lucide-react";
 import AnalyticsTracker from "@/components/AnalyticsTracker";
 import PatientTopBar from "@/components/patient/PatientTopBar";
@@ -10,7 +10,7 @@ import DoctorDirectory from "@/components/patient/DoctorDirectory";
 import PatientFooter from "@/components/patient/PatientFooter";
 import { CITIES, cityId as makeCityId, type CityOption, type Doctor } from "@/data/patient";
 import { useDoctors } from "@/lib/api/hooks";
-import { useGeolocatedCity } from "@/lib/geo";
+import { detectAgain, setLocation, useSharedLocation } from "@/lib/location/store";
 import { useTranslation } from "@/lib/i18n/I18nContext";
 
 interface HomeClientProps {
@@ -66,46 +66,34 @@ export default function HomeClient({
     return map.size > 0 ? Array.from(map.values()) : CITIES;
   }, [doctorsData]);
 
-  const [city, setCity] = useState<CityOption | null>(() => {
-    if (initialCityId) {
-      return dynamicCities.find(c => c.id === initialCityId) || null;
-    }
-    return null;
-  });
-  const [userPicked, setUserPicked] = useState(false);
-  const geo = useGeolocatedCity(dynamicCities);
-
-  // Business's primary market — the default city whenever geolocation isn't available
-  // (denied or unsupported), instead of leaving the search unscoped with only an "Allow
-  // Location" prompt as the way forward. A visitor who declines location still lands on a
-  // locally-relevant, pre-filtered result set rather than an empty/generic "All India" one.
-  const defaultCity = useMemo(
-    () => dynamicCities.find((c) => c.name === "Purnea") ?? null,
-    [dynamicCities]
+  // The location is shared with the whole site (see src/lib/location/store.ts): detected by default
+  // in the layout, and a city picked here shows in the Vita chat, and the other way round. A page made
+  // for one city (/specialties/{specialty}/{city}) shows that city until the patient changes it.
+  const shared = useSharedLocation();
+  const [pageCity, setPageCity] = useState<CityOption | null>(() =>
+    initialCityId ? dynamicCities.find((c) => c.id === initialCityId) ?? null : null
   );
-
-  // Auto-adopt geo city once resolved (unless user already picked manually); fall back to
-  // the default city once geolocation is known to be unavailable, rather than staying unset.
-  useEffect(() => {
-    if (userPicked) return;
-    if (geo.status === "found" && geo.city) {
-      setCity(geo.city);
-    } else if ((geo.status === "denied" || geo.status === "unsupported") && defaultCity) {
-      setCity(defaultCity);
-    }
-  }, [geo.status, geo.city, userPicked, defaultCity]);
+  const sharedCity = useMemo(
+    () => (shared.city ? dynamicCities.find((c) => c.id === shared.city?.id) ?? shared.city : null),
+    [shared.city, dynamicCities]
+  );
+  const city = pageCity ?? sharedCity;
+  const userPicked = pageCity !== null || shared.source === "picked";
+  const geo = {
+    status: shared.status,
+    coords: shared.coords ? { lat: shared.coords.lat, lon: shared.coords.lng } : null,
+  };
 
   function handleCityChange(next: CityOption | null) {
-    setUserPicked(true);
-    setCity(next);
+    setPageCity(null);
+    setLocation({ city: next }, "picked");
   }
 
-  // Re-trigger geolocation when user clicks "Allow Location"
+  // "Allow Location": detect again, and let the result replace a picked city.
   const handleRequestLocation = useCallback(() => {
-    // Reset picked flag so geo result can apply
-    setUserPicked(false);
-    geo.retry();
-  }, [geo]);
+    setPageCity(null);
+    void detectAgain();
+  }, []);
 
   // Search + specialty state (shared between Hero and Directory)
   const [query, setQuery] = useState(initialQuery);

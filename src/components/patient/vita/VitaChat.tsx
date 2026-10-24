@@ -122,7 +122,7 @@ export default function VitaChat({ chat, onClose }: { chat: VitaChatState; onClo
     setHint("vita.inputPlaceholderVoice");
   };
 
-  const place = chat.coords ? t("vita.locationShared") : chat.city || t("vita.locationNone");
+  const place = chat.city || (chat.coords ? t("vita.locationShared") : t("vita.locationNone"));
 
   return (
     <div className="flex min-h-0 flex-1 flex-col bg-[#EEF4F3]">
@@ -360,7 +360,7 @@ function LocationPrompt({ chat, answering, onDone }: {
       at = null;
     }
     setWorking(false);
-    chat.setCity(v);
+    chat.setCity(v, at ? { lat: at[1], lng: at[0] } : null);
     onDone();
     if (answering) void chat.send(v, {}, at ? { lat: at[1], lng: at[0], city: v } : { city: v });
   };
