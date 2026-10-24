@@ -3,20 +3,21 @@
 import { useEffect, useState } from "react";
 import Image from "next/image";
 import { AnimatePresence, motion } from "framer-motion";
-import { MessageCircle, X, ArrowUpRight } from "lucide-react";
+import { MessageCircle, X } from "lucide-react";
 import { usePatientAuth } from "@/hooks/usePatientAuth";
 import { useVitaChat } from "@/hooks/useVitaChat";
 import { trackEvent } from "@/lib/analytics";
 import { getChatGreeting } from "@/lib/chatEngine";
+import Eagle from "@/components/patient/vita/Eagle";
 import { useTranslation } from "@/lib/i18n/I18nContext";
 import { launcherMood, POSE } from "@/lib/vita/mood";
 import VitaChat from "@/components/patient/vita/VitaChat";
 
-// The chat button on every patient page, and the chat panel it opens.
-// With Vita on (the server says so: /api/vita/chat GET), the button is the eagle -- resting in the
-// corner, flying in once on a first visit with one line of welcome, asleep after the patient said
-// goodbye -- and the panel is Vita. With Vita off, both are the earlier WhatsApp hand-off.
-// The conversation lives here, so closing and reopening the panel keeps it.
+// The "Ask Vita" button on every patient page, and the chat panel it opens. The button is always the
+// eagle -- resting in the corner, flying in once on a first visit with one line of welcome, asleep after
+// the patient said goodbye -- with an "Ask Vita" label. The panel is Vita; only when the server says
+// the router cannot serve Vita yet (/api/vita/chat GET) does it show a short Vita "getting ready"
+// note with WhatsApp and the directory instead. The conversation lives here, so closing keeps it.
 
 const SEEN_KEY = "vita_seen";
 const NUDGE_DELAY_MS = 2500;
@@ -43,7 +44,8 @@ export default function ChatWidget() {
   const { t } = useTranslation();
   const [isOpen, setIsOpen] = useState(false);
   const [hasOpenedOnce, setHasOpenedOnce] = useState(false);
-  // null = not known yet; Vita replaces the WhatsApp hand-off only when the server says it is on.
+  // null = not checked yet. Only an explicit "not ready" from the server changes the panel; the button
+  // is always Vita.
   const [vitaOn, setVitaOn] = useState<boolean | null>(null);
   const [nudge, setNudge] = useState(false);
   const chat = useVitaChat();
@@ -55,7 +57,9 @@ export default function ChatWidget() {
     }
   }, [isOpen, hasOpenedOnce]);
 
-  // Ask once, shortly after the page settles, whether Vita is on (it decides the button's look).
+  // Ask, shortly after the page settles, whether the router can serve Vita; ask again on each open
+  // while it could not, so a fix on the server shows without a reload.
+  const [checks, setChecks] = useState(0);
   useEffect(() => {
     let live = true;
     const timer = setTimeout(() => {
@@ -63,17 +67,17 @@ export default function ChatWidget() {
         .then((r) => (r.ok ? r.json() : { enabled: false }))
         .then((d: { enabled?: boolean }) => live && setVitaOn(Boolean(d.enabled)))
         .catch(() => live && setVitaOn(false));
-    }, 800);
+    }, checks === 0 ? 800 : 0);
     return () => {
       live = false;
       clearTimeout(timer);
     };
-  }, []);
+  }, [checks]);
 
   // First visit only: the eagle flies in with one line, then lands. Never again after it was seen or
   // the chat was opened.
   useEffect(() => {
-    if (!vitaOn || isOpen || seenBefore()) return;
+    if (vitaOn === false || isOpen || seenBefore()) return;
     const show = setTimeout(() => setNudge(true), NUDGE_DELAY_MS);
     const hide = setTimeout(() => {
       setNudge(false);
@@ -90,6 +94,7 @@ export default function ChatWidget() {
     if (value) {
       setNudge(false);
       markSeen();
+      if (vitaOn === false) setChecks((n) => n + 1);
     }
   };
 
@@ -100,7 +105,7 @@ export default function ChatWidget() {
   return (
     <>
       <AnimatePresence>
-        {vitaOn && nudge && !isOpen && (
+        {nudge && !isOpen && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -119,30 +124,29 @@ export default function ChatWidget() {
         )}
       </AnimatePresence>
 
+      {!isOpen && !nudge && (
+        <button type="button" onClick={() => open(true)} tabIndex={-1} aria-hidden="true"
+          className="fixed z-50 bottom-[calc(4rem+1.75rem)] right-[5.25rem] md:bottom-[2.25rem] md:right-[6.25rem] rounded-full bg-[#0B4F4A] px-3.5 py-1.5 text-sm font-bold text-white shadow-[0_4px_12px_rgba(11,79,74,0.3)]">
+          {t("vita.ask")}
+        </button>
+      )}
+
       <motion.button
         type="button"
         onClick={() => open(!isOpen)}
         whileTap={{ scale: 0.94 }}
-        aria-label={isOpen ? t("vita.close") : t("vita.open")}
+        aria-label={isOpen ? t("vita.close") : t("vita.ask")}
         aria-expanded={isOpen}
-        className={`fixed z-50 bottom-[calc(4rem+1rem)] right-4 md:bottom-6 md:right-6 flex items-center justify-center overflow-hidden rounded-full active:scale-95 transition-transform ${
-          vitaOn
-            ? "h-16 w-16 border-[3px] border-white bg-[#0B4F4A] shadow-[0_6px_18px_rgba(11,79,74,0.35)]"
-            : "h-14 w-14 bg-[#25D366] text-white shadow-[0_8px_24px_rgba(37,211,102,0.4)] hover:brightness-105"
-        }`}
+        className="fixed z-50 bottom-[calc(4rem+1rem)] right-4 md:bottom-6 md:right-6 flex h-16 w-16 items-center justify-center overflow-hidden rounded-full border-[3px] border-white bg-[#0B4F4A] shadow-[0_6px_18px_rgba(11,79,74,0.35)] active:scale-95 transition-transform"
       >
         <AnimatePresence mode="wait" initial={false}>
           {isOpen ? (
             <motion.span key="close" initial={{ opacity: 0, rotate: -45 }} animate={{ opacity: 1, rotate: 0 }} exit={{ opacity: 0, rotate: 45 }} className="text-white">
               <X className="h-6 w-6" />
             </motion.span>
-          ) : vitaOn ? (
+          ) : (
             <motion.span key={launcher} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="flex h-full w-full items-end justify-center">
               <Image src={POSE[launcher]} alt="" width={60} height={56} aria-hidden="true" className="h-[56px] w-[60px] object-contain" />
-            </motion.span>
-          ) : (
-            <motion.span key="chat" initial={{ opacity: 0, rotate: 45 }} animate={{ opacity: 1, rotate: 0 }} exit={{ opacity: 0, rotate: -45 }}>
-              <MessageCircle className="h-6 w-6" />
             </motion.span>
           )}
         </AnimatePresence>
@@ -156,46 +160,48 @@ export default function ChatWidget() {
             exit={{ opacity: 0, y: 16, scale: 0.96 }}
             transition={{ type: "spring", stiffness: 260, damping: 24 }}
             role="dialog"
-            aria-label={vitaOn ? t("vita.title") : "Doctor Dekho Assistant"}
+            aria-label={t("vita.title")}
             className="fixed z-50 bottom-[calc(4rem+5.75rem)] right-4 md:bottom-[6.5rem] md:right-6 w-[calc(100vw-2rem)] max-w-sm h-[75svh] md:h-[min(680px,78svh)] rounded-3xl bg-white shadow-[0_16px_48px_rgba(0,0,0,0.18)] border border-slate-200/70 overflow-hidden flex flex-col"
           >
-            {vitaOn ? (
-              <VitaChat chat={chat} onClose={() => open(false)} />
+            {vitaOn === false ? (
+              <VitaGettingReady whatsappUrl={greeting.whatsappUrl} onClose={() => open(false)} />
             ) : (
-              <>
-                <div className="flex items-center gap-3 px-4 py-3 bg-[#075E54] text-white shrink-0">
-                  <div className="relative h-9 w-9 rounded-full bg-white/15 flex items-center justify-center">
-                    <MessageCircle className="h-5 w-5" />
-                    <span className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full bg-[#25D366] border-2 border-[#075E54]" />
-                  </div>
-                  <div className="flex-1">
-                    <p className="text-sm font-semibold leading-tight text-white">Doctor Dekho Assistant</p>
-                    <p className="text-xs text-white/70 leading-tight">Online</p>
-                  </div>
-                  <button type="button" onClick={() => open(false)} aria-label={t("vita.close")} className="p-2 rounded-full hover:bg-white/10">
-                    <X className="h-4 w-4" />
-                  </button>
-                </div>
-                <div className="px-4 py-5 bg-[#ECE5DD] flex flex-col gap-4 overflow-y-auto">
-                  <div className="max-w-[92%] rounded-2xl rounded-tl-sm bg-white px-3.5 py-2.5 text-sm text-slate-800 shadow-sm whitespace-pre-line leading-relaxed">
-                    {greeting.text}
-                  </div>
-                  <a
-                    href={greeting.whatsappUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    onClick={() => trackEvent("chat_whatsapp_handoff")}
-                    className="sticky bottom-0 inline-flex items-center justify-center gap-2 rounded-full bg-[#25D366] px-4 py-3 text-sm font-semibold text-white shadow-sm hover:brightness-105 active:scale-[0.98] transition-transform"
-                  >
-                    {greeting.ctaLabel}
-                    <ArrowUpRight className="h-4 w-4" />
-                  </a>
-                </div>
-              </>
+              <VitaChat chat={chat} onClose={() => open(false)} />
             )}
           </motion.div>
         )}
       </AnimatePresence>
     </>
+  );
+}
+
+/** Shown only when the server says the router cannot serve Vita yet: still Vita, with a way forward. */
+function VitaGettingReady({ whatsappUrl, onClose }: { whatsappUrl: string; onClose: () => void }) {
+  const { t } = useTranslation();
+  return (
+    <div className="flex min-h-0 flex-1 flex-col bg-[#EEF4F3]">
+      <header className="flex shrink-0 items-center gap-3 bg-[#0B4F4A] px-4 py-3 text-white">
+        <div className="flex h-11 w-11 shrink-0 items-end justify-center overflow-hidden rounded-full bg-[#E3EFEC]">
+          <Eagle mood="relaxed" size={40} />
+        </div>
+        <p className="min-w-0 flex-1 text-[17px] font-extrabold leading-tight text-white">{t("vita.title")}</p>
+        <button type="button" onClick={onClose} aria-label={t("vita.close")}
+          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full hover:bg-white/10">
+          <X className="h-5 w-5" aria-hidden="true" />
+        </button>
+      </header>
+      <div className="flex flex-1 flex-col items-center justify-center gap-3 px-6 text-center">
+        <Eagle mood="relaxed" size={128} />
+        <h2 className="text-xl font-extrabold text-[#10302D]">{t("vita.offlineTitle")}</h2>
+        <p className="text-sm leading-snug text-[#3D5A57]">{t("vita.offlineBody")}</p>
+        <a href={whatsappUrl} target="_blank" rel="noopener noreferrer" onClick={() => trackEvent("chat_whatsapp_handoff")}
+          className="mt-1 inline-flex min-h-[48px] w-full items-center justify-center gap-2 rounded-2xl bg-[#25D366] px-4 text-[15px] font-bold text-white">
+          <MessageCircle className="h-5 w-5" aria-hidden="true" /> {t("vita.whatsapp")}
+        </a>
+        <a href="/" className="inline-flex min-h-[44px] items-center text-sm font-semibold text-[#0B5E57] hover:underline">
+          {t("vita.browseDirectory")}
+        </a>
+      </div>
+    </div>
   );
 }
