@@ -1,8 +1,10 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import {
-  Activity, AlertTriangle, GraduationCap, LocateFixed, MapPin, MessageCircle, Mic, Send, Square, Stethoscope, User as UserRound, X,
+  Activity, AlertTriangle, ArrowDown, ChevronDown, GraduationCap, History, LocateFixed, MapPin, Maximize2, MessageCircle, Mic,
+  Minimize2, MoreVertical, RotateCcw, Send, Square, Stethoscope, User as UserRound, Volume2, X,
 } from "lucide-react";
 import { useVitaChat, type VitaEntry } from "@/hooks/useVitaChat";
 import { useSpeechInput } from "@/hooks/useSpeechInput";
@@ -13,10 +15,19 @@ import type { TranslationKey } from "@/lib/i18n/dictionaries/en";
 import { textWithout } from "@/lib/vita/filters";
 import { geocodeAddress } from "@/lib/navigation";
 import { WHATSAPP_BUSINESS_NUMBER } from "@/lib/site";
-import VitaReplyView, { type ReplyActions } from "@/components/patient/vita/VitaReplyView";
+import VitaReplyView, { type ReplyActions, type ReplySpeech } from "@/components/patient/vita/VitaReplyView";
+import { doctorHref } from "@/components/patient/vita/VitaDoctorCard";
+import { useSpeechOutput } from "@/hooks/useSpeechOutput";
+import { TEXT_ZOOM, useVitaPrefs, type TextSize, type VitaPrefs } from "@/lib/vita/prefs";
+import { addRecent, clearRecent, loadRecent } from "@/lib/vita/memory";
+import { REFINE_LABEL, refinePhrase, suggest } from "@/lib/vita/refine";
+import { LOCALES, type Locale } from "@/lib/i18n/types";
+import { trackEvent } from "@/lib/analytics";
 
-// The Vita chat panel (UI-1 to UI-8): header with the eagle's current mood, the welcome home, the
-// conversation, the location prompt and the message box (type or speak). The conversation state comes
+// The Vita chat panel (UI-1 to UI-8): header with the eagle, the place chip, the options menu (new chat,
+// language, text size, read aloud, a person); the welcome home with recent searches; the conversation
+// (each new reply read from its start, a "latest" pill when scrolled up, the chosen doctor pinned); the
+// location prompt; suggestions while typing; and the message box (type or speak). The conversation state comes
 // from the widget (useVitaChat), so closing the panel keeps it. Moods: src/lib/vita/mood.ts.
 
 // Words sent for the specialty shortcuts: the router reads them like anything a patient types.
@@ -46,22 +57,45 @@ const MOOD_STATUS: Record<VitaMood, TranslationKey> = {
   emergency: "vita.statusEmergency",
 };
 
-export default function VitaChat({ chat, onClose }: { chat: VitaChatState; onClose?: () => void }) {
-  const { t, locale } = useTranslation();
+export default function VitaChat({ chat, onClose, expanded = false, onToggleExpand }: {
+  chat: VitaChatState;
+  onClose?: () => void;
+  /** Desktop only: the panel is in its bigger size. */
+  expanded?: boolean;
+  onToggleExpand?: () => void;
+}) {
+  const { t, locale, setLocale } = useTranslation();
   const [draft, setDraft] = useState("");
   const [hint, setHint] = useState<TranslationKey>("vita.inputPlaceholderVoice");
   const [showSpecialties, setShowSpecialties] = useState(false);
   const [editingPlace, setEditingPlace] = useState(false);
   const [waitedLong, setWaitedLong] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [awayFromEnd, setAwayFromEnd] = useState(false);
+  const [pinHidden, setPinHidden] = useState(false);
+  const [votes, setVotes] = useState<Record<number, boolean>>({});
   const inputRef = useRef<HTMLInputElement>(null);
+  const logRef = useRef<HTMLDivElement>(null);
   const endRef = useRef<HTMLDivElement>(null);
   const speech = useSpeechInput(locale, (text) => setDraft(text));
+  const voice = useSpeechOutput();
+  const { prefs, update } = useVitaPrefs();
+  const spokenId = useRef<number | null>(null);
 
-  // Follow the conversation; the home screen stays at its top so the welcome eagle is seen.
+  // Where to look after each change: a new Vita reply is read from its start (its message and filter
+  // chips first, then the cards); while waiting, or after the patient's own message, the end.
   useEffect(() => {
     if (chat.entries.length === 0 && !chat.busy) return;
+    const lastEntry = chat.entries.at(-1);
+    if (!chat.busy && lastEntry?.role === "vita") {
+      const el = logRef.current?.querySelector<HTMLElement>(`[data-entry="${lastEntry.id}"]`);
+      if (el?.scrollIntoView) {
+        el.scrollIntoView({ block: "start" });
+        return;
+      }
+    }
     endRef.current?.scrollIntoView?.({ block: "end" });
-  }, [chat.entries.length, chat.busy, waitedLong]);
+  }, [chat.entries, chat.busy, waitedLong]);
 
   // "thinking" for a short beat, then "working" once the wait feels like a search
   useEffect(() => {
@@ -73,16 +107,47 @@ export default function VitaChat({ chat, onClose }: { chat: VitaChatState; onClo
     return () => clearTimeout(timer);
   }, [chat.busy]);
 
+  // Read each new reply aloud when the patient turned that on; never the ones already on screen when
+  // the panel opened (a restored conversation).
+  useEffect(() => {
+    const lastEntry = chat.entries.at(-1);
+    if (!lastEntry) {
+      spokenId.current = null;
+      return;
+    }
+    if (spokenId.current === null) {
+      spokenId.current = lastEntry.id;
+      if (chat.entries.length > 1 || lastEntry.role !== "user") return;
+    }
+    if (lastEntry.id === spokenId.current && lastEntry.role !== "user") return;
+    spokenId.current = lastEntry.id;
+    if (prefs.readAloud && lastEntry.role === "vita" && lastEntry.reply) {
+      voice.speak(lastEntry.id, lastEntry.reply.message, lastEntry.reply.language);
+    }
+  }, [chat.entries, prefs.readAloud, voice]);
+
   const last = chat.entries.at(-1);
   const mood = chatMood({ last, busy: chat.busy, waitedMs: waitedLong ? WORKING_AFTER_MS : 0 });
   const emergency = mood === "emergency";
   const latestVita = [...chat.entries].reverse().find((e) => e.role === "vita");
-  const chosenId = [...chat.entries].reverse().find((e) => e.reply?.kind === "doctor_selected")?.reply?.selectedDoctorId ?? null;
+  const selectedEntry = [...chat.entries].reverse().find((e) => e.reply?.kind === "doctor_selected");
+  const chosenId = selectedEntry?.reply?.selectedDoctorId ?? null;
+  const chosenDoctor = selectedEntry?.reply?.doctor ?? null;
   const askingLocation = latestVita?.reply?.clarify?.kind === "location" && chat.entries.at(-1) === latestVita;
+  const suggestions = draft && !chat.busy ? suggest(draft) : [];
 
   const send = (text: string, shownAs?: string) => {
     setShowSpecialties(false);
     void chat.send(text, { shownAs });
+  };
+
+  const newChat = () => {
+    voice.stop();
+    chat.reset();
+    setMenuOpen(false);
+    setPinHidden(false);
+    setVotes({});
+    setDraft("");
   };
 
   const askKind = (kind: string) => {
@@ -109,6 +174,8 @@ export default function VitaChat({ chat, onClose }: { chat: VitaChatState; onClo
         setShowSpecialties(true);
       }
     },
+    refine: (key, language) => send(refinePhrase(key, language), t(REFINE_LABEL[key])),
+    startOver: newChat,
     askKind,
     retry: chat.retry,
   };
@@ -117,16 +184,24 @@ export default function VitaChat({ chat, onClose }: { chat: VitaChatState; onClo
     e.preventDefault();
     if (!draft.trim()) return;
     if (speech.listening) speech.stop();
+    addRecent(draft);
     send(draft);
     setDraft("");
     setHint("vita.inputPlaceholderVoice");
   };
 
+  const onScroll = () => {
+    const el = logRef.current;
+    if (!el) return;
+    setAwayFromEnd(el.scrollHeight - el.scrollTop - el.clientHeight > 240);
+  };
+
   const place = chat.city || (chat.coords ? t("vita.locationShared") : t("vita.locationNone"));
+  const zoom = TEXT_ZOOM[prefs.textSize];
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col bg-[#EEF4F3]">
-      <header className={`flex shrink-0 items-center gap-3 px-4 py-3 text-white transition-colors ${emergency ? "bg-[#B3141E]" : "bg-[#0B4F4A]"}`}>
+    <div className="relative flex min-h-0 flex-1 flex-col bg-[#EEF4F3]">
+      <header className={`relative flex shrink-0 items-center gap-2.5 px-3 py-2.5 pt-[max(0.625rem,env(safe-area-inset-top))] text-white transition-colors ${emergency ? "bg-[#B3141E]" : "bg-[#0B4F4A]"}`}>
         {emergency ? (
           <AlertTriangle className="h-7 w-7 shrink-0" aria-hidden="true" />
         ) : (
@@ -136,10 +211,28 @@ export default function VitaChat({ chat, onClose }: { chat: VitaChatState; onClo
         )}
         <div className="min-w-0 flex-1">
           <p className="text-[17px] font-extrabold leading-tight text-white">{emergency ? t("vita.statusEmergency") : t("vita.title")}</p>
-          <p className="truncate text-xs leading-tight text-white/80" aria-live="polite">
-            {emergency ? t("directory.emergencyBody") : t(MOOD_STATUS[mood])}
-          </p>
+          {emergency ? (
+            <p className="truncate text-xs leading-tight text-white/80" aria-live="polite">{t("directory.emergencyBody")}</p>
+          ) : (
+            <button type="button" onClick={() => setEditingPlace((v) => !v)} aria-label={t("vita.changeLocation", { place })}
+              className="mt-0.5 inline-flex max-w-full items-center gap-1 rounded-full bg-white/15 px-2 py-0.5 text-xs font-semibold text-white hover:bg-white/25">
+              <MapPin className="h-3 w-3 shrink-0" aria-hidden="true" />
+              <span className="truncate">{place}</span>
+              <ChevronDown className="h-3 w-3 shrink-0" aria-hidden="true" />
+            </button>
+          )}
+          <span className="sr-only" aria-live="polite">{emergency ? "" : t(MOOD_STATUS[mood])}</span>
         </div>
+        {onToggleExpand && (
+          <button type="button" onClick={onToggleExpand} aria-label={expanded ? t("vita.shrink") : t("vita.expand")}
+            className="hidden h-11 w-11 shrink-0 items-center justify-center rounded-full hover:bg-white/10 md:flex">
+            {expanded ? <Minimize2 className="h-5 w-5" aria-hidden="true" /> : <Maximize2 className="h-5 w-5" aria-hidden="true" />}
+          </button>
+        )}
+        <button type="button" onClick={() => setMenuOpen((v) => !v)} aria-label={t("vita.menu")} aria-expanded={menuOpen}
+          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full hover:bg-white/10">
+          <MoreVertical className="h-5 w-5" aria-hidden="true" />
+        </button>
         {onClose && (
           <button type="button" onClick={onClose} aria-label={t("vita.close")}
             className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full hover:bg-white/10">
@@ -148,49 +241,97 @@ export default function VitaChat({ chat, onClose }: { chat: VitaChatState; onClo
         )}
       </header>
 
-      <div role="log" aria-live="polite" aria-relevant="additions" className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-3 py-4">
-        {chat.entries.length === 0 ? (
-          <Home onAsk={askKind} />
-        ) : (
-          <div className="flex items-center gap-2 self-center rounded-full bg-white/70 px-3 py-1 text-xs text-slate-600">
-            <Eagle mood="welcome" size={22} /> {t("vita.homeTitle")}
-          </div>
-        )}
+      {menuOpen && (
+        <ChatMenu
+          onClose={() => setMenuOpen(false)}
+          onNewChat={newChat}
+          locale={locale}
+          setLocale={setLocale}
+          prefs={prefs}
+          update={update}
+          canSpeak={voice.supported}
+          onStopSpeaking={voice.stop}
+        />
+      )}
 
-        {chat.entries.map((e) => (
-          <Entry key={e.id} entry={e} actions={actions} active={e === latestVita} busy={chat.busy} chosenId={chosenId} />
-        ))}
-
-        {showSpecialties && (
-          <div className="flex flex-wrap gap-2" role="group" aria-label={t("vita.chipSpecialty")}>
-            {SPECIALTY_SHORTCUTS.map((s) => (
-              <button key={s.send} type="button" disabled={chat.busy} onClick={() => send(s.send, t(s.key))}
-                className="min-h-[44px] rounded-full border border-[#9CC5BD] bg-white px-4 text-sm font-semibold text-[#0B5E57] hover:bg-emerald-50 disabled:opacity-50">
-                {t(s.key)}
-              </button>
-            ))}
-          </div>
-        )}
-
-        {(askingLocation || editingPlace) && !chat.busy && (
-          <LocationPrompt chat={chat} answering={askingLocation} onDone={() => setEditingPlace(false)} />
-        )}
-
-        {chat.busy && (mood === "working" ? <WorkingCard /> : <ThinkingRow />)}
-        <div ref={endRef} />
-      </div>
-
-      {!emergency && (
-        <div className="flex shrink-0 items-center gap-1.5 border-t border-[#DCE7E4] bg-white px-4 py-1.5 text-xs text-slate-600">
-          <MapPin className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-          <span className="min-w-0 flex-1 truncate">{t("vita.locationLine", { place })}</span>
-          <button type="button" onClick={() => setEditingPlace((v) => !v)} className="min-h-[32px] px-1 font-semibold text-[#0B5E57] hover:underline">
-            {t("vita.change")}
+      {chosenDoctor && !pinHidden && !emergency && latestVita !== selectedEntry && (
+        <div className="flex shrink-0 items-center gap-2 border-b border-[#DCE7E4] bg-white px-3 py-1.5 text-sm">
+          <span className="rounded-full bg-[#E3F2EC] px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide text-[#0B6B4F]">{t("vita.yourDoctor")}</span>
+          <span className="min-w-0 flex-1 truncate font-semibold text-[#10302D]">{chosenDoctor.name}</span>
+          <Link href={`${doctorHref(chosenDoctor)}#book`}
+            className="inline-flex min-h-[36px] shrink-0 items-center rounded-full bg-[#0B5E57] px-3 text-xs font-bold text-white">
+            {t("vita.bookSlot")}
+          </Link>
+          <button type="button" onClick={() => setPinHidden(true)} aria-label={t("vita.hide")}
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-slate-500 hover:bg-slate-100">
+            <X className="h-4 w-4" aria-hidden="true" />
           </button>
         </div>
       )}
 
-      <form onSubmit={submit} className="flex shrink-0 items-center gap-2 border-t border-[#DCE7E4] bg-white px-3 py-2">
+      <div ref={logRef} onScroll={onScroll} role="log" aria-live="polite" aria-relevant="additions"
+        className="flex min-h-0 flex-1 flex-col overflow-y-auto">
+        <div className="flex flex-col gap-3 px-3 py-4" style={{ zoom }}>
+          {chat.entries.length === 0 ? (
+            <Home onAsk={askKind} onRecent={(text) => send(text)} />
+          ) : (
+            <div className="flex items-center gap-2 self-center rounded-full bg-white/70 px-3 py-1 text-xs text-slate-600">
+              <Eagle mood="welcome" size={22} />
+              {chat.restoredAt ? t("vita.earlier", { when: ago(chat.restoredAt, t) }) : t("vita.homeTitle")}
+            </div>
+          )}
+
+          {chat.entries.map((e) => (
+            <div key={e.id} data-entry={e.id} className="scroll-mt-2">
+              <Entry entry={e} actions={actions} active={e === latestVita} busy={chat.busy} chosenId={chosenId}
+                speech={voice.supported ? { speaking: voice.speakingId === e.id, speak: () => e.reply && voice.speak(e.id, e.reply.message, e.reply.language), stop: voice.stop } : undefined}
+                vote={votes[e.id]}
+                onVote={e === latestVita && e.reply ? (helpful) => {
+                  setVotes((v) => ({ ...v, [e.id]: helpful }));
+                  trackEvent("vita_feedback", { metadata: { helpful, kind: e.reply?.kind, clarify: e.reply?.clarify?.kind ?? null, sessionId: e.reply?.session_id, turn: e.reply?.turn, language: e.reply?.language } });
+                } : undefined} />
+            </div>
+          ))}
+
+          {showSpecialties && (
+            <div className="flex flex-wrap gap-2" role="group" aria-label={t("vita.chipSpecialty")}>
+              {SPECIALTY_SHORTCUTS.map((s) => (
+                <button key={s.send} type="button" disabled={chat.busy} onClick={() => send(s.send, t(s.key))}
+                  className="min-h-[44px] rounded-full border border-[#9CC5BD] bg-white px-4 text-sm font-semibold text-[#0B5E57] hover:bg-emerald-50 disabled:opacity-50">
+                  {t(s.key)}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {(askingLocation || editingPlace) && !chat.busy && (
+            <LocationPrompt chat={chat} answering={askingLocation} onDone={() => setEditingPlace(false)} />
+          )}
+
+          {chat.busy && (mood === "working" ? <WorkingCard /> : <ThinkingRow />)}
+          <div ref={endRef} />
+        </div>
+      </div>
+
+      {awayFromEnd && (
+        <button type="button" onClick={() => endRef.current?.scrollIntoView?.({ block: "end", behavior: "smooth" })}
+          className="absolute bottom-[5.5rem] left-1/2 z-10 inline-flex -translate-x-1/2 items-center gap-1 rounded-full bg-[#10302D] px-3 py-1.5 text-xs font-bold text-white shadow-lg">
+          <ArrowDown className="h-3.5 w-3.5" aria-hidden="true" /> {t("vita.latest")}
+        </button>
+      )}
+
+      {suggestions.length > 0 && (
+        <div className="flex shrink-0 gap-1.5 overflow-x-auto border-t border-[#DCE7E4] bg-white px-3 pt-2" role="group" aria-label={t("vita.suggestions")}>
+          {suggestions.map((sg) => (
+            <button key={sg.send} type="button" onClick={() => { addRecent(sg.label[locale]); send(sg.send, sg.label[locale]); setDraft(""); }}
+              className="inline-flex min-h-[36px] shrink-0 items-center rounded-full border border-[#9CC5BD] bg-[#F3F8F7] px-3 text-[13px] font-semibold text-[#0B5E57]">
+              {sg.label[locale]}
+            </button>
+          ))}
+        </div>
+      )}
+
+      <form onSubmit={submit} className="flex shrink-0 items-center gap-2 border-t border-[#DCE7E4] bg-white px-3 py-2 pb-[max(0.5rem,env(safe-area-inset-bottom))]">
         <input
           ref={inputRef}
           value={draft}
@@ -198,7 +339,7 @@ export default function VitaChat({ chat, onClose }: { chat: VitaChatState; onClo
           placeholder={speech.listening ? t("vita.listening") : hint === "vita.inputPlaceholderVoice" && !speech.supported ? t("vita.inputPlaceholder") : t(hint)}
           aria-label={t("vita.inputLabel")}
           maxLength={1000}
-          className="min-h-[48px] min-w-0 flex-1 rounded-full border border-[#C9DAD6] bg-[#F7FAF9] px-4 text-[15px] text-slate-900 placeholder:text-slate-500 focus:border-[#0B5E57] focus:outline-none"
+          className="min-h-[48px] min-w-0 flex-1 rounded-full border border-[#C9DAD6] bg-[#F7FAF9] px-4 text-base text-slate-900 placeholder:text-slate-500 focus:border-[#0B5E57] focus:outline-none"
         />
         {speech.supported && (
           <button type="button" onClick={speech.listening ? speech.stop : speech.start}
@@ -212,15 +353,79 @@ export default function VitaChat({ chat, onClose }: { chat: VitaChatState; onClo
           <Send className="h-5 w-5" aria-hidden="true" />
         </button>
       </form>
-
-      <div className="flex shrink-0 items-center justify-between gap-2 bg-white px-4 pb-2 text-[11px] text-slate-500">
-        <span>{t("vita.disclaimer")}</span>
-        <a href={`https://wa.me/${WHATSAPP_BUSINESS_NUMBER}?text=${encodeURIComponent("Hi, I need help finding a doctor.")}`}
-          target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 whitespace-nowrap font-semibold text-[#0B5E57] hover:underline">
-          <MessageCircle className="h-3.5 w-3.5" aria-hidden="true" /> WhatsApp
-        </a>
-      </div>
     </div>
+  );
+}
+
+function ago(at: number, t: ReturnType<typeof useTranslation>["t"]): string {
+  const minutes = Math.max(1, Math.round((Date.now() - at) / 60000));
+  return minutes < 60 ? t("vita.minutesAgo", { n: minutes }) : t("vita.hoursAgo", { n: Math.round(minutes / 60) });
+}
+
+function ChatMenu({ onClose, onNewChat, locale, setLocale, prefs, update, canSpeak, onStopSpeaking }: {
+  onClose: () => void;
+  onNewChat: () => void;
+  locale: Locale;
+  setLocale: (l: Locale) => void;
+  prefs: VitaPrefs;
+  update: (p: Partial<VitaPrefs>) => void;
+  canSpeak: boolean;
+  onStopSpeaking: () => void;
+}) {
+  const { t } = useTranslation();
+  const [recentCleared, setRecentCleared] = useState(false);
+  const seg = (on: boolean) =>
+    `min-h-[40px] flex-1 rounded-lg px-2 text-sm font-semibold ${on ? "bg-[#0B5E57] text-white" : "bg-[#F1F6F5] text-[#10302D] hover:bg-[#E3EFEC]"}`;
+  return (
+    <>
+      <button type="button" aria-hidden="true" tabIndex={-1} onClick={onClose} className="absolute inset-0 z-20 cursor-default bg-black/20" />
+      <div role="dialog" aria-label={t("vita.menu")}
+        className="absolute right-2 top-[4.25rem] z-30 flex w-[min(330px,calc(100%-1rem))] flex-col gap-3 rounded-2xl bg-white p-3 text-[#10302D] shadow-[0_12px_32px_rgba(0,0,0,0.2)]">
+        <button type="button" onClick={onNewChat}
+          className="inline-flex min-h-[44px] items-center gap-2 rounded-xl bg-[#E3EFEC] px-3 text-sm font-bold text-[#0B5E57]">
+          <RotateCcw className="h-4 w-4" aria-hidden="true" /> {t("vita.newChat")}
+        </button>
+        <div>
+          <p className="mb-1 text-xs font-bold uppercase tracking-wide text-slate-500">{t("vita.language")}</p>
+          <div className="grid grid-cols-2 gap-1.5">
+            {LOCALES.map((l) => (
+              <button key={l.code} type="button" lang={l.code === "hinglish" ? "hi-Latn" : l.code} aria-pressed={locale === l.code}
+                onClick={() => setLocale(l.code)} className={seg(locale === l.code)}>
+                {l.nativeLabel}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div>
+          <p className="mb-1 text-xs font-bold uppercase tracking-wide text-slate-500">{t("vita.textSize")}</p>
+          <div className="flex gap-1.5">
+            {(["normal", "large", "larger"] as TextSize[]).map((size, i) => (
+              <button key={size} type="button" aria-pressed={prefs.textSize === size} onClick={() => update({ textSize: size })}
+                className={seg(prefs.textSize === size)} style={{ fontSize: 13 + i * 2 }}>
+                {t(size === "normal" ? "vita.textNormal" : size === "large" ? "vita.textLarge" : "vita.textLarger")}
+              </button>
+            ))}
+          </div>
+        </div>
+        {canSpeak && (
+          <label className="flex min-h-[44px] cursor-pointer items-center justify-between gap-3 rounded-xl bg-[#F1F6F5] px-3 text-sm font-semibold">
+            <span className="inline-flex items-center gap-2"><Volume2 className="h-4 w-4" aria-hidden="true" /> {t("vita.readAloud")}</span>
+            <input type="checkbox" role="switch" checked={prefs.readAloud} className="h-5 w-5 accent-[#0B5E57]"
+              onChange={(e) => { update({ readAloud: e.target.checked }); if (!e.target.checked) onStopSpeaking(); }} />
+          </label>
+        )}
+        <a href={`https://wa.me/${WHATSAPP_BUSINESS_NUMBER}?text=${encodeURIComponent("Hi, I need help finding a doctor.")}`}
+          target="_blank" rel="noopener noreferrer"
+          className="inline-flex min-h-[44px] items-center gap-2 rounded-xl px-3 text-sm font-semibold text-[#0B5E57] hover:bg-emerald-50">
+          <MessageCircle className="h-4 w-4" aria-hidden="true" /> {t("vita.talkToPerson")}
+        </a>
+        <button type="button" disabled={recentCleared} onClick={() => { clearRecent(); setRecentCleared(true); }}
+          className="inline-flex min-h-[40px] items-center gap-2 rounded-xl px-3 text-left text-sm text-slate-700 hover:bg-slate-50 disabled:opacity-50">
+          <History className="h-4 w-4" aria-hidden="true" /> {t("vita.clearRecent")}
+        </button>
+        <p className="border-t border-slate-100 pt-2 text-xs text-slate-500">{t("vita.disclaimer")}</p>
+      </div>
+    </>
   );
 }
 
@@ -231,8 +436,10 @@ const HOME_ASKS: { kind: string; key: TranslationKey; Icon: typeof Activity }[] 
   { kind: "degree", key: "vita.chipDegree", Icon: GraduationCap },
 ];
 
-function Home({ onAsk }: { onAsk: (kind: string) => void }) {
+function Home({ onAsk, onRecent }: { onAsk: (kind: string) => void; onRecent: (text: string) => void }) {
   const { t } = useTranslation();
+  const [recent, setRecent] = useState<string[]>([]);
+  useEffect(() => setRecent(loadRecent()), []);
   return (
     <div className="flex flex-col items-center gap-3 px-1 pt-1">
       <div className="relative flex h-[124px] w-[140px] items-end justify-center">
@@ -258,6 +465,22 @@ function Home({ onAsk }: { onAsk: (kind: string) => void }) {
           <MapPin className="h-5 w-5" aria-hidden="true" /> {t("vita.chipNear")}
         </button>
       </div>
+      {recent.length > 0 && (
+        <div className="w-full">
+          <p className="mb-1.5 flex items-center gap-1 text-xs font-bold uppercase tracking-wide text-slate-500">
+            <History className="h-3.5 w-3.5" aria-hidden="true" /> {t("vita.recent")}
+          </p>
+          <div className="flex flex-wrap gap-1.5">
+            {recent.map((r) => (
+              <button key={r} type="button" onClick={() => onRecent(r)}
+                className="min-h-[36px] max-w-full truncate rounded-full border border-[#CFE0DC] bg-white px-3 text-[13px] text-[#10302D] hover:border-[#0B5E57]">
+                {r}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+      <p className="text-center text-[11px] text-slate-500">{t("vita.disclaimer")}</p>
     </div>
   );
 }
@@ -290,13 +513,14 @@ function WorkingCard() {
   );
 }
 
-function Entry({ entry, actions, active, busy, chosenId }: {
+function Entry({ entry, actions, active, busy, chosenId, speech, vote, onVote }: {
   entry: VitaEntry; actions: ReplyActions; active: boolean; busy: boolean; chosenId: string | null;
+  speech?: ReplySpeech; vote?: boolean; onVote?: (helpful: boolean) => void;
 }) {
   const { t } = useTranslation();
   if (entry.role === "user") {
     return (
-      <div className="max-w-[80%] self-end whitespace-pre-line rounded-[18px] rounded-br-[4px] bg-[#0B5E57] px-3.5 py-2.5 text-[15px] leading-snug text-white">
+      <div className="ml-auto w-fit max-w-[80%] whitespace-pre-line rounded-[18px] rounded-br-[4px] bg-[#0B5E57] px-3.5 py-2.5 text-[15px] leading-snug text-white">
         {entry.text}
       </div>
     );
@@ -320,7 +544,10 @@ function Entry({ entry, actions, active, busy, chosenId }: {
       </div>
     );
   }
-  return entry.reply ? <VitaReplyView reply={entry.reply} actions={actions} active={active} busy={busy} chosenId={chosenId} /> : null;
+  return entry.reply ? (
+    <VitaReplyView reply={entry.reply} actions={actions} active={active} busy={busy} chosenId={chosenId}
+      speech={speech} vote={vote} onVote={onVote} />
+  ) : null;
 }
 
 function LocationPrompt({ chat, answering, onDone }: {

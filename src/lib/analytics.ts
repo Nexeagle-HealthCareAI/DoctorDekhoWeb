@@ -181,7 +181,8 @@ export type AnalyticsEventType =
   | "doctor_profile_viewed"
   | "booking_step_reached"
   | "chat_widget_opened"
-  | "chat_whatsapp_handoff";
+  | "chat_whatsapp_handoff"
+  | "vita_feedback";
 
 interface TrackEventPayload {
   mobile?: string;
