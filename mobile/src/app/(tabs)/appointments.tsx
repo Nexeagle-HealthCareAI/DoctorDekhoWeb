@@ -115,6 +115,9 @@ function UpcomingCard({ a, doctor }: { a: MyAppointment; doctor?: Doctor }) {
   const st = STATUS[kind];
   const time = formatTime(a.startAt);
   const day = a.apptDate.slice(0, 10);
+  // Set by the server the first time hospital staff open or act on the request.
+  const seen = !!a.hospitalSeenAt;
+  const seenWhen = a.hospitalSeenAt ? seenLabel(a.hospitalSeenAt, t) : "";
   const start = a.startAt?.slice(11, 16) && a.startAt.slice(11, 16) !== "00:00" ? a.startAt.slice(11, 16) : undefined;
   // "Leave by" only for a visit today or tomorrow, and only from a position the patient already shared.
   const soon = day === istDateString() || day === istDateString(1);
@@ -170,13 +173,18 @@ function UpcomingCard({ a, doctor }: { a: MyAppointment; doctor?: Doctor }) {
         </View>
       </View>
 
-      <Journey current={kind === "pending" ? 1 : day === istDateString() ? 3 : 2} />
+      <Journey current={kind === "pending" ? (seen ? 2 : 1) : day === istDateString() ? 4 : 3} />
       {kind === "pending" ? (
         <View style={[styles.status, { backgroundColor: st.bg, alignItems: "flex-start" }]}>
-          <Ionicons name={st.icon} size={18} color={st.fg} style={{ marginTop: 2 }} />
-          <Txt variant="small" color={colors.ink} style={{ marginLeft: space.sm, flex: 1 }}>
-            {doctor?.hospitalPhone ? t("trustNumber", { phone: doctor.hospitalPhone }) : t(st.key)}
-          </Txt>
+          <Ionicons name={seen ? "eye-outline" : st.icon} size={18} color={st.fg} style={{ marginTop: 2 }} />
+          <View style={{ marginLeft: space.sm, flex: 1, gap: 2 }}>
+            <Txt variant="smallBold" color={colors.ink}>
+              {seen ? t("hospitalSawIt", { when: seenWhen }) : t("notSeenYet")}
+            </Txt>
+            <Txt variant="small" color={colors.ink}>
+              {doctor?.hospitalPhone ? t("trustNumber", { phone: doctor.hospitalPhone }) : t(st.key)}
+            </Txt>
+          </View>
         </View>
       ) : null}
       {doctor ? (
@@ -217,10 +225,22 @@ function UpcomingCard({ a, doctor }: { a: MyAppointment; doctor?: Doctor }) {
   );
 }
 
-/** The request's real steps. Only what the server knows: sent → the hospital calls → confirmed → visit day. */
+/** "today, 10:42 AM" / "24 Oct, 10:42 AM" in India time, for "The hospital saw it …". */
+function seenLabel(iso: string, t: (k: StringKey) => string): string {
+  const d = new Date(/[zZ]|[+-]\d\d:?\d\d$/.test(iso) ? iso : `${iso}Z`);
+  if (Number.isNaN(d.getTime())) return "";
+  const ist = new Date(d.getTime() + (d.getTimezoneOffset() + 330) * 60000);
+  const day = `${ist.getFullYear()}-${String(ist.getMonth() + 1).padStart(2, "0")}-${String(ist.getDate()).padStart(2, "0")}`;
+  const h = ist.getHours();
+  const time = `${((h + 11) % 12) + 1}:${String(ist.getMinutes()).padStart(2, "0")} ${h < 12 ? "AM" : "PM"}`;
+  const when = day === istDateString() ? t("today") : day === istDateString(-1) ? t("yesterday") : `${ist.getDate()} ${ist.toLocaleString("en-IN", { month: "short" })}`;
+  return `${when}, ${time}`;
+}
+
+/** The request's real steps, each one known to the server: sent → seen by the hospital → the hospital calls → confirmed → visit day. */
 function Journey({ current }: { current: number }) {
   const { t } = useI18n();
-  const steps = [t("jSent"), t("jCall"), t("jConfirmed"), t("jVisit")];
+  const steps = [t("jSent"), t("jSeen"), t("jCall"), t("jConfirmed"), t("jVisit")];
   return (
     <View style={styles.journey} accessibilityLabel={t("stepOf", { n: current + 1, total: steps.length, step: steps[current] })}>
       {steps.map((label, i) => (

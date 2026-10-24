@@ -30,6 +30,8 @@ export interface DoctorDto {
   isFeatured?: boolean;
   isRegistrationVerified?: boolean;
   isAvailableToday?: boolean;
+  /** Today's hours in India time, e.g. [{ name: "Evening", startTime: "17:00:00", endTime: "20:00:00" }]. */
+  todayHours?: { name?: string | null; startTime?: string | null; endTime?: string | null }[];
   isOnlineNow?: boolean;
 }
 
@@ -206,6 +208,8 @@ export interface MyAppointment {
   /** Pending Confirmation | Confirmed | Cancelled | Completed */
   status: string;
   statusCode: string;
+  /** When someone at the hospital first saw or acted on the request (UTC ISO); null if nobody has yet. */
+  hospitalSeenAt?: string | null;
 }
 
 export interface MyAppointmentsResponse {

@@ -163,7 +163,7 @@ export default function HomeScreen() {
                 </Txt>
                 <View style={[styles.pill, { backgroundColor: nextConfirmed ? colors.successSoft : colors.warningSoft }]}>
                   <Txt variant="tinyBold" color={nextConfirmed ? colors.success : colors.warning}>
-                    {nextConfirmed ? t("statusConfirmed") : t("hospitalWillCall")}
+                    {nextConfirmed ? t("statusConfirmed") : next.hospitalSeenAt ? t("hospitalHasSeen") : t("hospitalWillCall")}
                   </Txt>
                 </View>
               </View>

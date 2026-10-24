@@ -2,9 +2,8 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { Platform, ScrollView, Share, StyleSheet, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { DoctorAvatar } from "../../components/DoctorCard";
+import { DoctorAvatar, OpenLine } from "../../components/DoctorCard";
 import { MapPreview } from "../../components/MapPreview";
-import { LiveDot } from "../../components/Motion";
 import { Button, Card, EmptyState, IconButton, Loading, TopBar, Txt } from "../../components/ui";
 import { effectiveFee } from "../../lib/api/doctors";
 import { config } from "../../lib/config";
@@ -80,10 +79,15 @@ export default function DoctorScreen() {
         </View>
 
         <View style={[styles.avail, { backgroundColor: d.isAvailableToday ? colors.successSoft : colors.card }]}>
-          {d.isAvailableToday ? <LiveDot size={12} color={colors.success} /> : <Ionicons name="time-outline" size={20} color={colors.muted} />}
-          <Txt variant="bodyBold" color={d.isAvailableToday ? colors.success : colors.muted} style={{ marginLeft: space.sm, fontSize: 16, flex: 1 }}>
-            {d.isAvailableToday ? t("availableToday") : d.isAvailableToday === false ? t("notAvailableToday") : t("hospitalFixesTime")}
-          </Txt>
+          <View style={{ flex: 1, minWidth: 0 }}>
+            {d.isAvailableToday != null ? (
+              <OpenLine doctor={d} big />
+            ) : (
+              <Txt variant="bodyBold" color={colors.muted}>
+                {t("hospitalFixesTime")}
+              </Txt>
+            )}
+          </View>
           <Button label={speaking ? t("stop") : t("listen")} icon={speaking ? "stop" : "volume-high"} variant="outline" size="sm" onPress={() => toggle(spoken)} />
         </View>
 
@@ -188,7 +192,7 @@ const styles = StyleSheet.create({
   verified: { flexDirection: "row", alignItems: "center", backgroundColor: colors.primarySoft, borderRadius: radius.pill, paddingHorizontal: space.md, paddingVertical: 5, marginTop: space.sm },
   facts: { flexDirection: "row", gap: 10 },
   fact: { flex: 1, alignItems: "center", backgroundColor: colors.card, borderWidth: 1, borderColor: colors.line, borderRadius: radius.lg - 2, paddingVertical: space.md, paddingHorizontal: space.xs },
-  avail: { flexDirection: "row", alignItems: "center", borderRadius: radius.lg - 2, paddingVertical: space.sm + 2, paddingLeft: space.md + 2, paddingRight: space.sm, borderWidth: 1, borderColor: colors.line },
+  avail: { flexDirection: "row", alignItems: "center", gap: space.sm, borderRadius: radius.lg - 2, paddingVertical: space.sm + 2, paddingLeft: space.md + 2, paddingRight: space.sm, borderWidth: 1, borderColor: colors.line },
   rupee: { width: 46, height: 46, borderRadius: 23, backgroundColor: colors.segment, alignItems: "center", justifyContent: "center" },
   tags: { flexDirection: "row", flexWrap: "wrap", gap: space.sm },
   tag: { backgroundColor: colors.card, borderWidth: 1, borderColor: colors.line, borderRadius: radius.pill, paddingHorizontal: space.md, paddingVertical: space.sm },

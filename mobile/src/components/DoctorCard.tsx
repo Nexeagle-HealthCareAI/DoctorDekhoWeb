@@ -2,6 +2,7 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import { Pressable, StyleSheet, View } from "react-native";
 import { effectiveFee, type Doctor } from "../lib/api/doctors";
 import { rupees } from "../lib/format";
+import { openState } from "../lib/hours";
 import { useI18n } from "../lib/i18n";
 import { useReadAloud } from "../lib/speech";
 import { plainSpecialty } from "../lib/specialties";
@@ -88,18 +89,7 @@ export function DoctorCard({ doctor, onPress, onBook, why }: { doctor: Doctor; o
 
       <View style={styles.bottom}>
         <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
-          {doctor.isAvailableToday ? (
-            <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-              <LiveDot color={colors.success} />
-              <Txt variant="smallBold" color={colors.success}>
-                {t("availableToday")}
-              </Txt>
-            </View>
-          ) : doctor.isAvailableToday === false ? (
-            <Txt variant="small" color={colors.muted}>
-              {t("notAvailableToday")}
-            </Txt>
-          ) : null}
+          <OpenLine doctor={doctor} />
           {why ? (
             <Txt variant="small" color={colors.text} numberOfLines={1}>
               {t("whyThis", { why })}
@@ -121,3 +111,38 @@ const styles = StyleSheet.create({
   bottom: { flexDirection: "row", alignItems: "center", gap: space.md, marginTop: space.md },
   online: { position: "absolute", right: 0, bottom: 0, backgroundColor: colors.successStrong, borderWidth: 2, borderColor: "#fff" },
 });
+
+/**
+ * Today's status from the doctor's real shifts: "Open now · till 8 PM" (live dot), "Opens today at 5 PM",
+ * "Done for today" — or, when the server sent no hours, the plain "Available today" / "Not available today".
+ */
+export function OpenLine({ doctor, big }: { doctor: Pick<Doctor, "isAvailableToday" | "todayHours">; big?: boolean }) {
+  const { t } = useI18n();
+  const st = openState(doctor);
+  const variant = big ? "bodyBold" : "smallBold";
+  if (st?.kind === "open" || (!st && doctor.isAvailableToday))
+    return (
+      <View style={{ flexDirection: "row", alignItems: "center", gap: 8, flexShrink: 1 }}>
+        <LiveDot size={big ? 12 : 10} color={colors.success} />
+        <Txt variant={variant} color={colors.success} numberOfLines={1} style={{ flexShrink: 1 }}>
+          {st?.kind === "open" ? t("openNowUntil", { time: st.until }) : t("availableToday")}
+        </Txt>
+      </View>
+    );
+  if (st?.kind === "later")
+    return (
+      <View style={{ flexDirection: "row", alignItems: "center", gap: 6, flexShrink: 1 }}>
+        <Ionicons name="time-outline" size={big ? 18 : 15} color={colors.primaryDark} />
+        <Txt variant={variant} color={colors.primaryDark} numberOfLines={1} style={{ flexShrink: 1 }}>
+          {t("opensTodayAt", { time: st.at })}
+        </Txt>
+      </View>
+    );
+  if (st?.kind === "done" || doctor.isAvailableToday === false)
+    return (
+      <Txt variant={big ? "body" : "small"} color={colors.muted} numberOfLines={1}>
+        {st?.kind === "done" ? t("doneForToday") : t("notAvailableToday")}
+      </Txt>
+    );
+  return null;
+}

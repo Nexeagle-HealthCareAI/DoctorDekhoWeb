@@ -4,7 +4,7 @@ import { useRouter } from "expo-router";
 import { useMemo, useRef, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { DoctorAvatar } from "../../components/DoctorCard";
+import { DoctorAvatar, OpenLine } from "../../components/DoctorCard";
 import { RiseIn } from "../../components/Motion";
 import { Button, EmptyState, Logo, Txt } from "../../components/ui";
 import { distanceKm, type Doctor } from "../../lib/api/doctors";
@@ -224,12 +224,9 @@ export default function MapScreen() {
                 </Txt>
               </View>
             ) : null}
-            {sel.isAvailableToday ? (
-              <View style={[styles.fact, { backgroundColor: colors.successSoft }]}>
-                <Ionicons name="time" size={15} color={colors.success} />
-                <Txt variant="smallBold" color={colors.success} style={{ marginLeft: 6 }}>
-                  {t("availableToday")}
-                </Txt>
+            {sel.isAvailableToday != null ? (
+              <View style={[styles.fact, { backgroundColor: colors.bg }]}>
+                <OpenLine doctor={sel} />
               </View>
             ) : null}
           </View>
