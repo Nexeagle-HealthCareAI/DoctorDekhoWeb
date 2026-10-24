@@ -112,6 +112,35 @@ export interface VitaBooking {
   appointmentId?: string;
 }
 
+/** One emergency-ready place (1HMS emergency takeover), nearest first. */
+export interface VitaEmergencyPlace {
+  settingId: string;
+  name: string;
+  kind?: string;
+  phone: string;
+  alternatePhone?: string | null;
+  distanceKm?: number | null;
+  address?: string | null;
+  landmark?: string | null;
+  city?: string | null;
+  lat?: number | null;
+  lng?: number | null;
+  mapUrl?: string | null;
+}
+
+/** With kind "emergency": the nearest emergency hospitals, alerted (vision Phase 3). */
+export interface VitaEmergency {
+  places: VitaEmergencyPlace[];
+  eventId?: string | null;
+  alerted?: number;
+  repeated?: boolean;
+  /** No location yet: ask for it; the next turn with a location brings the places. */
+  needsLocation?: boolean;
+  numberShared?: boolean;
+  /** The router knows the number (signed in): its own "Share my number" chip shares it. */
+  canShareNumber?: boolean;
+}
+
 export interface VitaReply {
   session_id: string;
   turn: number | null;
@@ -127,6 +156,7 @@ export interface VitaReply {
   availability?: { days: VitaAvailabilityDay[]; nextAvailableDate?: string | null; note?: string };
   handoff?: { reason: string };
   booking?: VitaBooking;
+  emergency?: VitaEmergency;
   card?: {
     kind?: string;
     outputs?: { role: string; specialist: string }[];

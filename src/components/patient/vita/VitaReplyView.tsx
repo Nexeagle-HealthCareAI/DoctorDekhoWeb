@@ -10,6 +10,7 @@ import type { VitaBooking, VitaDoctor, VitaDoctorsBlock, VitaOption, VitaReply }
 import { WHATSAPP_BUSINESS_NUMBER } from "@/lib/site";
 import { replyMood } from "@/lib/vita/mood";
 import Eagle from "@/components/patient/vita/Eagle";
+import VitaEmergencyHelp from "@/components/patient/vita/VitaEmergencyHelp";
 import { REFINE_LABEL, refineOptions, type RefineKey } from "@/lib/vita/refine";
 
 // One Vita reply, drawn by its kind (requirements doc, section 9; UI-2 to UI-7). Doctors, hours and
@@ -28,6 +29,8 @@ export interface ReplyActions {
   /** One-tap narrowing of the latest list, said in the conversation's language. */
   refine: (key: RefineKey, language?: string) => void;
   startOver: () => void;
+  /** Emergency without a location: ask the browser for it and send it, so the nearest hospitals follow. */
+  shareLocation?: () => void;
 }
 
 export interface ReplySpeech {
@@ -68,9 +71,19 @@ export default function VitaReplyView({
   // UI-6: the emergency card replaces everything else. The router's own emergency text is not shown
   // here so the screen carries one emergency number, the one EmergencyBanner shows.
   if (reply.kind === "emergency") {
+    const share = (reply.clarify?.options ?? []).filter((o) => o.id === "emergency:share");
     return (
-      <div className="w-full [&>div]:mb-0">
-        <EmergencyBanner reasons={emergencyReasons(reply)} doctorsBelow={false} />
+      <div className="flex w-full flex-col gap-3">
+        <div className="[&>div]:mb-0">
+          <EmergencyBanner reasons={emergencyReasons(reply)} doctorsBelow={false} />
+        </div>
+        {reply.emergency && <VitaEmergencyHelp emergency={reply.emergency} active={active && !busy} onShareLocation={actions.shareLocation} />}
+        {active && share.map((o) => (
+          <button key={o.id} type="button" disabled={off} onClick={() => actions.sendText(o.label)}
+            className="inline-flex min-h-[48px] items-center justify-center self-start rounded-xl border-2 border-red-600 bg-white px-4 font-bold text-red-700 hover:bg-red-50 disabled:opacity-50">
+            {o.label}
+          </button>
+        ))}
       </div>
     );
   }
