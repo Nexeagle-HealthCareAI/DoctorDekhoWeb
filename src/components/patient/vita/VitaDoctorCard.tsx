@@ -44,7 +44,7 @@ export default function VitaDoctorCard({
 
   return (
     <article
-      className={`rounded-xl border bg-white p-3 shadow-sm ${chosen ? "border-emerald-600 ring-2 ring-emerald-200" : "border-slate-200"}`}
+      className={`rounded-[20px] border bg-white p-3.5 shadow-[0_1px_3px_rgba(16,48,45,0.10)] ${chosen ? "border-[#0B5E57] ring-2 ring-[#9CC5BD]" : "border-transparent"}`}
       aria-label={name}
     >
       <div className="flex gap-3">
@@ -58,7 +58,7 @@ export default function VitaDoctorCard({
           fallbackClassName="flex h-14 w-14 shrink-0 items-center justify-center rounded-full text-sm font-semibold text-white"
         />
         <div className="min-w-0 flex-1">
-          <p className="flex items-center gap-1 text-sm font-semibold text-slate-900">
+          <p className="flex items-center gap-1 text-base font-bold text-[#10302D]">
             <span className="truncate">{name}</span>
             {doctor.registrationVerified && (
               <BadgeCheck className="h-4 w-4 shrink-0 text-emerald-600" aria-label={t("vita.verified")} />
@@ -83,10 +83,10 @@ export default function VitaDoctorCard({
       </div>
       <div className="mt-2 flex flex-wrap items-center gap-2">
         {doctor.availableToday && (
-          <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700">{t("vita.availableToday")}</span>
+          <span className="rounded-xl bg-[#E3F2EC] px-2.5 py-1 text-xs font-bold text-[#0B6B4F]">{t("vita.availableToday")}</span>
         )}
         {fee != null && (
-          <span className="text-sm font-semibold text-slate-900">
+          <span className="text-base font-extrabold text-[#10302D]">
             ₹{fee}
             {doctor.discountedFee != null && doctor.consultFee != null && doctor.consultFee !== fee && (
               <s className="ml-1 text-xs font-normal text-slate-500">₹{doctor.consultFee}</s>
@@ -96,7 +96,7 @@ export default function VitaDoctorCard({
         <div className="ml-auto flex items-center gap-1">
           <Link
             href={doctorHref(doctor)}
-            className="inline-flex min-h-[44px] items-center rounded-lg px-3 text-sm font-medium text-[#075E54] hover:underline"
+            className="inline-flex min-h-[44px] items-center rounded-lg px-3 text-sm font-medium text-[#0B5E57] hover:underline"
           >
             {t("vita.viewProfile")}
           </Link>
@@ -106,7 +106,7 @@ export default function VitaDoctorCard({
               disabled={disabled}
               onClick={() => onChoose(doctor)}
               aria-label={t("vita.chooseDoctor", { name })}
-              className="inline-flex min-h-[44px] items-center rounded-lg bg-[#075E54] px-4 text-sm font-semibold text-white hover:brightness-110 disabled:opacity-50"
+              className="inline-flex min-h-[44px] items-center rounded-[14px] bg-[#0B5E57] px-[18px] text-sm font-bold text-white hover:brightness-110 disabled:opacity-50"
             >
               {t("vita.choose")}
             </button>

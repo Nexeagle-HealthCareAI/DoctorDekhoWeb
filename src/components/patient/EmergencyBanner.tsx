@@ -10,7 +10,13 @@ import { useTranslation } from "@/lib/i18n/I18nContext";
 // Phone numbers are shown as text as well as tel: links: a tel: link does nothing on a desktop
 // browser, and the patient must still be able to read and dial the number.
 
+// 108 (medical ambulance) is the main call; 112 (any emergency) and 102 (ambulance in some states) are
+// offered under it. Decided 2026-10-24; the router names 108 and 112 the same way.
 const AMBULANCE = "108";
+const OTHER_NUMBERS = [
+  { number: "112", key: "directory.emergency112" },
+  { number: "102", key: "directory.emergency102" },
+] as const;
 const TELE_MANAS = "14416";
 
 // Router reasons are English phrases such as "Suicidal thoughts / self-harm". Self-harm needs
@@ -55,6 +61,16 @@ export default function EmergencyBanner({ reasons, doctorsBelow = true }: {
             <Phone className="w-5 h-5" aria-hidden="true" />
             {t("directory.emergencyCall")}
           </a>
+
+          <div className="flex flex-wrap gap-2" aria-label={t("directory.emergencyOther")}>
+            {OTHER_NUMBERS.map((n) => (
+              <a key={n.number} href={`tel:${n.number}`}
+                className="inline-flex min-h-[44px] items-center gap-1.5 rounded-xl border-2 border-red-600 bg-white px-3 text-sm font-bold text-red-700 hover:bg-red-50 focus:outline-none focus-visible:ring-4 focus-visible:ring-red-300">
+                <Phone className="w-4 h-4" aria-hidden="true" />
+                {t(n.key)}
+              </a>
+            ))}
+          </div>
 
           {selfHarm && (
             <div className="rounded-xl border border-red-200 bg-white p-4 space-y-2">
