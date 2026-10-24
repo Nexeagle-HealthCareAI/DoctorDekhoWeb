@@ -341,6 +341,21 @@ export const en = {
   "vita.whatsapp": "Continue on WhatsApp",
   "vita.handoffNote": "Our support team will reply on WhatsApp.",
   "vita.disclaimer": "Vita suggests doctors; it does not diagnose.",
+  "vita.statusWelcome": "Doctor Dekho · here to help",
+  "vita.statusThinking": "Thinking about what you said…",
+  "vita.statusWorking": "Finding doctors for you…",
+  "vita.statusJoyful": "Great choice!",
+  "vita.statusRelaxed": "Take your time",
+  "vita.statusEmergency": "This may be an emergency",
+  "vita.homeTitle": "Namaste! I'm Vita.",
+  "vita.homeBody": "Tell me how you feel, or which doctor you need. I'll show you real doctors you can book.",
+  "vita.searching": "Looking for the right doctors…",
+  "vita.micStart": "Speak your message",
+  "vita.micStop": "Stop listening",
+  "vita.listening": "Listening… speak now",
+  "vita.inputPlaceholderVoice": "Type or speak…",
+  "vita.nudge": "Need a doctor? Ask me in Hindi or English.",
+  "vita.nudgeClose": "Hide this message",
 } as const;
 
 export type TranslationKey = keyof typeof en;

@@ -9,12 +9,18 @@ import replies from "./vitaReplies.fixture.json";
 
 vi.mock("next/image", () => ({
   // eslint-disable-next-line @next/next/no-img-element, jsx-a11y/alt-text
-  default: (p: { src: string; alt: string }) => <img src={p.src} alt={p.alt} />,
+  default: (p: { src: string; alt: string; "data-mood"?: string }) => <img src={p.src} alt={p.alt} data-mood={p["data-mood"]} />,
 }));
 vi.mock("@/lib/navigation", () => ({ geocodeAddress: vi.fn(async () => [88.41, 22.58]) }));
 
 import VitaChat from "./VitaChat";
 import { I18nProvider } from "@/lib/i18n/I18nContext";
+import { useVitaChat } from "@/hooks/useVitaChat";
+
+function Harness() {
+  const chat = useVitaChat();
+  return <VitaChat chat={chat} onClose={() => {}} />;
+}
 
 type Reply = (typeof replies)[keyof typeof replies];
 const sent: Record<string, unknown>[] = [];
@@ -34,7 +40,7 @@ beforeEach(() => {
 });
 afterEach(() => vi.unstubAllGlobals());
 
-const show = () => render(<I18nProvider><VitaChat /></I18nProvider>);
+const show = () => render(<I18nProvider><Harness /></I18nProvider>);
 
 async function say(text: string, reply: Reply | { status: number }) {
   queue.push(reply);
@@ -46,7 +52,7 @@ async function say(text: string, reply: Reply | { status: number }) {
 describe("Vita chat panel", () => {
   it("UI-1: greets and offers the five ways to ask", () => {
     show();
-    expect(screen.getByText(/I'm Vita/)).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: /I'm Vita/ })).toBeInTheDocument();
     for (const name of ["Describe a symptom", "Choose a specialty", "Doctor's name", "By degree", "Doctors near me"]) {
       expect(screen.getByRole("button", { name })).toBeInTheDocument();
     }
@@ -180,5 +186,54 @@ describe("Vita chat panel", () => {
   it("UI-8: new messages are announced to screen readers", () => {
     show();
     expect(screen.getByRole("log")).toHaveAttribute("aria-live", "polite");
+  });
+
+  it("moods: the header pose and words follow what Vita is doing", async () => {
+    const { container } = show();
+    const header = () => container.querySelector("header")!;
+    expect(header()).toHaveTextContent("here to help");
+    expect(header().querySelector("[data-mood]")).toHaveAttribute("data-mood", "welcome");
+
+    // a slow search: thinking first, then the working card
+    let release: (r: Response) => void = () => {};
+    (fetch as unknown as { mockImplementationOnce: (f: unknown) => void }).mockImplementationOnce(
+      (_u: string, init?: RequestInit) => {
+        sent.push(JSON.parse(String(init?.body ?? "{}")));
+        return new Promise<Response>((res) => { release = res; });
+      });
+    await userEvent.type(screen.getByRole("textbox", { name: /message to vita/i }), "lady skin doctor");
+    await userEvent.click(screen.getByRole("button", { name: /send/i }));
+    expect(header()).toHaveTextContent("Thinking about what you said");
+    expect(await screen.findByText("Looking for the right doctors…", {}, { timeout: 2000 })).toBeInTheDocument();
+    expect(header().querySelector("[data-mood]")).toHaveAttribute("data-mood", "working");
+    release(new Response(JSON.stringify(replies.list), { status: 200, headers: { "content-type": "application/json" } }));
+    expect(await screen.findByText("Dr. Anita Sen")).toBeInTheDocument();
+    expect(screen.queryByText("Looking for the right doctors…")).not.toBeInTheDocument();
+  });
+
+  it("moods: choosing a doctor brings the joyful eagle", async () => {
+    show();
+    await say("lady skin doctor", replies.list);
+    queue.push(replies.selected);
+    await userEvent.click(await screen.findByRole("button", { name: "Choose Dr. Anita Sen" }));
+    await screen.findByRole("link", { name: /Book a slot/ });
+    expect(document.querySelector('[data-mood="joyful"]')).not.toBeNull();
+  });
+
+  it("moods: an emergency turns the header red and shows no eagle at all", async () => {
+    const { container } = show();
+    await say("seene mein tez dard aur saans nahi aa rahi", replies.emergency);
+    await screen.findByRole("alert");
+    const header = container.querySelector("header")!;
+    expect(header).toHaveTextContent("This may be an emergency");
+    expect(header.className).toContain("bg-[#B3141E]");
+    const lastEntry = screen.getByRole("alert").parentElement!;
+    expect(lastEntry.querySelector("[data-mood]")).toBeNull();
+    expect(header.querySelector("[data-mood]")).toBeNull();
+  });
+
+  it("voice: the mic shows only where the browser can listen, and fills the box", async () => {
+    show();
+    expect(screen.queryByRole("button", { name: "Speak your message" })).not.toBeInTheDocument();
   });
 });
