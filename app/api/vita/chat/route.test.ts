@@ -74,7 +74,7 @@ describe("/api/vita/chat", () => {
     expect(init.headers["X-Api-Key"]).toBe("secret");
     expect(JSON.parse(init.body)).toEqual({
       text: "skin ka doctor", session_id: "s1", city: "Kolkata", lat: 22.5, lng: 88.4, page: 2, new_search: true,
-      select_doctor_id: "00000000-0000-0000-0000-000000000001",
+      select_doctor_id: "00000000-0000-0000-0000-000000000001", client_ip: "1.2.3.4",
     });
   });
 
@@ -83,7 +83,7 @@ describe("/api/vita/chat", () => {
     fetchMock.mockResolvedValue(json({}));
     await post({ text: "near me", lat: 95, lng: 88 });
     await post({ text: "near me", lat: 22 });
-    for (const call of fetchMock.mock.calls) expect(JSON.parse(call[1].body)).toEqual({ text: "near me" });
+    for (const call of fetchMock.mock.calls) expect(JSON.parse(call[1].body)).toEqual({ text: "near me", client_ip: "1.2.3.4" });
   });
 
   it("rejects empty or too long text without calling the router", async () => {
@@ -113,5 +113,35 @@ describe("/api/vita/chat", () => {
     expect((await post({ text: "b" }, "9.9.9.9")).status).toBe(200);
     expect((await post({ text: "c" }, "9.9.9.9")).status).toBe(429);
     expect((await post({ text: "d" }, "8.8.8.8")).status).toBe(200);
+  });
+
+  it("books as the signed-in patient: forwards the session cookie, never trusts the body for it", async () => {
+    await load({ NLP_ROUTER_BASE_URL: "http://router" });
+    fetchMock.mockResolvedValue(json({ kind: "follow_up", message: "Which day?" }));
+    await route.POST(new NextRequest("http://dd.test/api/vita/chat", {
+      method: "POST",
+      body: JSON.stringify({ text: "yes", patient_token: "forged", client_ip: "6.6.6.6", verified_mobile: "9999999999" }),
+      headers: { "x-forwarded-for": "5.5.5.5, 10.0.0.1", cookie: "nexeagle_patient_session=jwt-abc" },
+    }));
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toEqual({ text: "yes", client_ip: "5.5.5.5", patient_token: "jwt-abc" });
+  });
+
+  it("signs the patient in after Vita checked their code, and keeps the token out of the browser", async () => {
+    await load({ NLP_ROUTER_BASE_URL: "http://router" });
+    fetchMock.mockResolvedValue(json({
+      kind: "follow_up", message: "Shall I book?", patient_session: { token: "jwt-new", mobile: "9876543210" },
+    }));
+    const res = await post({ text: "123456" });
+    const body = await res.json();
+    expect(body).toEqual({ kind: "follow_up", message: "Shall I book?" });
+    const cookie = res.cookies.get("nexeagle_patient_session");
+    expect(cookie?.value).toBe("jwt-new");
+    expect(cookie?.httpOnly).toBe(true);
+  });
+
+  it("sets no cookie on ordinary replies", async () => {
+    await load({ NLP_ROUTER_BASE_URL: "http://router" });
+    fetchMock.mockResolvedValue(json({ kind: "doctor_list", message: "ok" }));
+    expect((await post({ text: "skin" })).cookies.get("nexeagle_patient_session")).toBeUndefined();
   });
 });

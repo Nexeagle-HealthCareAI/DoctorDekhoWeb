@@ -1,12 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { CalendarCheck, MessageCircle, RotateCcw, RotateCw, Square, ThumbsDown, ThumbsUp, Volume2, X } from "lucide-react";
+import { CalendarCheck, CheckCircle2, MapPin, MessageCircle, RotateCcw, RotateCw, Square, ThumbsDown, ThumbsUp, Volume2, X } from "lucide-react";
 import EmergencyBanner from "@/components/patient/EmergencyBanner";
 import VitaDoctorCard, { doctorHref, feeOf } from "@/components/patient/vita/VitaDoctorCard";
 import { useTranslation } from "@/lib/i18n/I18nContext";
 import { filterChips, type FilterKey } from "@/lib/vita/filters";
-import type { VitaDoctor, VitaDoctorsBlock, VitaOption, VitaReply } from "@/lib/vita/types";
+import type { VitaBooking, VitaDoctor, VitaDoctorsBlock, VitaOption, VitaReply } from "@/lib/vita/types";
 import { WHATSAPP_BUSINESS_NUMBER } from "@/lib/site";
 import { replyMood } from "@/lib/vita/mood";
 import Eagle from "@/components/patient/vita/Eagle";
@@ -94,7 +94,7 @@ export default function VitaReplyView({
   return (
     <div className="flex w-full flex-col gap-2">
       <div className="flex items-end gap-2">
-        {reply.kind !== "doctor_selected" && (
+        {reply.kind !== "doctor_selected" && reply.kind !== "booked" && (
           <Eagle mood={mood === "emergency" ? "welcome" : mood} size={relaxed ? 96 : 44} className={relaxed ? "-mb-1" : ""} />
         )}
         <div className="max-w-[88%]">
@@ -150,8 +150,13 @@ export default function VitaReplyView({
       )}
 
       {reply.kind === "doctor_selected" && reply.doctor && (
-        <SelectedDoctor doctor={reply.doctor} onOthers={() => actions.sendText("See other doctors", t("vita.seeOthers"))} off={off} />
+        <SelectedDoctor doctor={reply.doctor} onOthers={() => actions.sendText("See other doctors", t("vita.seeOthers"))} off={off}
+          bookingHere={Boolean(reply.clarify?.kind?.startsWith("book_"))} />
       )}
+
+      {reply.clarify?.kind === "book_confirm" && reply.booking && <BookingSummary booking={reply.booking} />}
+
+      {reply.kind === "booked" && reply.booking && <BookedCard booking={reply.booking} />}
 
       {reply.kind === "info" && reply.doctor && (
         <VitaDoctorCard doctor={reply.doctor} disabled={off} onChoose={(d) => actions.choose(d.doctorId, t("vita.chooseDoctor", { name: d.name ?? "" }))} />
@@ -264,7 +269,11 @@ function DoctorList({ block, actions, off, chosenId, active, language }: {
   );
 }
 
-function SelectedDoctor({ doctor, onOthers, off }: { doctor: VitaDoctor; onOthers: () => void; off: boolean }) {
+function SelectedDoctor({ doctor, onOthers, off, bookingHere }: {
+  doctor: VitaDoctor; onOthers: () => void; off: boolean;
+  /** Vita is booking in the chat (its day question is below), so no separate "Book a slot" page. */
+  bookingHere: boolean;
+}) {
   const { t } = useTranslation();
   const fee = feeOf(doctor);
   const h = doctor.hospital;
@@ -278,10 +287,12 @@ function SelectedDoctor({ doctor, onOthers, off }: { doctor: VitaDoctor; onOther
       {(h?.address || h?.city) && <p className="text-slate-600">{[h?.address, h?.city].filter(Boolean).join(", ")}</p>}
       {fee != null && <p className="mt-1 font-semibold text-slate-900">₹{fee}</p>}
       <div className="mt-3 flex w-full flex-col gap-2">
-        <Link href={`${doctorHref(doctor)}#book`}
-          className="inline-flex min-h-[52px] items-center justify-center gap-2 rounded-2xl bg-[#0B5E57] px-4 text-base font-extrabold text-white hover:brightness-110">
-          <CalendarCheck className="h-5 w-5" aria-hidden="true" /> {t("vita.bookSlot")}
-        </Link>
+        {!bookingHere && (
+          <Link href={`${doctorHref(doctor)}#book`}
+            className="inline-flex min-h-[52px] items-center justify-center gap-2 rounded-2xl bg-[#0B5E57] px-4 text-base font-extrabold text-white hover:brightness-110">
+            <CalendarCheck className="h-5 w-5" aria-hidden="true" /> {t("vita.bookSlot")}
+          </Link>
+        )}
         <button type="button" disabled={off} onClick={onOthers}
           className="min-h-[44px] rounded-2xl border border-[#C9DAD6] px-3 font-semibold text-[#10302D] hover:bg-slate-50 disabled:opacity-50">
           {t("vita.seeOthers")}
@@ -289,5 +300,86 @@ function SelectedDoctor({ doctor, onOthers, off }: { doctor: VitaDoctor; onOther
       </div>
       <p className="mt-2 text-xs text-slate-500">{t("vita.hospitalConfirms")}</p>
     </div>
+  );
+}
+
+function sexShort(sex?: string | null): string {
+  const s = (sex ?? "").toLowerCase();
+  return s.startsWith("m") ? "M" : s.startsWith("f") ? "F" : s ? "O" : "";
+}
+
+function patientLine(b: VitaBooking): string | null {
+  if (!b.patientName) return null;
+  const months = ["m", "months"].includes((b.patientAgeUnit ?? "").toLowerCase());
+  const age = b.patientAge != null ? `${b.patientAge}${months ? " mo" : ""}` : "";
+  const extra = [age, sexShort(b.patientSex)].filter(Boolean).join(", ");
+  return extra ? `${b.patientName} (${extra})` : b.patientName;
+}
+
+function Rows({ booking, showMobile }: { booking: VitaBooking; showMobile: boolean }) {
+  const { t } = useTranslation();
+  const where = [booking.hospital, booking.city].filter(Boolean).join(", ");
+  const rows: [string, string | null | undefined][] = [
+    [t("vita.yourDoctor"), [booking.doctorName, booking.specialty].filter(Boolean).join(" · ")],
+    [t("vita.labelWhere"), where],
+    [t("vita.labelWhen"), booking.when],
+    [t("vita.labelPatient"), patientLine(booking)],
+    [t("vita.labelMobile"), showMobile ? booking.mobile : null],
+    [t("vita.labelFee"), booking.fee != null ? t("vita.payAtHospital", { fee: String(booking.fee) }) : null],
+  ];
+  return (
+    <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-left">
+      {rows.filter(([, v]) => v).map(([k, v]) => (
+        <div key={k} className="contents">
+          <dt className="text-slate-500">{k}</dt>
+          <dd className="font-medium text-[#10302D]">{v}</dd>
+        </div>
+      ))}
+    </dl>
+  );
+}
+
+/** Before Vita books: everything it will send, in one place, above "Yes, book / Change / Cancel". */
+function BookingSummary({ booking }: { booking: VitaBooking }) {
+  const { t } = useTranslation();
+  return (
+    <section aria-label={t("vita.confirmTitle")} className="rounded-2xl border border-[#C9DAD6] bg-white p-3.5 text-sm shadow-[0_1px_2px_rgba(16,48,45,0.08)]">
+      <p className="mb-2 text-xs font-bold uppercase tracking-wider text-[#0B6B4F]">{t("vita.confirmTitle")}</p>
+      <Rows booking={booking} showMobile />
+      <p className="mt-2 text-xs text-slate-500">{t("vita.hospitalConfirms")}</p>
+    </section>
+  );
+}
+
+/** Booked: the ID to quote at the desk, the details, the way there and where to find it again. */
+function BookedCard({ booking }: { booking: VitaBooking }) {
+  const { t } = useTranslation();
+  const ref = booking.appointmentId ? booking.appointmentId.slice(0, 8).toUpperCase() : null;
+  return (
+    <section aria-label={t("vita.booked")} className="flex flex-col items-center rounded-3xl bg-white p-4 text-center text-sm shadow-[0_2px_8px_rgba(16,48,45,0.10)]">
+      <Eagle mood="joyful" size={130} />
+      <p className="mt-1 inline-flex items-center gap-1.5 text-lg font-extrabold text-[#0B6B4F]">
+        <CheckCircle2 className="h-5 w-5" aria-hidden="true" /> {t("vita.booked")}
+      </p>
+      {ref && (
+        <p className="mt-1 rounded-full bg-[#E3F2EC] px-3 py-1 font-mono text-sm font-bold tracking-wider text-[#10302D]">
+          {t("vita.bookingId")}: {ref}
+        </p>
+      )}
+      <div className="mt-3 w-full"><Rows booking={booking} showMobile={false} /></div>
+      <div className="mt-3 flex w-full flex-col gap-2">
+        {booking.mapUrl && (
+          <a href={booking.mapUrl} target="_blank" rel="noopener noreferrer"
+            className="inline-flex min-h-[48px] items-center justify-center gap-2 rounded-2xl bg-[#0B5E57] px-4 font-bold text-white hover:brightness-110">
+            <MapPin className="h-5 w-5" aria-hidden="true" /> {t("vita.directions")}
+          </a>
+        )}
+        <Link href="/appointments"
+          className="inline-flex min-h-[44px] items-center justify-center rounded-2xl border border-[#C9DAD6] px-3 font-semibold text-[#10302D] hover:bg-slate-50">
+          {t("vita.myAppointments")}
+        </Link>
+      </div>
+      <p className="mt-2 text-xs text-slate-500">{t("vita.hospitalConfirms")}</p>
+    </section>
   );
 }

@@ -39,9 +39,10 @@ export function replyMood(reply: VitaReply): VitaMood {
     case "emergency":
       return "emergency";
     case "doctor_selected":
+    case "booked":
       return "joyful";
     case "follow_up":
-      return "thinking";
+      return reply.clarify?.kind?.startsWith("book_") ? "welcome" : "thinking"; // booking: just asking, not puzzled
     case "handoff":
       return "relaxed";
     case "info":
