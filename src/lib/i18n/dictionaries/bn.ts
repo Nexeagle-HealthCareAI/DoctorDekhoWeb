@@ -336,4 +336,7 @@ export const bn: Record<keyof typeof en, string> = {
   "vita.inputPlaceholderVoice": "লিখুন বা বলুন…",
   "vita.nudge": "ডাক্তার দরকার? আমাকে বাংলা, হিন্দি বা ইংরেজিতে জিজ্ঞেস করুন।",
   "vita.nudgeClose": "এই বার্তা লুকান",
+  "vita.ask": "Vita-কে জিজ্ঞেস করুন",
+  "vita.offlineTitle": "Vita তৈরি হচ্ছে",
+  "vita.offlineBody": "খুব শিগগিরই আমি এখানেই আপনার জন্য ডাক্তার খুঁজে দিতে পারব। ততক্ষণ আমাদের টিম WhatsApp-এ সাহায্য করতে পারে, বা আপনি সব ডাক্তার দেখতে পারেন।",
 };

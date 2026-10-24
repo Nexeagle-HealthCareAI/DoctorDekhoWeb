@@ -29,12 +29,23 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllGlobals());
 
 const show = () => render(<I18nProvider><ChatWidget /></I18nProvider>);
-const launcherImg = () => screen.getByRole("button", { name: "Open chat with Vita" }).querySelector("img");
+const launcherImg = () => screen.getByRole("button", { name: "Ask Vita" }).querySelector("img");
 
 describe("chat widget launcher", () => {
-  it("is the resting eagle when Vita is on", async () => {
+  it("is always the resting eagle with Ask Vita, from the first paint", () => {
     show();
-    await waitFor(() => expect(launcherImg()).toHaveAttribute("src", "/vita/resting.png"), { timeout: 3000 });
+    expect(launcherImg()).toHaveAttribute("src", "/vita/resting.png");
+    expect(screen.queryByRole("button", { name: /whatsapp/i })).not.toBeInTheDocument();
+  });
+
+  it("stays Vita even when the router is not ready: a getting-ready note with WhatsApp inside", async () => {
+    enabled = false;
+    show();
+    await new Promise((r) => setTimeout(r, 1000));
+    expect(launcherImg()).toHaveAttribute("src", "/vita/resting.png");
+    await userEvent.click(screen.getByRole("button", { name: "Ask Vita" }));
+    expect(await screen.findByText("Vita is getting ready")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /Continue on WhatsApp/ })).toHaveAttribute("href", expect.stringContaining("wa.me"));
   });
 
   it("flies in once on a first visit with one line, and not again", async () => {
@@ -53,23 +64,23 @@ describe("chat widget launcher", () => {
     window.localStorage.setItem("vita_seen", "1");
     show();
     await waitFor(() => expect(launcherImg()).not.toBeNull(), { timeout: 3000 });
-    await userEvent.click(screen.getByRole("button", { name: "Open chat with Vita" }));
+    await userEvent.click(screen.getByRole("button", { name: "Ask Vita" }));
     answers.push({ ...replies.handoff, kind: "info", message: "No problem. I'm here whenever you need a doctor." });
     await userEvent.type(screen.getByRole("textbox", { name: /message to vita/i }), "bas dekh raha tha");
     await userEvent.click(screen.getByRole("button", { name: "Send" }));
     expect(await screen.findByText(/No problem/)).toBeInTheDocument();
     await userEvent.click(screen.getAllByRole("button", { name: "Close chat" })[0]);
     await waitFor(() => expect(launcherImg()).toHaveAttribute("src", "/vita/sleeping.png"), { timeout: 3000 });
-    await userEvent.click(screen.getByRole("button", { name: "Open chat with Vita" }));
+    await userEvent.click(screen.getByRole("button", { name: "Ask Vita" }));
     expect(await screen.findByText(/No problem/)).toBeInTheDocument(); // the conversation is still there
   });
 
-  it("falls back to the WhatsApp hand-off when Vita is off", async () => {
+  it("checks again on open, so a router fixed meanwhile turns the chat on", async () => {
     enabled = false;
     show();
     await new Promise((r) => setTimeout(r, 1000));
-    await userEvent.click(screen.getByRole("button", { name: "Open chat with Vita" }));
-    expect(await screen.findByRole("link", { name: /WhatsApp/ })).toBeInTheDocument();
-    expect(screen.queryByRole("textbox", { name: /message to vita/i })).not.toBeInTheDocument();
+    enabled = true;
+    await userEvent.click(screen.getByRole("button", { name: "Ask Vita" }));
+    expect(await screen.findByRole("textbox", { name: /message to vita/i })).toBeInTheDocument();
   });
 });

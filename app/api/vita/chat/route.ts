@@ -36,9 +36,39 @@ function inRange(v: unknown, min: number, max: number): v is number {
   return typeof v === "number" && Number.isFinite(v) && v >= min && v <= max;
 }
 
-/** The chat widget asks this once when opened: is Vita on for this deployment? */
+// Is the router actually able to serve Vita? Asked with a session that cannot exist: a router with Vita
+// answers 404 "Session ... not found"; one without it (Vita not deployed yet) answers a bare 404; a key
+// without the "chat" scope gets 401/403. Remembered for 5 minutes so pages don't hammer the router.
+const READY_TTL_MS = 5 * 60 * 1000;
+let ready: { ok: boolean; reason: string; at: number } | null = null;
+
+async function routerReady(): Promise<{ ok: boolean; reason: string }> {
+  if (ready && Date.now() - ready.at < READY_TTL_MS) return ready;
+  let result: { ok: boolean; reason: string };
+  try {
+    const res = await fetch(`${BASE}/v2/agent/session/vita-readiness-check`, {
+      headers: KEY ? { "X-Api-Key": KEY } : {},
+      cache: "no-store",
+      signal: AbortSignal.timeout(5000),
+    });
+    const text = await res.text();
+    if (res.status === 404 && /session/i.test(text)) result = { ok: true, reason: "ready" };
+    else if (res.status === 404) result = { ok: false, reason: "router has no /v2/agent/chat (deploy 1HMS-NLP-Router with Vita)" };
+    else if (res.status === 401 || res.status === 403) result = { ok: false, reason: `router refused this site's key (${res.status}): it needs the "chat" scope` };
+    else result = { ok: res.ok, reason: res.ok ? "ready" : `router answered ${res.status}` };
+  } catch (e) {
+    result = { ok: false, reason: `router unreachable: ${(e as Error).name}` };
+  }
+  if (!result.ok) console.error(`[vita] chat is off: ${result.reason}`);
+  ready = { ...result, at: Date.now() };
+  return result;
+}
+
+/** The chat widget asks this when a page loads: is Vita on and ready? If not, it stays the WhatsApp
+ * hand-off, and the server log says why. */
 export async function GET() {
-  return NextResponse.json({ enabled: ENABLED }, { headers: { "Cache-Control": "no-store" } });
+  const ok = ENABLED && (await routerReady()).ok;
+  return NextResponse.json({ enabled: ok }, { headers: { "Cache-Control": "no-store" } });
 }
 
 export async function POST(req: NextRequest) {
@@ -80,9 +110,16 @@ export async function POST(req: NextRequest) {
     });
     if (res.status === 422) return fail("invalid", 422); // e.g. a doctor not shown in this session
     if (res.status === 429) return fail("too_many", 429);
-    if (!res.ok) return fail("vita_unavailable", 502);
+    if (!res.ok) {
+      // the browser only learns "unavailable"; the server log says why, and the next widget check
+      // re-probes the router
+      console.error(`[vita] router answered ${res.status} for /v2/agent/chat`);
+      if ([401, 403, 404].includes(res.status)) ready = null;
+      return fail("vita_unavailable", 502);
+    }
     return NextResponse.json(await res.json());
-  } catch {
+  } catch (e) {
+    console.error(`[vita] router unreachable: ${(e as Error).name}`);
     return fail("vita_unavailable", 502);
   } finally {
     clearTimeout(timer);

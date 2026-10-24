@@ -338,4 +338,7 @@ export const hinglish: Record<keyof typeof en, string> = {
   "vita.inputPlaceholderVoice": "Likhein ya bolein…",
   "vita.nudge": "Doctor chahiye? Mujhse Hindi ya English mein poochein.",
   "vita.nudgeClose": "Yeh message chhupayein",
+  "vita.ask": "Vita se poochein",
+  "vita.offlineTitle": "Vita taiyaar ho rahi hai",
+  "vita.offlineBody": "Main bahut jaldi yahin aapke liye doctor dhoondh paungi. Tab tak hamari team WhatsApp par madad kar sakti hai, ya aap saare doctor dekh sakte hain.",
 };
