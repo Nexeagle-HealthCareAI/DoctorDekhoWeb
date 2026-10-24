@@ -16,6 +16,7 @@ vi.mock("@/lib/navigation", () => ({ geocodeAddress: vi.fn(async () => [88.41, 2
 import VitaChat from "./VitaChat";
 import { I18nProvider } from "@/lib/i18n/I18nContext";
 import { useVitaChat } from "@/hooks/useVitaChat";
+import { __resetLocationStore, getLocation, setLocation, useSharedLocation } from "@/lib/location/store";
 
 function Harness() {
   const chat = useVitaChat();
@@ -31,6 +32,7 @@ beforeEach(() => {
   queue = [];
   window.sessionStorage.clear();
   window.localStorage.clear();
+  __resetLocationStore();
   vi.stubGlobal("fetch", vi.fn(async (_url: string, init?: RequestInit) => {
     sent.push(JSON.parse(String(init?.body ?? "{}")));
     const next = queue.shift();
@@ -126,7 +128,43 @@ describe("Vita chat panel", () => {
     await userEvent.type(screen.getByRole("textbox", { name: /your city or area/i }), "Salt Lake");
     await userEvent.click(screen.getByRole("button", { name: "Use this" }));
     expect(sent.at(-1)).toMatchObject({ text: "Salt Lake", city: "Salt Lake", lat: 22.58, lng: 88.41 });
-    expect(window.localStorage.getItem("vita_city")).toBe("Salt Lake");
+    expect(getLocation()).toMatchObject({ city: { name: "Salt Lake" }, source: "picked", coords: { lat: 22.58, lng: 88.41 } });
+  });
+
+  it("LOC: the detected location is sent by default, without asking", async () => {
+    setLocation({ city: { id: "kolkata-west-bengal", name: "Kolkata", state: "West Bengal" }, coords: { lat: 22.57, lng: 88.36 } }, "detected");
+    show();
+    expect(screen.getByText(/Kolkata/)).toBeInTheDocument();
+    await say("paas mein cardiologist", replies.list);
+    expect(sent.at(-1)).toMatchObject({ city: "Kolkata", lat: 22.57, lng: 88.36 });
+  });
+
+  it("LOC: a city picked on the site shows in the chat, and one typed in the chat shows on the site", async () => {
+    function Site() {
+      const loc = useSharedLocation();
+      return (
+        <div>
+          <p data-testid="site-city">{loc.city?.name ?? "none"}</p>
+          <button type="button" onClick={() => setLocation({ city: { id: "purnea-bihar", name: "Purnea", state: "Bihar" } }, "picked")}>pick Purnea</button>
+        </div>
+      );
+    }
+    render(<I18nProvider><Site /><Harness /></I18nProvider>);
+    await userEvent.click(screen.getByRole("button", { name: "pick Purnea" }));
+    expect(screen.getByTestId("site-city")).toHaveTextContent("Purnea");
+    expect(screen.getByText(/Purnea/, { selector: "span" })).toBeInTheDocument(); // the chat's location line
+    await say("paas mein cardiologist", replies.list);
+    expect(sent.at(-1)).toMatchObject({ city: "Purnea" });
+    expect(sent.at(-1)).not.toHaveProperty("lat");
+
+    await say("paas mein cardiologist", replies.location);
+    await userEvent.click(await screen.findByRole("button", { name: "Type area or pincode" }));
+    queue.push(replies.list);
+    const box = screen.getByRole("textbox", { name: /your city or area/i });
+    await userEvent.clear(box);
+    await userEvent.type(box, "Kishanganj");
+    await userEvent.click(screen.getByRole("button", { name: "Use this" }));
+    expect(screen.getByTestId("site-city")).toHaveTextContent("Kishanganj");
   });
 
   it("UI-6: an emergency shows the emergency card and nothing to book", async () => {

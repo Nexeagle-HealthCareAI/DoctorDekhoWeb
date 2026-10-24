@@ -1,12 +1,15 @@
 "use client";
 
 import { useCallback, useRef, useState } from "react";
+import { CITIES } from "@/data/patient";
+import { cityFromText, detectAgain, setLocation, useSharedLocation } from "@/lib/location/store";
 import type { VitaReply, VitaRequest } from "@/lib/vita/types";
 
 // Conversation state for the Vita chat panel. Every turn goes through /api/vita/chat (server proxy
 // to the router's /v2/agent/chat). The session id lives in sessionStorage so a page change keeps the
-// conversation; the city the patient typed lives in localStorage. Location (lat/lng) is kept only in
-// memory and sent with each search: the router uses it for that search and never stores it.
+// conversation. The location is the site's shared one (src/lib/location/store.ts): taken by default,
+// the same city the home page shows, and a change here shows there. City and point are sent with each
+// turn; the router uses them for that search and never stores the point.
 
 export type VitaErrorKind = "unavailable" | "invalid" | "too_many";
 
@@ -29,7 +32,6 @@ export interface SendOptions {
 }
 
 const SESSION_KEY = "vita_session";
-const CITY_KEY = "vita_city";
 
 function readStore(storage: "local" | "session", key: string): string | null {
   try {
@@ -52,9 +54,9 @@ function writeStore(storage: "local" | "session", key: string, value: string | n
 export function useVitaChat(options: { hospitalId?: string } = {}) {
   const [entries, setEntries] = useState<VitaEntry[]>([]);
   const [busy, setBusy] = useState(false);
-  const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
-  const [city, setCityState] = useState<string | null>(() =>
-    typeof window === "undefined" ? null : readStore("local", CITY_KEY));
+  const location = useSharedLocation();
+  const coords = location.coords;
+  const city = location.city?.name ?? null;
   const sessionRef = useRef<string | null>(typeof window === "undefined" ? null : readStore("session", SESSION_KEY));
   const nextId = useRef(1);
   const lastSend = useRef<{ text: string; opts: SendOptions } | null>(null);
@@ -113,28 +115,14 @@ export function useVitaChat(options: { hospitalId?: string } = {}) {
     if (last) void send(last.text, { ...last.opts, quiet: true });
   }, [send]);
 
-  /** Asks the browser for the location (only after the patient taps "Share my location"). */
-  const requestLocation = useCallback(
-    (): Promise<{ lat: number; lng: number } | null> =>
-      new Promise((resolve) => {
-        if (typeof navigator === "undefined" || !navigator.geolocation) return resolve(null);
-        navigator.geolocation.getCurrentPosition(
-          (pos) => {
-            const c = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-            setCoords(c);
-            resolve(c);
-          },
-          () => resolve(null),
-          { enableHighAccuracy: false, timeout: 10000, maximumAge: 300000 },
-        );
-      }),
-    [],
-  );
+  /** "Share my location": detect again; the result replaces a picked city, here and on the site. */
+  const requestLocation = useCallback((): Promise<{ lat: number; lng: number } | null> => detectAgain(), []);
 
-  const setCity = useCallback((value: string | null) => {
+  /** A city or area the patient typed (with its point, when the map service found one); the site's
+   * city picker shows it too. */
+  const setCity = useCallback((value: string | null, at?: { lat: number; lng: number } | null) => {
     const v = value?.trim() || null;
-    setCityState(v);
-    writeStore("local", CITY_KEY, v);
+    setLocation({ city: v ? cityFromText(v, CITIES) : null, coords: at ?? null }, "picked");
   }, []);
 
   const reset = useCallback(() => {
