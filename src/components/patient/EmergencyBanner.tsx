@@ -21,7 +21,11 @@ export function isSelfHarm(reasons: string[]): boolean {
   return reasons.some((r) => SELF_HARM.test(r));
 }
 
-export default function EmergencyBanner({ reasons }: { reasons: string[] }) {
+export default function EmergencyBanner({ reasons, doctorsBelow = true }: {
+  reasons: string[];
+  /** false where no doctor list follows (the Vita chat): the "listed below" line would be untrue. */
+  doctorsBelow?: boolean;
+}) {
   const { t } = useTranslation();
   const selfHarm = isSelfHarm(reasons);
 
@@ -68,7 +72,7 @@ export default function EmergencyBanner({ reasons }: { reasons: string[] }) {
             </div>
           )}
 
-          <p className="text-sm text-slate-600">{t("directory.emergencyDoctorsBelow")}</p>
+          {doctorsBelow && <p className="text-sm text-slate-600">{t("directory.emergencyDoctorsBelow")}</p>}
         </div>
       </div>
     </div>
