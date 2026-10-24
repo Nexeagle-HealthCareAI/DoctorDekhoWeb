@@ -34,6 +34,28 @@ describe("/api/vita/chat", () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
+  it("is on only when the router can really serve Vita", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    const probe = async (status: number, body: string) => {
+      await load({ NLP_ROUTER_BASE_URL: "http://router", NLP_ROUTER_API_KEY: "k" });
+      fetchMock.mockResolvedValueOnce(new Response(body, { status }));
+      return (await (await route.GET()).json()).enabled;
+    };
+    expect(await probe(404, JSON.stringify({ detail: "Session 'vita-readiness-check' not found or has expired" }))).toBe(true);
+    expect(fetchMock.mock.calls[0][0]).toBe("http://router/v2/agent/session/vita-readiness-check");
+    expect(await probe(404, JSON.stringify({ detail: "Not Found" }))).toBe(false);   // Vita not deployed yet
+    expect(await probe(403, "{}")).toBe(false);                                       // key without the chat scope
+    expect(await probe(401, "{}")).toBe(false);
+  });
+
+  it("remembers the router check for a few minutes", async () => {
+    await load({ NLP_ROUTER_BASE_URL: "http://router" });
+    fetchMock.mockResolvedValue(new Response(JSON.stringify({ detail: "Session 'x' not found" }), { status: 404 }));
+    await route.GET();
+    await route.GET();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
   it("can be switched off at runtime", async () => {
     await load({ NLP_ROUTER_BASE_URL: "http://router", VITA_CHAT_ENABLED: "0" });
     expect(await (await route.GET()).json()).toEqual({ enabled: false });
@@ -75,6 +97,7 @@ describe("/api/vita/chat", () => {
     await load({ NLP_ROUTER_BASE_URL: "http://router" });
     fetchMock.mockResolvedValueOnce(json({ detail: "x" }, 422));
     expect((await post({ text: "Choose" })).status).toBe(422);
+    vi.spyOn(console, "error").mockImplementation(() => {});
     fetchMock.mockResolvedValueOnce(json({ detail: "boom" }, 500));
     const res = await post({ text: "hi" });
     expect(res.status).toBe(502);
