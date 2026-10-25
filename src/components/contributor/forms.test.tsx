@@ -229,13 +229,14 @@ describe("SubmitConsentDialog", () => {
 });
 
 describe("TopicForm: asking for a writer", () => {
-  it("lets a doctor ask for a writer, and sends that with the topic", async () => {
+  it("tells a doctor the team writes the topic and they review it, and always sends it that way", async () => {
     const onSubmit = vi.fn().mockResolvedValue(undefined);
     render(<TopicForm sectorOnly={false} canAskWriter onSubmit={onSubmit} />);
     await userEvent.type(screen.getByLabelText("Topic"), "Sleep and blood pressure");
     await userEvent.type(screen.getByLabelText("What would you write about?"), "How poor sleep raises BP.");
     await userEvent.type(screen.getByLabelText("Why does it matter?"), "Patients ask.");
-    await userEvent.click(screen.getByRole("checkbox", { name: /someone else to write it/i }));
+    expect(screen.getByText(/The NexEagle team writes this one/)).toBeInTheDocument();
+    expect(screen.queryByRole("checkbox")).toBeNull();
     await userEvent.click(screen.getByRole("button", { name: "Send to the team" }));
     await waitFor(() => expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ title: "Sleep and blood pressure", requestWriter: true })));
   });
