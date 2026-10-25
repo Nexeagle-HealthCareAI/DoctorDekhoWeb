@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { CalendarCheck, CheckCircle2, MapPin, MessageCircle, RotateCcw, RotateCw, Square, ThumbsDown, ThumbsUp, Volume2, X } from "lucide-react";
+import { CalendarCheck, CheckCircle2, LocateFixed, MapPin, MessageCircle, Ticket, RotateCcw, RotateCw, Square, ThumbsDown, ThumbsUp, Volume2, X } from "lucide-react";
 import EmergencyBanner from "@/components/patient/EmergencyBanner";
 import VitaDoctorCard, { doctorHref, feeOf } from "@/components/patient/vita/VitaDoctorCard";
 import { useTranslation } from "@/lib/i18n/I18nContext";
@@ -31,6 +31,8 @@ export interface ReplyActions {
   startOver: () => void;
   /** Emergency without a location: ask the browser for it and send it, so the nearest hospitals follow. */
   shareLocation?: () => void;
+  /** After booking, "Check in now": ask the browser for the location and send "check in" with it. */
+  checkIn?: () => void;
 }
 
 export interface ReplySpeech {
@@ -91,7 +93,8 @@ export default function VitaReplyView({
   const lookupFailed = (reply.degraded ?? []).includes("doctor_lookup");
   const primary = reply.card?.outputs?.find((o) => o.role === "PRIMARY")?.specialist;
   const block = reply.doctors;
-  const clarify = reply.clarify && reply.clarify.kind !== "location" ? reply.clarify : null;
+  // "location" is answered by the location prompt; "visit_checkin" by the visit card's own button
+  const clarify = reply.clarify && reply.clarify.kind !== "location" && reply.clarify.kind !== "visit_checkin" ? reply.clarify : null;
 
   const onOption = (o: VitaOption) => {
     if (UUID.test(o.id)) actions.choose(o.id, o.label);
@@ -170,6 +173,10 @@ export default function VitaReplyView({
       {reply.clarify?.kind === "book_confirm" && reply.booking && <BookingSummary booking={reply.booking} />}
 
       {reply.kind === "booked" && reply.booking && <BookedCard booking={reply.booking} />}
+
+      {reply.kind === "visit" && reply.visit && (
+        <VisitCard reply={reply} active={active} off={off} onCheckIn={actions.checkIn} />
+      )}
 
       {reply.kind === "info" && reply.doctor && (
         <VitaDoctorCard doctor={reply.doctor} disabled={off} onChoose={(d) => actions.choose(d.doctorId, t("vita.chooseDoctor", { name: d.name ?? "" }))} />
@@ -393,6 +400,44 @@ function BookedCard({ booking }: { booking: VitaBooking }) {
         </Link>
       </div>
       <p className="mt-2 text-xs text-slate-500">{t("vita.hospitalConfirms")}</p>
+    </section>
+  );
+}
+
+/** After booking: directions, the visit page, the token, and "Check in now" (the hospital checks the patient is there). */
+function VisitCard({ reply, active, off, onCheckIn }: { reply: VitaReply; active: boolean; off: boolean; onCheckIn?: () => void }) {
+  const { t } = useTranslation();
+  const visit = reply.visit!;
+  const token = visit.token;
+  const canCheckIn = active && reply.clarify?.kind === "visit_checkin" && !!onCheckIn;
+  return (
+    <section aria-label={t("visit.details")} className="flex flex-col gap-2 rounded-2xl border border-[#C9DAD6] bg-white p-3.5 text-sm shadow-[0_1px_2px_rgba(16,48,45,0.08)]">
+      {token?.tokenNo ? (
+        <div className="flex items-center gap-3 rounded-xl bg-[#0B4F4A] px-3 py-2 text-white">
+          <Ticket className="h-5 w-5" aria-hidden="true" />
+          <span className="text-xs font-bold uppercase tracking-wider text-white/80">{t("visit.token")}</span>
+          <span className="text-2xl font-extrabold" aria-live="polite">{token.tokenNo}</span>
+          {token.estimatedWaitMinutes ? <span className="ml-auto text-xs">{t("visit.wait", { m: String(token.estimatedWaitMinutes) })}</span> : null}
+        </div>
+      ) : null}
+      {canCheckIn && (
+        <button type="button" disabled={off} onClick={onCheckIn}
+          className="inline-flex min-h-[48px] items-center justify-center gap-2 rounded-xl bg-[#0B5E57] px-4 font-bold text-white disabled:opacity-50">
+          <LocateFixed className="h-5 w-5" aria-hidden="true" /> {reply.clarify?.options?.[0]?.label ?? t("visit.checkIn")}
+        </button>
+      )}
+      <div className="flex flex-wrap gap-2">
+        {!visit.cancelled && (
+          <a href={visit.mapUrl} target="_blank" rel="noopener noreferrer"
+            className="inline-flex min-h-[44px] items-center gap-1.5 rounded-xl border border-slate-300 bg-white px-3 font-semibold text-slate-800 hover:bg-slate-50">
+            <MapPin className="h-4 w-4" aria-hidden="true" /> {t("vita.directions")}
+          </a>
+        )}
+        <Link href={`/appointments/visit/${visit.appointmentId}`}
+          className="inline-flex min-h-[44px] items-center rounded-xl border border-slate-300 bg-white px-3 font-semibold text-[#0B5E57] hover:bg-slate-50">
+          {t("visit.details")}
+        </Link>
+      </div>
     </section>
   );
 }

@@ -122,7 +122,14 @@ function AppointmentCard({ appt, canViewDocuments }: { appt: PatientAppointment;
 
       <div className="mt-5 pt-4 border-t border-slate-100 flex items-center justify-between">
         <span className="text-[11px] font-semibold text-slate-400">Ref: {appt.appointmentId.slice(0, 8).toUpperCase()}</span>
-        <ChevronRight className="w-4 h-4 text-slate-300" />
+        {!isCancelled ? (
+          <Link href={`/appointments/visit/${appt.appointmentId}`}
+            className="inline-flex items-center gap-1 text-xs font-bold text-brand-teal hover:text-teal-700">
+            Directions &amp; check-in <ChevronRight className="w-4 h-4" />
+          </Link>
+        ) : (
+          <ChevronRight className="w-4 h-4 text-slate-300" />
+        )}
       </div>
     </div>
   );
