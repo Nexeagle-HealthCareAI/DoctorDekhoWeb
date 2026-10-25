@@ -23,12 +23,22 @@ interface MineResponse {
 
 const MINE_QUERY_KEY = ["patient-auth", "mine"];
 
+/** The check could not be answered (rate limit, a deploy in progress). It says nothing about the login, so it is asked again shortly. */
+export class LoginCheckError extends Error {
+  constructor(public status: number, public retryAfterMs: number | null) {
+    super(`login check failed (${status})`);
+  }
+}
+
 async function fetchMine(): Promise<MineResponse> {
   const res = await fetch("/api/public/appointments/mine");
   // 401 just means "not logged in" here — not an error state, the route always returns JSON.
   // Any other failure (rate limit, a deploy in progress) says nothing about the login: throw, so the query keeps the last known
   // state instead of showing a signed-in patient as signed out.
-  if (!res.ok && res.status !== 401) throw new Error(`login check failed (${res.status})`);
+  if (!res.ok && res.status !== 401) {
+    const seconds = Number(res.headers.get("Retry-After"));
+    throw new LoginCheckError(res.status, Number.isFinite(seconds) && seconds > 0 ? seconds * 1000 : null);
+  }
   return res.json();
 }
 
@@ -47,7 +57,10 @@ export function usePatientAuth() {
     queryKey: MINE_QUERY_KEY,
     queryFn: fetchMine,
     staleTime: 30_000,
-    retry: false,
+    // A busy moment (429) or a restart (502/503) is asked again a few times, waiting as long as the server says (at most 10 s), and until
+    // then the person sees "checking", not "logged out". An answer of "not logged in" (401) is final and is not retried.
+    retry: (count, error) => error instanceof LoginCheckError && count < 3,
+    retryDelay: (count, error) => Math.min(error instanceof LoginCheckError && error.retryAfterMs ? error.retryAfterMs : 1500 * (count + 1), 10_000),
   });
 
   const sendOtp = useMutation({
@@ -96,6 +109,8 @@ export function usePatientAuth() {
     mobile: mounted ? mine.data?.mobile ?? null : null,
     appointments: mounted ? mine.data?.appointments ?? [] : [],
     isLoading: mine.isLoading || !mounted,
+    // The login could not be checked at all (and nothing is known from before): neither "signed in" nor "signed out" is true.
+    loginCheckFailed: mounted && mine.isError && !mine.data,
     notConfigured: mine.data?.notConfigured === true,
     refetch: mine.refetch,
     sendOtp,

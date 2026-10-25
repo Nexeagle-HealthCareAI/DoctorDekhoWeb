@@ -17,7 +17,7 @@ const ICON = "flex items-center justify-center w-8 h-8 rounded-xl bg-slate-50 bo
  */
 export default function AccountMenu() {
   const router = useRouter();
-  const { isLoggedIn, isLoading, mobile, name, initials, tag, logout } = usePatientIdentity();
+  const { isLoggedIn, isLoading, loginCheckFailed, refetch, mobile, name, initials, tag, logout } = usePatientIdentity();
   const [open, setOpen] = useState(false);
   const box = useRef<HTMLDivElement>(null);
 
@@ -45,8 +45,8 @@ export default function AccountMenu() {
     <div className="relative shrink-0" ref={box}>
       <button
         type="button"
-        onClick={() => setOpen((v) => !v)}
-        aria-label="Account menu"
+        onClick={() => (loginCheckFailed ? void refetch() : setOpen((v) => !v))}
+        aria-label={loginCheckFailed ? "Could not check your login. Try again" : "Account menu"}
         aria-expanded={open}
         aria-haspopup="menu"
         className={cn(
@@ -58,7 +58,7 @@ export default function AccountMenu() {
           {isLoggedIn ? initials : <User className="w-4 h-4" aria-hidden="true" />}
         </span>
         <span className="hidden md:block text-sm font-semibold text-slate-700 group-hover:text-brand-teal transition-colors max-w-[10rem] truncate">
-          {isLoggedIn ? (firstName ?? shownName) : "Log in / Register"}
+          {isLoggedIn ? (firstName ?? shownName) : loginCheckFailed ? "Retry login check" : "Log in / Register"}
         </span>
         <ChevronDown className={cn("hidden md:block w-3.5 h-3.5 text-slate-400 transition-transform duration-200", open && "rotate-180 text-brand-teal")} aria-hidden="true" />
       </button>

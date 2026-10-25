@@ -52,6 +52,8 @@ export interface UpstreamResult<T = unknown> {
   status: number;
   /** When the upstream env isn't set yet, so callers can fall back to mock data. */
   notConfigured: boolean;
+  /** The upstream's Retry-After (seconds) on a rate-limit answer, so it can be passed on to the browser. */
+  retryAfter?: string | null;
   data: T | null;
 }
 
@@ -114,7 +116,7 @@ export async function easyhmsFetch<T = unknown>(
     /* non-JSON or empty body */
   }
 
-  return { ok: res.ok, status: res.status, data, notConfigured: false };
+  return { ok: res.ok, status: res.status, data, notConfigured: false, retryAfter: res.headers.get("retry-after") };
 }
 
 export interface GetDoctorByIdResult {
