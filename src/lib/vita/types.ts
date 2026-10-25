@@ -167,6 +167,8 @@ export interface VitaReply {
     kind?: string;
     outputs?: { role: string; specialist: string }[];
     emergency_reasons?: string[];
+    /** The same signs in the reply's language ("saans phoolna"), for the banner. */
+    emergency_signs?: string[];
   } | null;
 }
 
