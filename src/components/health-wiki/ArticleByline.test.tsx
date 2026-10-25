@@ -25,6 +25,13 @@ describe("ArticleByline", () => {
     expect(screen.queryByText(/Medically reviewed by/i)).toBeNull();
   });
 
+  it("says the NexEagle team wrote it, next to the reviewer badge, when the team wrote it for the doctor who reviews it", () => {
+    render(<ArticleByline article={make({ reviewer })} />);
+    expect(screen.getByText(/Medically reviewed by/i)).toBeInTheDocument();
+    expect(screen.getByText("Dr. Meera Nair")).toBeInTheDocument();
+    expect(screen.getByText("The NexEagle Health Wiki team")).toBeInTheDocument();
+  });
+
   it("does not repeat the person when author and reviewer are the same", () => {
     render(<ArticleByline article={make({ reviewer, author: reviewer })} />);
     expect(screen.getAllByText("Dr. Meera Nair")).toHaveLength(1);
