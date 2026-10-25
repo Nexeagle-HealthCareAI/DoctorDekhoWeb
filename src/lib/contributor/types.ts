@@ -73,6 +73,9 @@ export interface MyArticle {
   awaitingVerification: boolean;
   /** The team pulled this article back to review: its author cannot publish it alone until it is approved. */
   holdForReview?: boolean;
+  /** For a reviewer: the doctor whose topic this article was written for, and whether that is the reviewer. */
+  suggestedBy?: string | null;
+  suggestedByMe?: boolean;
   views: number | null;
   likes: number | null;
   publishedAt: string | null;

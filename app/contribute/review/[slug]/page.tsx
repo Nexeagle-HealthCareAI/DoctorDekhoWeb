@@ -56,7 +56,15 @@ export default function ReviewPage({ params }: { params: { slug: string } }) {
   return (
     <div>
       <BackLink href="/contribute">My articles</BackLink>
-      <PageTitle title={a.title} sub={`From ${a.authorName}`} action={a.waitingDays !== null && a.status === "IN_REVIEW" ? <WaitingChip days={a.waitingDays} /> : undefined} />
+      <PageTitle title={a.title} sub={a.authorName ? `From ${a.authorName}` : "Written by the NexEagle team"} action={a.waitingDays !== null && a.status === "IN_REVIEW" ? <WaitingChip days={a.waitingDays} /> : undefined} />
+
+      {canDecide && a.suggestedBy && (
+        <Banner tone="info" className="mb-6">
+          {a.suggestedByMe
+            ? "You suggested this topic. The NexEagle team wrote the article, and it is with you to review. Readers see it only after you approve it."
+            : `${a.suggestedBy} suggested this topic, and the NexEagle team asked you to review the article. Readers see it only after you approve it.`}
+        </Banner>
+      )}
 
       {!canDecide && (
         <Banner tone="info" className="mb-6">{a.status === "PUBLISHED" ? "This article is published." : "This article is not waiting for your review."}</Banner>
