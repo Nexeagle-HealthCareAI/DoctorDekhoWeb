@@ -18,6 +18,13 @@ describe("ArticleByline", () => {
     expect(screen.getByText("Written by")).toBeInTheDocument();
   });
 
+  it("names the NexEagle team when the article has no author and no reviewer, so the box is never empty", () => {
+    render(<ArticleByline article={make({})} />);
+    expect(screen.getByText("Written by")).toBeInTheDocument();
+    expect(screen.getByText("The NexEagle Health Wiki team")).toBeInTheDocument();
+    expect(screen.queryByText(/Medically reviewed by/i)).toBeNull();
+  });
+
   it("does not repeat the person when author and reviewer are the same", () => {
     render(<ArticleByline article={make({ reviewer, author: reviewer })} />);
     expect(screen.getAllByText("Dr. Meera Nair")).toHaveLength(1);

@@ -42,6 +42,16 @@ export default function ArticleByline({ article }: { article: HealthArticle }) {
             </div>
           </div>
         ) : null}
+
+        {/* Written by the NexEagle team in the CMS: no contributor to name, but the box must not be empty. */}
+        {!author && !reviewer ? (
+          <div className="flex items-center gap-4">
+            <div className="min-w-0">
+              <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">Written by</p>
+              <p className="text-sm font-bold text-slate-900">The NexEagle Health Wiki team</p>
+            </div>
+          </div>
+        ) : null}
       </div>
 
       <div className="hidden sm:block w-px bg-slate-200" aria-hidden="true" />

@@ -9,6 +9,7 @@ import { articlePath, buildArticleJsonLd, buildBreadcrumbJsonLd, jsonLdString } 
 import PatientTopBar from "@/components/patient/PatientTopBar";
 import PatientFooter from "@/components/patient/PatientFooter";
 import ArticleBody from "@/components/health-wiki/ArticleBody";
+import BackToEasyHms from "@/components/health-wiki/BackToEasyHms";
 import ArticleByline from "@/components/health-wiki/ArticleByline";
 import ArticleCover from "@/components/health-wiki/ArticleCover";
 import { Disclosure, ReferencesList, SectorNotice } from "@/components/health-wiki/ArticleNotices";
@@ -85,6 +86,7 @@ export default async function HealthArticlePage({ params }: PageProps) {
       <PatientTopBar wide />
 
       <main className="flex-1 pb-24">
+        <BackToEasyHms />
         <div className="bg-white border-b border-slate-200">
           <div className="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
             <nav aria-label="Breadcrumb" className="flex items-center gap-2 text-xs font-medium text-slate-500">
