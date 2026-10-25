@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { PATIENT_SESSION_COOKIE, patientSessionCookieOptions } from "@/lib/api/patientSession";
 
 // Doctor Dekho's chat with Vita, the patient agent: a thin server-side proxy to the NLP router's
 // POST /v2/agent/chat, so the router API key never reaches the browser. It only forwards the fields
@@ -7,6 +8,12 @@ import { NextRequest, NextResponse } from "next/server";
 // The router counts its rate limit per API key, and every Doctor Dekho visitor shares this site's
 // key -- so its HMS_RATE_LIMIT_CHAT must be sized for the whole site, and this route keeps any one
 // visitor (by IP) from using that shared budget up.
+//
+// Booking in the chat (vision Phase 2): the visitor's IP goes to the router as client_ip (1HMS limits
+// bookings and codes per visitor), and a signed-in patient's session token (httpOnly cookie, never in
+// the browser) as patient_token, so Vita books as them without asking for a code. When Vita verified
+// a code, its reply carries patient_session: this route signs the patient in with it (same cookie as
+// the site's own login) and strips it, so the token never reaches the browser.
 
 const BASE = (process.env.NLP_ROUTER_BASE_URL ?? "").trim().replace(/\/+$/, "");
 const KEY = (process.env.NLP_ROUTER_API_KEY ?? "").trim();
@@ -98,6 +105,9 @@ export async function POST(req: NextRequest) {
   if (body.new_search === true) out.new_search = true;
   if (typeof body.ui_language === "string" && /^(en|hi|hinglish|bn)$/.test(body.ui_language)) out.ui_language = body.ui_language;
   if (typeof body.page === "number" && Number.isInteger(body.page) && body.page >= 1 && body.page <= 10) out.page = body.page;
+  if (ip !== "unknown" && ip.length <= 64) out.client_ip = ip;
+  const patientToken = req.cookies.get(PATIENT_SESSION_COOKIE)?.value;
+  if (patientToken && patientToken.length <= 4096) out.patient_token = patientToken;
 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
@@ -118,7 +128,14 @@ export async function POST(req: NextRequest) {
       if ([401, 403, 404].includes(res.status)) ready = null;
       return fail("vita_unavailable", 502);
     }
-    return NextResponse.json(await res.json());
+    const reply = (await res.json()) as Record<string, unknown>;
+    const session = reply.patient_session as { token?: unknown } | undefined;
+    delete reply.patient_session;
+    const response = NextResponse.json(reply);
+    if (session && typeof session.token === "string" && session.token) {
+      response.cookies.set(PATIENT_SESSION_COOKIE, session.token, patientSessionCookieOptions);
+    }
+    return response;
   } catch (e) {
     console.error(`[vita] router unreachable: ${(e as Error).name}`);
     return fail("vita_unavailable", 502);

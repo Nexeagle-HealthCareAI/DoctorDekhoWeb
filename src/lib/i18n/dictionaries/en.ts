@@ -397,6 +397,21 @@ export const en = {
   "vita.shareText": "{name}, {specialty} at {hospital}. On Doctor Dekho: {url}",
   "vita.suggestions": "Suggestions",
   "vita.hide": "Hide",
+  "vita.bookMobileHint": "Your 10-digit mobile number",
+  "vita.bookOtpHint": "6-digit code from WhatsApp",
+  "vita.bookNameHint": "Patient's full name",
+  "vita.bookAgeHint": "Age in years",
+  "vita.codeSent": "Code entered",
+  "vita.confirmTitle": "Check before I book",
+  "vita.labelWhere": "Where",
+  "vita.labelWhen": "When",
+  "vita.labelPatient": "Patient",
+  "vita.labelMobile": "Mobile",
+  "vita.labelFee": "Fee",
+  "vita.payAtHospital": "₹{fee}, paid at the hospital",
+  "vita.booked": "Booked",
+  "vita.bookingId": "Booking ID",
+  "vita.myAppointments": "My appointments",
 } as const;
 
 export type TranslationKey = keyof typeof en;

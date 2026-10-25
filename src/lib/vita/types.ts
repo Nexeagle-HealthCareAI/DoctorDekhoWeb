@@ -9,7 +9,8 @@ export type VitaKind =
   | "doctor_selected"
   | "info"
   | "handoff"
-  | "emergency";
+  | "emergency"
+  | "booked";
 
 export interface VitaOption {
   id: string;
@@ -87,6 +88,30 @@ export interface VitaAvailabilityDay {
   shifts: { name?: string | null; start?: string | null; end?: string | null }[];
 }
 
+/** What Vita is about to book (with clarify.kind "book_confirm") or has booked (kind "booked"). */
+export interface VitaBooking {
+  doctorId: string;
+  doctorName: string;
+  specialty?: string | null;
+  hospital?: string | null;
+  city?: string | null;
+  date: string;
+  shift?: { name?: string | null; start?: string | null; end?: string | null } | null;
+  /** Day and time already said in the conversation's language, e.g. "Tomorrow (Mon 26 Oct), Morning 09:00-13:00". */
+  when: string;
+  fee?: number | null;
+  patientName?: string | null;
+  patientAge?: number | null;
+  patientAgeUnit?: string | null;
+  patientSex?: string | null;
+  forWhom?: string | null;
+  /** Masked, e.g. "98xxxxxx10". */
+  mobile?: string | null;
+  mapUrl?: string | null;
+  /** Only once booked. */
+  appointmentId?: string;
+}
+
 export interface VitaReply {
   session_id: string;
   turn: number | null;
@@ -101,6 +126,7 @@ export interface VitaReply {
   selectedDoctorId?: string;
   availability?: { days: VitaAvailabilityDay[]; nextAvailableDate?: string | null; note?: string };
   handoff?: { reason: string };
+  booking?: VitaBooking;
   card?: {
     kind?: string;
     outputs?: { role: string; specialist: string }[];

@@ -5,6 +5,7 @@ import { CITIES } from "@/data/patient";
 import { cityFromText, detectAgain, setLocation, useSharedLocation } from "@/lib/location/store";
 import type { VitaReply, VitaRequest } from "@/lib/vita/types";
 import { clearChat, loadChat, saveChat } from "@/lib/vita/memory";
+import { useGuestAppointments } from "@/hooks/useGuestAppointments";
 
 // Conversation state for the Vita chat panel. Every turn goes through /api/vita/chat (server proxy
 // to the router's /v2/agent/chat). The conversation is kept on this device for 24 hours after the last
@@ -32,6 +33,8 @@ export interface SendOptions {
   shownAs?: string;
   /** Do not show a patient bubble (e.g. "Show more doctors" button). */
   quiet?: boolean;
+  /** The booking question this answers (clarify.kind), e.g. "book_mobile". */
+  bookingStep?: string;
 }
 
 const SESSION_KEY = "vita_session";
@@ -66,6 +69,10 @@ export function useVitaChat(options: { hospitalId?: string; uiLanguage?: string 
   /** When a conversation from an earlier visit was brought back (ms since epoch), else null. */
   const [restoredAt, setRestoredAt] = useState<number | null>(null);
   const loaded = useRef(false);
+  // The number a guest gave while booking, kept only in memory so a booking made here is listed on this
+  // device's "My appointments" the same way the site's own booking form lists it.
+  const bookingMobile = useRef<string | null>(null);
+  const { addAppointment } = useGuestAppointments();
 
   // Bring back this device's conversation once, after the first render (the server renders it empty).
   useEffect(() => {
@@ -94,6 +101,7 @@ export function useVitaChat(options: { hospitalId?: string; uiLanguage?: string 
       const clean = text.trim();
       if (!clean || busy) return;
       lastSend.current = { text: clean, opts };
+      if (opts.bookingStep === "book_mobile") bookingMobile.current = clean.replace(/\D/g, "").slice(-10) || null;
       if (!opts.quiet) push({ role: "user", text: opts.shownAs ?? clean });
       setBusy(true);
 
@@ -125,6 +133,9 @@ export function useVitaChat(options: { hospitalId?: string; uiLanguage?: string 
           sessionRef.current = reply.session_id;
           writeStore("session", SESSION_KEY, reply.session_id);
         }
+        if (reply.kind === "booked" && reply.booking?.appointmentId && bookingMobile.current) {
+          addAppointment(reply.booking.appointmentId, bookingMobile.current);
+        }
         push({ role: "vita", reply });
       } catch {
         push({ role: "error", error: "unavailable" });
@@ -132,7 +143,7 @@ export function useVitaChat(options: { hospitalId?: string; uiLanguage?: string 
         setBusy(false);
       }
     },
-    [busy, coords, city, options.hospitalId, options.uiLanguage, push],
+    [busy, coords, city, options.hospitalId, options.uiLanguage, push, addAppointment],
   );
 
   const retry = useCallback(() => {
@@ -156,6 +167,7 @@ export function useVitaChat(options: { hospitalId?: string; uiLanguage?: string 
     sessionRef.current = null;
     writeStore("session", SESSION_KEY, null);
     lastSend.current = null;
+    bookingMobile.current = null;
     clearChat();
     setRestoredAt(null);
     setEntries([]);

@@ -134,12 +134,22 @@ export default function VitaChat({ chat, onClose, expanded = false, onToggleExpa
   const chosenId = selectedEntry?.reply?.selectedDoctorId ?? null;
   const chosenDoctor = selectedEntry?.reply?.doctor ?? null;
   const askingLocation = latestVita?.reply?.clarify?.kind === "location" && chat.entries.at(-1) === latestVita;
-  const suggestions = draft && !chat.busy ? suggest(draft) : [];
+  // Booking in the chat: which question Vita is asking right now (book_mobile, book_otp, ...), so the
+  // input offers the right keyboard and autofill, and nothing typed for a booking is kept as a "recent search".
+  const latestKind = chat.entries.at(-1) === latestVita ? latestVita?.reply?.clarify?.kind : undefined;
+  const bookStep = latestKind?.startsWith("book_") ? latestKind : undefined;
+  const typed = bookStep ? BOOK_INPUT[bookStep] : undefined;
+  const suggestions = draft && !chat.busy && !bookStep ? suggest(draft) : [];
 
   const send = (text: string, shownAs?: string) => {
     setShowSpecialties(false);
-    void chat.send(text, { shownAs });
+    void chat.send(text, { shownAs, bookingStep: bookStep });
   };
+
+  // Vita asked for something to type (number, code, name, age): put the cursor there.
+  useEffect(() => {
+    if (typed && !chat.busy) inputRef.current?.focus();
+  }, [typed, chat.busy]);
 
   const newChat = () => {
     voice.stop();
@@ -184,8 +194,9 @@ export default function VitaChat({ chat, onClose, expanded = false, onToggleExpa
     e.preventDefault();
     if (!draft.trim()) return;
     if (speech.listening) speech.stop();
-    addRecent(draft);
-    send(draft);
+    if (!bookStep) addRecent(draft);
+    // the WhatsApp code is never shown back or kept in this device's saved conversation
+    send(draft, bookStep === "book_otp" ? `${t("vita.codeSent")} ••••••` : undefined);
     setDraft("");
     setHint("vita.inputPlaceholderVoice");
   };
@@ -336,9 +347,12 @@ export default function VitaChat({ chat, onClose, expanded = false, onToggleExpa
           ref={inputRef}
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
-          placeholder={speech.listening ? t("vita.listening") : hint === "vita.inputPlaceholderVoice" && !speech.supported ? t("vita.inputPlaceholder") : t(hint)}
-          aria-label={t("vita.inputLabel")}
-          maxLength={1000}
+          placeholder={speech.listening ? t("vita.listening") : typed ? t(typed.hint) : hint === "vita.inputPlaceholderVoice" && !speech.supported ? t("vita.inputPlaceholder") : t(hint)}
+          aria-label={typed ? t(typed.hint) : t("vita.inputLabel")}
+          type={typed?.type ?? "text"}
+          inputMode={typed?.inputMode}
+          autoComplete={typed?.autoComplete ?? "off"}
+          maxLength={typed?.maxLength ?? 1000}
           className="min-h-[48px] min-w-0 flex-1 rounded-full border border-[#C9DAD6] bg-[#F7FAF9] px-4 text-base text-slate-900 placeholder:text-slate-500 focus:border-[#0B5E57] focus:outline-none"
         />
         {speech.supported && (
@@ -356,6 +370,16 @@ export default function VitaChat({ chat, onClose, expanded = false, onToggleExpa
     </div>
   );
 }
+
+/** The input for each booking question Vita asks in words. */
+const BOOK_INPUT: Record<string, {
+  hint: TranslationKey; type?: string; inputMode?: "tel" | "numeric" | "text"; autoComplete?: string; maxLength?: number;
+}> = {
+  book_mobile: { hint: "vita.bookMobileHint", type: "tel", inputMode: "tel", autoComplete: "tel-national", maxLength: 16 },
+  book_otp: { hint: "vita.bookOtpHint", inputMode: "numeric", autoComplete: "one-time-code", maxLength: 6 },
+  book_name: { hint: "vita.bookNameHint", autoComplete: "name", maxLength: 100 },
+  book_age: { hint: "vita.bookAgeHint", inputMode: "numeric", maxLength: 12 },
+};
 
 function ago(at: number, t: ReturnType<typeof useTranslation>["t"]): string {
   const minutes = Math.max(1, Math.round((Date.now() - at) / 60000));
