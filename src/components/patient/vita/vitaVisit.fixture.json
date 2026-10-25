@@ -1,0 +1,105 @@
+{
+ "arrival": {
+  "session_id": "sess_6496b1023ebd",
+  "turn": 1,
+  "kind": "visit",
+  "message": "Welcome! Here's what to do:\n1. Entrance: Use Gate 2.\n2. Go to Counter 3, ground floor and give your booking ID ABCDEF12. They will give you a token.\nOr check in right here: tap 'Check in now' and share your location; I'll get your token.\n3. Then go to the OPD: 1st floor, left of the lift.\n4. Pay the fee (Rs 600) at the counter. Cash and UPI accepted.",
+  "question": null,
+  "card": null,
+  "state": null,
+  "severity": null,
+  "keywords": [],
+  "language": "english",
+  "degraded": [],
+  "clarify": {
+   "kind": "visit_checkin",
+   "question": null,
+   "options": [
+    {
+     "id": "visit:checkin",
+     "label": "Check in now"
+    }
+   ]
+  },
+  "visit": {
+   "appointmentId": "abcdef12-3456-7890-abcd-ef1234567890",
+   "reference": "ABCDEF12",
+   "statusCode": "PRE_APPOINTMENT",
+   "status": "Requested",
+   "confirmed": false,
+   "cancelled": false,
+   "completed": false,
+   "doctorName": "Dr. Anita Sen",
+   "hospitalName": "Salt Lake Care",
+   "address": "Sector V",
+   "city": "Kolkata",
+   "latitude": 22.58,
+   "longitude": 88.42,
+   "mapUrl": "https://www.google.com/maps/dir/?api=1&destination=22.58,88.42",
+   "date": "2026-10-26",
+   "time": "09:00",
+   "isToday": true,
+   "fee": 600,
+   "guide": {
+    "landmark": "Opposite City Centre",
+    "entranceNote": "Use Gate 2",
+    "opdLocation": "1st floor, left of the lift",
+    "registrationDesk": "Counter 3, ground floor",
+    "paymentNote": "Cash and UPI accepted."
+   },
+   "canCheckIn": true,
+   "token": null
+  },
+  "visit_step": "arrival"
+ },
+ "checked_in": {
+  "session_id": "sess_6496b1023ebd",
+  "turn": 2,
+  "kind": "visit",
+  "message": "You're checked in. Your token is 7. Now seeing 4. About 25 min to go.\nWait near the OPD: 1st floor, left of the lift.",
+  "question": null,
+  "card": null,
+  "state": null,
+  "severity": null,
+  "keywords": [],
+  "language": "english",
+  "degraded": [],
+  "clarify": null,
+  "visit": {
+   "appointmentId": "abcdef12-3456-7890-abcd-ef1234567890",
+   "reference": "ABCDEF12",
+   "statusCode": "PRE_APPOINTMENT",
+   "status": "Requested",
+   "confirmed": false,
+   "cancelled": false,
+   "completed": false,
+   "doctorName": "Dr. Anita Sen",
+   "hospitalName": "Salt Lake Care",
+   "address": "Sector V",
+   "city": "Kolkata",
+   "latitude": 22.58,
+   "longitude": 88.42,
+   "mapUrl": "https://www.google.com/maps/dir/?api=1&destination=22.58,88.42",
+   "date": "2026-10-26",
+   "time": "09:00",
+   "isToday": true,
+   "fee": 600,
+   "guide": {
+    "landmark": "Opposite City Centre",
+    "entranceNote": "Use Gate 2",
+    "opdLocation": "1st floor, left of the lift",
+    "registrationDesk": "Counter 3, ground floor",
+    "paymentNote": "Cash and UPI accepted."
+   },
+   "canCheckIn": false,
+   "token": {
+    "tokenNo": 7,
+    "status": "WAITING",
+    "currentServingTokenNo": 4,
+    "positionInQueue": 3,
+    "estimatedWaitMinutes": 25
+   }
+  },
+  "visit_step": "checked_in"
+ }
+}

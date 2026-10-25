@@ -105,6 +105,9 @@ export async function POST(req: NextRequest) {
   if (body.new_search === true) out.new_search = true;
   if (typeof body.ui_language === "string" && /^(en|hi|hinglish|bn)$/.test(body.ui_language)) out.ui_language = body.ui_language;
   if (typeof body.page === "number" && Number.isInteger(body.page) && body.page >= 1 && body.page <= 10) out.page = body.page;
+  if (typeof body.visit_appointment_id === "string" && /^[0-9a-fA-F]{8}(-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}$/.test(body.visit_appointment_id)) {
+    out.visit_appointment_id = body.visit_appointment_id;
+  }
   if (ip !== "unknown" && ip.length <= 64) out.client_ip = ip;
   const patientToken = req.cookies.get(PATIENT_SESSION_COOKIE)?.value;
   if (patientToken && patientToken.length <= 4096) out.patient_token = patientToken;

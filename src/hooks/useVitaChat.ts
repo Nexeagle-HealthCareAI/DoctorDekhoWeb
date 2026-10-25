@@ -72,7 +72,12 @@ export function useVitaChat(options: { hospitalId?: string; uiLanguage?: string 
   // The number a guest gave while booking, kept only in memory so a booking made here is listed on this
   // device's "My appointments" the same way the site's own booking form lists it.
   const bookingMobile = useRef<string | null>(null);
-  const { addAppointment } = useGuestAppointments();
+  const { addAppointment, entries: guestBookings } = useGuestAppointments();
+  // The latest booking made on this device in the last two weeks: Vita uses it for "I've reached", directions and check-in.
+  const latestBooking = (() => {
+    const last = guestBookings.at(-1);
+    return last && Date.now() - Date.parse(last.bookedAt) < 14 * 24 * 60 * 60 * 1000 ? last.appointmentId : undefined;
+  })();
 
   // Bring back this device's conversation once, after the first render (the server renders it empty).
   useEffect(() => {
@@ -114,6 +119,7 @@ export function useVitaChat(options: { hospitalId?: string; uiLanguage?: string 
         ...(at && at.lat !== undefined && at.lng !== undefined ? { lat: at.lat, lng: at.lng } : {}),
         ...(options.hospitalId ? { hospital_id: options.hospitalId } : {}),
         ...(options.uiLanguage ? { ui_language: options.uiLanguage } : {}),
+        ...(latestBooking ? { visit_appointment_id: latestBooking } : {}),
         ...(opts.select_doctor_id ? { select_doctor_id: opts.select_doctor_id } : {}),
         ...(opts.page && opts.page > 1 ? { page: opts.page } : {}),
         ...(opts.new_search ? { new_search: true } : {}),
@@ -143,7 +149,7 @@ export function useVitaChat(options: { hospitalId?: string; uiLanguage?: string 
         setBusy(false);
       }
     },
-    [busy, coords, city, options.hospitalId, options.uiLanguage, push, addAppointment],
+    [busy, coords, city, options.hospitalId, options.uiLanguage, push, addAppointment, latestBooking],
   );
 
   const retry = useCallback(() => {

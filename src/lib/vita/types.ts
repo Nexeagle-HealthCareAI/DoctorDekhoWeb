@@ -10,7 +10,8 @@ export type VitaKind =
   | "info"
   | "handoff"
   | "emergency"
-  | "booked";
+  | "booked"
+  | "visit";
 
 export interface VitaOption {
   id: string;
@@ -141,6 +142,8 @@ export interface VitaEmergency {
   canShareNumber?: boolean;
 }
 
+import type { PublicVisit } from "@/lib/visit/types";
+
 export interface VitaReply {
   session_id: string;
   turn: number | null;
@@ -157,6 +160,9 @@ export interface VitaReply {
   handoff?: { reason: string };
   booking?: VitaBooking;
   emergency?: VitaEmergency;
+  /** kind "visit" (after booking): 1HMS's visit page data, and which answer it is. */
+  visit?: PublicVisit;
+  visit_step?: "directions" | "arrival" | "checked_in" | "status";
   card?: {
     kind?: string;
     outputs?: { role: string; specialist: string }[];
@@ -177,4 +183,6 @@ export interface VitaRequest {
   new_search?: boolean;
   /** The site's UI language (en, hi, hinglish, bn): Vita uses it only until the patient's own words show one. */
   ui_language?: string;
+  /** After booking: the patient's latest booking on this device, for "I've reached", directions and check-in. */
+  visit_appointment_id?: string;
 }

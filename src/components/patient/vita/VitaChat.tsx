@@ -186,6 +186,11 @@ export default function VitaChat({ chat, onClose, expanded = false, onToggleExpa
     },
     refine: (key, language) => send(refinePhrase(key, language), t(REFINE_LABEL[key])),
     startOver: newChat,
+    checkIn: () => {
+      void chat.requestLocation().then((at) => {
+        if (at) void chat.send("check in", { shownAs: t("visit.checkIn") }, { lat: at.lat, lng: at.lng });
+      });
+    },
     shareLocation: () => {
       void chat.requestLocation().then((at) => {
         if (at) void chat.send("location", { shownAs: t("vita.locationSharedMsg") }, { lat: at.lat, lng: at.lng });
