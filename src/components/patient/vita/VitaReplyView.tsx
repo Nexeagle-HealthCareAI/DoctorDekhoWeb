@@ -41,8 +41,10 @@ export interface ReplySpeech {
   stop: () => void;
 }
 
+/** The signs for the banner: in the patient's language when the router sends them (emergency_signs), else its English names. */
 export function emergencyReasons(reply: VitaReply): string[] {
-  return reply.card?.emergency_reasons ?? [];
+  const signs = reply.card?.emergency_signs?.length ? reply.card.emergency_signs : reply.card?.emergency_reasons ?? [];
+  return signs;
 }
 
 export default function VitaReplyView({

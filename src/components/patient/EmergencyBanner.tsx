@@ -23,6 +23,10 @@ const TELE_MANAS = "14416";
 // a mental-health line as well as the ambulance number.
 const SELF_HARM = /suicid|self[- ]?harm|harm (yourself|myself)|kill (myself|yourself)/i;
 
+// Not a sign a patient can read ("Humne yeh lakshan dekhe: Similar to emergency cases in the training data"): older
+// routers sent it when only their model flagged the message.
+const INTERNAL_REASON = /training data/i;
+
 export function isSelfHarm(reasons: string[]): boolean {
   return reasons.some((r) => SELF_HARM.test(r));
 }
@@ -33,6 +37,7 @@ export default function EmergencyBanner({ reasons, doctorsBelow = true }: {
   doctorsBelow?: boolean;
 }) {
   const { t } = useTranslation();
+  reasons = reasons.filter((r) => !INTERNAL_REASON.test(r));
   const selfHarm = isSelfHarm(reasons);
 
   return (
