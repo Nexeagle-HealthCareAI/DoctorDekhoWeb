@@ -1,7 +1,7 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useState } from "react";
-import { ScrollView, StyleSheet, View } from "react-native";
+import { Alert, ScrollView, StyleSheet, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Banner, Button, Chip, TopBar, Txt } from "../../components/ui";
 import { ApiError } from "../../lib/api/http";
@@ -34,6 +34,8 @@ export default function RescheduleScreen() {
       if (!r.success) throw new ApiError(r.message || t("retry"), 400, r);
       await qc.invalidateQueries({ queryKey: keys.appointments });
       router.back();
+      // Say plainly that it's a request again, so nobody takes the new day as confirmed.
+      Alert.alert(t("rescheduled"), t("rescheduledHint", { date: formatShortDate(date, locale) }));
     } catch (e) {
       setError(e instanceof ApiError && !e.isNetwork ? e.message : t("retry"));
     } finally {

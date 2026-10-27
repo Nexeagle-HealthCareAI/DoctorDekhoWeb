@@ -10,7 +10,7 @@ import { formatShortDate, istDateString } from "../../lib/format";
 import { useI18n } from "../../lib/i18n";
 import { localName } from "../../lib/translit";
 import { useHomePlace } from "../../lib/location";
-import { askForPosition, getMapbox, km, leaveBy, MAP_STYLE, minutes, useRoutes, type LatLng, type TravelMode } from "../../lib/map";
+import { askForPosition, getMapbox, hasLiveMap, km, leaveBy, MAP_STYLE, minutes, useRoutes, type LatLng, type TravelMode } from "../../lib/map";
 import { useDoctors } from "../../lib/queries";
 import { callNumber, mapsLink, openDirections } from "../../lib/support";
 import { colors, space } from "../../lib/theme";
@@ -23,7 +23,7 @@ const MODES: { id: TravelMode; label: "modeCar" | "modeAuto" | "modeWalk"; by: "
 
 /**
  * "On the way": the route from you to the hospital on a live map, with Car / Auto / Walk times and, for a booked
- * visit, when to leave. Start directions hands over to Google Maps for turn-by-turn. Params: id = doctor id,
+ * visit, when to leave. Start directions opens the in-app navigator (Google Maps when there's no live map). Params: id = doctor id,
  * date = visit day (YYYY-MM-DD), start = visit start (HH:mm) when known.
  */
 export default function RouteScreen() {
@@ -162,7 +162,11 @@ export default function RouteScreen() {
             onPress={() => void Share.share({ message: t("shareTripMessage", { hospital: d.hospitalName ?? "", doctor: d.name, link: mapsLink(target) }) })}
           />
         </View>
-        <Button label={t("startDirections")} icon="navigate" onPress={() => openDirections(target, mode)} />
+        <Button
+          label={t("startDirections")}
+          icon="navigate"
+          onPress={() => (hasLiveMap() && to ? router.push({ pathname: "/navigate/[id]", params: { id: d.id, mode } }) : openDirections(target, mode))}
+        />
       </View>
     </View>
   );

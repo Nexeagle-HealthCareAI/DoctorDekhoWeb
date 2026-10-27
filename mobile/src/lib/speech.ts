@@ -1,6 +1,7 @@
 import * as Speech from "expo-speech";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Locale } from "./i18n/types";
+import { speakable } from "./spokenNumbers";
 
 /** BCP-47 voices on Android/iOS. Hinglish is written in Latin script but spoken like Hindi-accented English. */
 export const SPEECH_LANG: Record<Locale, string> = { en: "en-IN", hi: "hi-IN", bn: "bn-IN", hinglish: "en-IN" };
@@ -17,7 +18,7 @@ export function useReadAloud(locale: Locale) {
         return;
       }
       setSpeaking(true);
-      Speech.speak(text, {
+      Speech.speak(speakable(text, locale), {
         language: SPEECH_LANG[locale],
         rate: 0.92,
         onDone: () => setSpeaking(false),

@@ -41,6 +41,10 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       SecureStore.deleteItemAsync(TOKEN_KEY).catch(() => {}),
       SecureStore.deleteItemAsync(MOBILE_KEY).catch(() => {}),
       AsyncStorage.removeItem(PROFILE_DONE_KEY).catch(() => {}),
+      // Per-visit things kept on the phone (What to bring ticks, hidden cards): not for the next person on a shared phone.
+      AsyncStorage.getAllKeys()
+        .then((keys) => AsyncStorage.multiRemove(keys.filter((k) => k.startsWith("dd."))))
+        .catch(() => {}),
     ]);
     qc.clear();
     setMobile(null);

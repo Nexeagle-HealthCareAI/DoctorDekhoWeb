@@ -203,6 +203,8 @@ export interface FamilyResponse {
 
 export interface MyAppointment {
   appointmentId: string;
+  /** The doctor's id in the doctor list (newer API only; older servers leave it out). */
+  doctorId?: string;
   doctorName: string;
   hospitalName: string;
   apptDate: string;

@@ -4,19 +4,22 @@ import { setStatusBarStyle } from "expo-status-bar";
 import { useCallback, useMemo, useState } from "react";
 import { Pressable, RefreshControl, ScrollView, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { AfterVisitCard, BringList, FamilyChips, Journey, OtherVisits } from "../../components/CareCards";
 import { CityPicker } from "../../components/CityPicker";
 import { DoctorAvatar, DoctorCard } from "../../components/DoctorCard";
 import { LanguageLink } from "../../components/LanguagePicker";
 import { MapPreview } from "../../components/MapPreview";
 import { Banner, Button, HelpButton, IconCircle, Loading, Logo, SectionHeader, Txt } from "../../components/ui";
-import { distanceKm } from "../../lib/api/doctors";
+import { distanceKm, effectiveFee, type Doctor } from "../../lib/api/doctors";
+import type { MyAppointment } from "../../lib/api/types";
 import { visitKind } from "../../lib/booking";
+import { careState, journeyStep, leaveTime, otherUpcoming, useStoredSet, whoseVisit } from "../../lib/care";
 import { formatShortDate, formatTime, istDateString } from "../../lib/format";
 import { useI18n } from "../../lib/i18n";
 import { localName } from "../../lib/translit";
 import { useHomePlace } from "../../lib/location";
-import { hasLiveMap, hasMapImages, km, leaveBy, minutes, useQuietPosition, useRoutes, type LatLng } from "../../lib/map";
-import { useAppProfile, useDoctors, useMyAppointments, useProfile } from "../../lib/queries";
+import { hasLiveMap, hasMapImages, km, minutes, useQuietPosition, useRoutes, type LatLng } from "../../lib/map";
+import { useAppProfile, useDoctors, useFamily, useMyAppointments, useProfile } from "../../lib/queries";
 import { filterDoctors } from "../../lib/search";
 import { skyNow } from "../../lib/sky";
 import { voiceSearchAvailable } from "../../lib/speech";
@@ -39,6 +42,9 @@ export default function HomeScreen() {
   const app = useAppProfile();
   const doctors = useDoctors();
   const appts = useMyAppointments();
+  const family = useFamily();
+  // Whose care Home shows: "all", "me" or a family member's id. Session only.
+  const [who, setWho] = useState("all");
   const { place, setPlace, locate, locating, cities } = useHomePlace();
   const [pickCity, setPickCity] = useState(false);
   const voice = voiceSearchAvailable();
@@ -60,13 +66,43 @@ export default function HomeScreen() {
     () => (app.data?.lastDoctorId ? doctors.data?.find((d) => d.id === app.data?.lastDoctorId) : undefined),
     [app.data?.lastDoctorId, doctors.data],
   );
-  const next = useMemo(() => {
+  // What Home leads with depends on where the patient is in their care (see lib/care).
+  const members = useMemo(() => family.data?.members ?? [], [family.data]);
+  const myName = profile.data?.fullName;
+  const allAppts = useMemo(() => appts.data?.appointments ?? [], [appts.data]);
+  const shown = useMemo(() => (who === "all" ? allAppts : allAppts.filter((a) => whoseVisit(a, myName, members) === who)), [allAppts, who, myName, members]);
+  const care = useMemo(() => careState(shown), [shown]);
+  const chips = useMemo(() => {
+    if (!members.length) return [];
     const today = istDateString();
-    return (appts.data?.appointments ?? [])
-      .filter((a) => a.apptDate.slice(0, 10) >= today && (visitKind(a) === "pending" || visitKind(a) === "confirmed"))
-      .sort((a, b) => a.apptDate.localeCompare(b.apptDate) || a.startAt.localeCompare(b.startAt))[0];
-  }, [appts.data]);
-  const nextDoctor = useMemo(() => (next ? doctors.data?.find((d) => d.name === next.doctorName) : undefined), [next, doctors.data]);
+    const upcoming = allAppts.filter((a) => a.apptDate.slice(0, 10) >= today && ["pending", "confirmed"].includes(visitKind(a)));
+    const count = (id: string) => upcoming.filter((a) => whoseVisit(a, myName, members) === id).length;
+    return [{ id: "me", name: t("me"), count: count("me") }, ...members.map((m) => ({ id: m.memberId, name: localName(m.firstName, locale), count: count(m.memberId) }))];
+  }, [members, allAppts, myName, t, locale]);
+  const whoName = chips.find((c) => c.id === who)?.name;
+  const { stage, next, last } = care;
+  const nextDoctor = useMemo(() => doctorOf(next, doctors.data), [next, doctors.data]);
+  const lastVisitDoctor = useMemo(() => doctorOf(last, doctors.data), [last, doctors.data]);
+  const hiddenAfter = useStoredSet("dd.afterHidden");
+  const showAfter = stage === "after" && last && !hiddenAfter.ids.has(last.appointmentId);
+  const others = useMemo(
+    () =>
+      who === "all"
+        ? otherUpcoming(allAppts, next)
+            .slice(0, 2)
+            .map((a) => {
+              const day = a.apptDate.slice(0, 10);
+              return {
+                key: a.appointmentId,
+                name: a.patientName ? localName(a.patientName, locale) : "",
+                when: [day === istDateString() ? t("today") : day === istDateString(1) ? t("tomorrow") : formatShortDate(a.apptDate, locale), formatTime(a.startAt)].filter(Boolean).join(" "),
+                doctor: [localName(a.doctorName, locale), localName(a.hospitalName, locale)].join(" · "),
+              };
+            })
+        : [],
+    [who, allAppts, next, locale, t],
+  );
+  const staleMin = appts.dataUpdatedAt ? Math.floor((Date.now() - appts.dataUpdatedAt) / 60000) : 0;
   const nextConfirmed = next ? visitKind(next) === "confirmed" : false;
   const nextDay = next?.apptDate.slice(0, 10);
   const soon = nextDay === istDateString() || nextDay === istDateString(1);
@@ -79,7 +115,13 @@ export default function HomeScreen() {
   // Routes only for a visit today or tomorrow, so Home doesn't spend a route lookup on a visit next week.
   const routes = useRoutes(soon ? origin : null, soon ? clinic : null);
   const auto = routes.data?.auto;
-  const leave = auto ? leaveBy(nextStartTime, auto.seconds) : null;
+  const leave = auto ? leaveTime(nextStartTime, auto.seconds) : null;
+  const visitDay = stage === "visitDay";
+  const openWay = () => {
+    if (!nextDoctor) return;
+    if (visitDay && hasLiveMap() && clinic) router.push({ pathname: "/navigate/[id]", params: { id: nextDoctor.id, mode: "auto" } });
+    else router.push({ pathname: "/route/[id]", params: { id: nextDoctor.id, date: nextDay ?? "", start: nextStartTime ?? "" } });
+  };
 
   // The still map: centred on you, else on the doctors in your city.
   const pinned = nearby.filter((d) => d.latitude != null && d.longitude != null);
@@ -89,7 +131,9 @@ export default function HomeScreen() {
 
   const firstName = profile.data?.firstName || profile.data?.fullName?.split(" ")[0];
   const greeting = firstName ? `${t(sky.greeting)}, ${firstName}` : t(sky.greeting);
-  const areaLabel = place?.area && place.city ? `${place.area}, ${place.city}` : (place?.city ?? t("allIndia"));
+  // "Sector 11, Ghaziabad": the real town from the map; the doctor-list city only when there's no town name.
+  const town = place?.town ?? place?.city;
+  const areaLabel = [place?.area, town].filter(Boolean).join(", ") || t("allIndia");
   const openArea = () => (hasLiveMap() ? router.push("/area") : setPickCity(true));
 
   return (
@@ -154,13 +198,15 @@ export default function HomeScreen() {
             ) : null}
           </Pressable>
 
+          {chips.length ? <FamilyChips chips={chips} value={who} onChange={setWho} /> : null}
+
           {doctors.isError && doctors.data ? <Banner text={t("offline")} tone="warning" icon="cloud-offline" /> : null}
 
           {next ? (
             <View style={styles.nextCard} accessibilityLabel={t("nextVisit")}>
               <View style={styles.rowBetween}>
                 <Txt variant="eyebrow" color={colors.primaryOnDark} style={{ flexShrink: 1 }} numberOfLines={1}>
-                  {[nextDay === istDateString() ? t("today") : nextDay === istDateString(1) ? t("tomorrow") : formatShortDate(next.apptDate, locale), formatTime(next.startAt)].filter(Boolean).join(" · ")}
+                  {[visitDay ? t("visitToday") : nextDay === istDateString(1) ? t("tomorrow") : formatShortDate(next.apptDate, locale), formatTime(next.startAt)].filter(Boolean).join(" · ")}
                 </Txt>
                 <View style={[styles.pill, { backgroundColor: nextConfirmed ? colors.successSoft : colors.warningSoft }]}>
                   <Txt variant="tinyBold" color={nextConfirmed ? colors.success : colors.warning}>
@@ -181,9 +227,22 @@ export default function HomeScreen() {
                   </Txt>
                 ) : null}
               </Pressable>
-              {nextDoctor ? (
+              <Journey current={journeyStep(next)} tone="dark" />
+              {nextDoctor && visitDay ? (
+                <View style={styles.leaveBlock}>
+                  <Txt variant="title" color="#fff">
+                    {leave ? (leave.late ? t("leaveNow") : t("leaveByTime", { time: leave.label })) : t("seeTheWay")}
+                  </Txt>
+                  {auto ? (
+                    <Txt variant="small" color="#DDF1ED">
+                      {t("routeSummary", { min: minutes(auto.seconds), mode: t("byAuto"), dist: km(auto.meters) })}
+                    </Txt>
+                  ) : null}
+                  <Button label={t("startNavigation")} icon="navigate" variant="onDark" onPress={openWay} style={{ marginTop: space.sm }} />
+                </View>
+              ) : nextDoctor ? (
                 <Pressable
-                  onPress={() => router.push({ pathname: "/route/[id]", params: { id: nextDoctor.id, date: nextDay ?? "", start: nextStartTime ?? "" } })}
+                  onPress={openWay}
                   accessibilityRole="button"
                   style={({ pressed }) => [styles.routeRow, { transform: [{ scale: pressed ? 0.98 : 1 }] }]}
                 >
@@ -192,7 +251,7 @@ export default function HomeScreen() {
                   </View>
                   <View style={{ flex: 1 }}>
                     <Txt variant="bodyBold" color="#fff">
-                      {leave ? t("leaveByTime", { time: leave }) : t("seeTheWay")}
+                      {leave ? t("leaveByTime", { time: leave.label }) : t("seeTheWay")}
                     </Txt>
                     {auto ? (
                       <Txt variant="small" color="#DDF1ED">
@@ -209,40 +268,57 @@ export default function HomeScreen() {
             </View>
           ) : null}
 
-          {center && hasMapImages() ? (
-            <MapPreview
-              center={center}
-              zoom={origin ? 13 : 12}
-              pins={pinned.slice(0, 10).map((d) => ({ lat: d.latitude!, lng: d.longitude! }))}
-              me={!!origin}
-              label={mapLabel}
-              action={t("openMap")}
-              onPress={() => router.push("/map")}
-              accessibilityLabel={[mapLabel, t("openMap")].filter(Boolean).join(". ")}
+          {appts.isLoading && !appts.data ? <View style={styles.placeholder} accessibilityLabel={t("loading")} /> : null}
+          {next && staleMin >= 5 ? (
+            <Txt variant="tiny" color={colors.muted} style={{ marginTop: -space.sm }}>
+              {t("updatedAgo", { min: staleMin })}
+            </Txt>
+          ) : null}
+          {who !== "all" && stage === "none" && whoName && appts.data ? (
+            <View style={styles.again}>
+              <Ionicons name="calendar-clear-outline" size={26} color={colors.muted} />
+              <Txt variant="bodyBold" style={{ flex: 1 }}>
+                {t("noVisitsFor", { name: whoName })}
+              </Txt>
+              <Button label={t("findDoctorFor")} size="md" variant="secondary" onPress={() => router.push("/doctors")} />
+            </View>
+          ) : null}
+          <OtherVisits rows={others} onOpen={() => router.push("/appointments")} />
+
+          {next && (stage === "dayBefore" || visitDay) ? <BringList appointmentId={next.appointmentId} fee={nextDoctor ? effectiveFee(nextDoctor) : undefined} /> : null}
+
+          {showAfter && last ? (
+            <AfterVisitCard
+              doctorName={localName(last.doctorName, locale)}
+              hospitalName={localName(last.hospitalName, locale)}
+              onSave={() => router.push({ pathname: "/records", params: { add: "prescription" } })}
+              onFollowUp={lastVisitDoctor ? () => router.push(`/book/${lastVisitDoctor.id}`) : undefined}
+              onHide={() => hiddenAfter.toggle(last.appointmentId)}
             />
           ) : null}
 
           <View style={{ gap: space.md }}>
             <SectionHeader title={t("whatsTroubling")} action={t("seeAll")} onAction={() => router.push("/doctors")} />
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: space.sm, paddingRight: space.lg }} style={{ marginHorizontal: -space.lg, paddingLeft: space.lg }}>
+            {/* The main job of Home: a big, two-column grid, ahead of the map. */}
+            <View style={styles.symptomGrid}>
               {SYMPTOMS.map((s) => (
                 <Pressable
                   key={s.id}
                   onPress={() => router.push({ pathname: "/doctors", params: { symptom: s.id } })}
                   accessibilityRole="button"
                   accessibilityLabel={s.label[locale]}
-                  style={({ pressed }) => [styles.chip, pressed && { borderColor: colors.primary, backgroundColor: colors.primarySoft, transform: [{ scale: 0.96 }] }]}
+                  style={({ pressed }) => [styles.symptom, pressed && { borderColor: colors.primary, backgroundColor: colors.primarySoft, transform: [{ scale: 0.97 }] }]}
                 >
-                  <IconCircle icon={s.icon} tint={s.tint} size={38} />
-                  <Txt variant="smallBold" style={{ marginLeft: space.sm, fontSize: 15 }}>
+                  <IconCircle icon={s.icon} tint={s.tint} size={44} />
+                  <Txt variant="bodyBold" numberOfLines={2} style={{ flex: 1, fontSize: 15 }}>
                     {s.label[locale]}
                   </Txt>
                 </Pressable>
               ))}
-            </ScrollView>
+            </View>
           </View>
 
-          {lastDoctor ? (
+          {lastDoctor && !(showAfter && lastVisitDoctor?.id === lastDoctor.id) ? (
             <View style={styles.again}>
               <DoctorAvatar doctor={lastDoctor} size={46} />
               <View style={{ flex: 1, minWidth: 0 }}>
@@ -258,6 +334,20 @@ export default function HomeScreen() {
               </View>
               <Button label={t("book")} size="md" onPress={() => router.push(`/book/${lastDoctor.id}`)} />
             </View>
+          ) : null}
+
+          {center && hasMapImages() ? (
+            <MapPreview
+              center={center}
+              zoom={origin ? 13 : 12}
+              height={120}
+              pins={pinned.slice(0, 10).map((d) => ({ lat: d.latitude!, lng: d.longitude! }))}
+              me={!!origin}
+              label={mapLabel}
+              action={t("openMap")}
+              onPress={() => router.push("/map")}
+              accessibilityLabel={[mapLabel, t("openMap")].filter(Boolean).join(". ")}
+            />
           ) : null}
 
           <SectionHeader title={place?.city ? t("nearYou", { city: place.city }) : t("topDoctors")} action={t("seeAll")} onAction={() => router.push("/doctors")} />
@@ -289,6 +379,12 @@ export default function HomeScreen() {
   );
 }
 
+/** The doctor for a visit: by id (newer API), else by name for older servers. */
+function doctorOf(a: MyAppointment | undefined, list: Doctor[] | undefined): Doctor | undefined {
+  if (!a || !list) return undefined;
+  return (a.doctorId ? list.find((d) => d.id.toLowerCase() === a.doctorId!.toLowerCase()) : undefined) ?? list.find((d) => d.name === a.doctorName);
+}
+
 const avg = (xs: number[]) => xs.reduce((a, b) => a + b, 0) / xs.length;
 
 const styles = StyleSheet.create({
@@ -303,7 +399,10 @@ const styles = StyleSheet.create({
   rowBetween: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: space.sm },
   pill: { borderRadius: radius.pill, paddingHorizontal: 10, paddingVertical: 4 },
   routeRow: { flexDirection: "row", alignItems: "center", gap: space.md, padding: space.md, borderRadius: 16, backgroundColor: "rgba(255,255,255,0.12)" },
+  placeholder: { height: 190, borderRadius: radius.xl, backgroundColor: colors.line },
+  leaveBlock: { padding: space.md, borderRadius: 16, backgroundColor: "rgba(255,255,255,0.12)", gap: 2 },
   routeIcon: { width: 40, height: 40, borderRadius: 20, backgroundColor: "rgba(255,255,255,0.16)", alignItems: "center", justifyContent: "center" },
-  chip: { flexDirection: "row", alignItems: "center", minHeight: 50, paddingLeft: 6, paddingRight: 16, backgroundColor: colors.card, borderWidth: 1, borderColor: colors.line, borderRadius: 25 },
+  symptomGrid: { flexDirection: "row", flexWrap: "wrap", justifyContent: "space-between", rowGap: space.sm },
+  symptom: { width: "48.5%", flexDirection: "row", alignItems: "center", gap: space.sm, minHeight: 72, paddingHorizontal: space.md, backgroundColor: colors.card, borderWidth: 1, borderColor: colors.line, borderRadius: radius.lg },
   again: { flexDirection: "row", alignItems: "center", gap: space.md, backgroundColor: colors.card, borderWidth: 1, borderColor: colors.line, borderRadius: radius.lg, padding: space.md, paddingLeft: space.md + 2 },
 });

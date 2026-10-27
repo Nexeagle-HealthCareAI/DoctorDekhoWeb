@@ -1,9 +1,11 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
-import { Tabs } from "expo-router";
+import { Tabs, useRouter } from "expo-router";
+import { useEffect } from "react";
 import { View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTextStyle } from "../../lib/appearance";
 import { useI18n } from "../../lib/i18n";
+import { recoverCameraPhoto } from "../../lib/pendingPick";
 import { colors } from "../../lib/theme";
 
 type IconName = "home" | "map" | "calendar" | "folder-open" | "person";
@@ -21,6 +23,13 @@ export default function TabsLayout() {
   const { t } = useI18n();
   const ts = useTextStyle();
   const insets = useSafeAreaInsets();
+  const router = useRouter();
+  // If Android closed the app while the camera was open for Records, go back there with the photo.
+  useEffect(() => {
+    void recoverCameraPhoto().then((found) => {
+      if (found) router.navigate({ pathname: "/records", params: { resume: "1" } });
+    });
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
   return (
     <Tabs
       screenOptions={{

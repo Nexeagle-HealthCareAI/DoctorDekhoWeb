@@ -3,11 +3,13 @@ import { useQueryClient } from "@tanstack/react-query";
 import * as DocumentPicker from "expo-document-picker";
 import { Image } from "expo-image";
 import * as ImagePicker from "expo-image-picker";
-import { useMemo, useState } from "react";
+import { useLocalSearchParams, useRouter } from "expo-router";
+import { useEffect, useMemo, useState } from "react";
 import { Alert, Linking, Modal, Pressable, RefreshControl, ScrollView, SectionList, StyleSheet, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Avatar, Banner, Button, Chip, EmptyState, IconCircle, Label, Loading, Logo, TopBar, Txt, type IconName } from "../../components/ui";
 import { ApiError } from "../../lib/api/http";
+import { takePendingPhoto } from "../../lib/pendingPick";
 import { deleteLockerDocument, uploadLockerDocument } from "../../lib/api/patient";
 import type { HealthLockerDocument } from "../../lib/api/types";
 import { relationLabel } from "../../lib/booking";
@@ -60,10 +62,29 @@ export default function RecordsScreen() {
     return all.filter((d) => (filter === "me" ? !d.memberId : d.memberId === filter));
   }, [locker.data, filter]);
 
+  // Home's "Save prescription" opens this tab with add=prescription: go straight to the camera, type already set.
+  const { add, resume } = useLocalSearchParams<{ add?: string; resume?: string }>();
+  const router = useRouter();
+  useEffect(() => {
+    if (add !== "prescription") return;
+    router.setParams({ add: undefined });
+    setType("Prescription");
+    void fromCamera();
+  }, [add]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // A photo recovered after Android closed the app during the camera: open it ready to save.
+  useEffect(() => {
+    if (resume !== "1") return;
+    router.setParams({ resume: undefined });
+    const p = takePendingPhoto();
+    if (p) open(p);
+  }, [resume]); // eslint-disable-line react-hooks/exhaustive-deps
+
   async function fromCamera() {
     const perm = await ImagePicker.requestCameraPermissionsAsync();
     if (!perm.granted) return;
-    const r = await ImagePicker.launchCameraAsync({ quality: 0.7, mediaTypes: ["images"] });
+    // Smaller photos (still sharp enough to read a prescription) use less memory, so Android is less likely to close the app.
+    const r = await ImagePicker.launchCameraAsync({ quality: 0.6, mediaTypes: ["images"], exif: false });
     if (r.canceled || !r.assets[0]) return;
     const a = r.assets[0];
     open({ uri: a.uri, name: a.fileName ?? `photo-${Date.now()}.jpg`, mimeType: a.mimeType ?? "image/jpeg", size: a.fileSize });

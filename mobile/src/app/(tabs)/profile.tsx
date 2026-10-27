@@ -1,3 +1,4 @@
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useQueryClient } from "@tanstack/react-query";
 import Constants from "expo-constants";
 import { useFocusEffect, useRouter } from "expo-router";
@@ -73,6 +74,8 @@ export default function ProfileScreen() {
           setDeleting(true);
           try {
             await deleteAccount();
+            // The saved home area is personal too; language and text size stay (they're about the phone, not the person).
+            await AsyncStorage.removeItem("dd_home_place").catch(() => {});
             await signOut({ serverRevoked: true });
           } catch (e) {
             const tooMany = e instanceof ApiError && e.status === 429;

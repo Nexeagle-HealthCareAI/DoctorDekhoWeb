@@ -105,16 +105,134 @@ export function useRoutes(from: LatLng | null, to: LatLng | null) {
   });
 }
 
-/** The name of the place under a point ("Line Bazar"), in the patient's language where Mapbox has it. */
-export async function areaName(p: LatLng, locale: Locale): Promise<string | null> {
+// ── In-app navigation ───────────────────────────────────────────────────────────────────────────
+
+/** One manoeuvre: what to do at `at`, and the road it leads onto. Text is built in the app's language from `kind`. */
+export interface NavStep {
+  kind: "depart" | "arrive" | "left" | "right" | "slightLeft" | "slightRight" | "sharpLeft" | "sharpRight" | "uturn" | "straight" | "keepLeft" | "keepRight" | "roundabout";
+  road: string;
+  exit?: number;
+  at: LatLng;
+  /** Distance along the route line (m) where this manoeuvre happens. */
+  along: number;
+}
+export interface NavRoute {
+  seconds: number;
+  meters: number;
+  line: LatLng[];
+  /** Cumulative distance (m) along `line` at each point. */
+  cum: number[];
+  steps: NavStep[];
+}
+
+type RawStep = { name?: string; maneuver: { type: string; modifier?: string; exit?: number; location: [number, number] } };
+
+function stepKind(m: RawStep["maneuver"]): NavStep["kind"] {
+  if (m.type === "arrive") return "arrive";
+  if (m.type === "depart") return "depart";
+  if (m.type === "roundabout" || m.type === "rotary" || m.type === "exit roundabout" || m.type === "exit rotary") return "roundabout";
+  const mod = m.modifier ?? "straight";
+  if (m.type === "fork" || m.type === "merge" || m.type === "on ramp" || m.type === "off ramp") {
+    if (mod.includes("left")) return "keepLeft";
+    if (mod.includes("right")) return "keepRight";
+    return "straight";
+  }
+  switch (mod) {
+    case "uturn": return "uturn";
+    case "sharp right": return "sharpRight";
+    case "right": return "right";
+    case "slight right": return "slightRight";
+    case "sharp left": return "sharpLeft";
+    case "left": return "left";
+    case "slight left": return "slightLeft";
+    default: return "straight";
+  }
+}
+
+/** Distance in metres between two points (haversine). */
+export function meters(a: LatLng, b: LatLng): number {
+  const R = 6371000;
+  const rad = Math.PI / 180;
+  const dLat = (b.lat - a.lat) * rad;
+  const dLng = (b.lng - a.lng) * rad;
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(a.lat * rad) * Math.cos(b.lat * rad) * Math.sin(dLng / 2) ** 2;
+  return 2 * R * Math.asin(Math.min(1, Math.sqrt(h)));
+}
+
+/**
+ * Where `p` sits on the line: distance along it (m), how far off it (m), and the segment index. Uses a flat
+ * projection around `p`, which is exact enough at street scale.
+ */
+export function snapToLine(p: LatLng, line: LatLng[], cum: number[]): { along: number; off: number; seg: number } {
+  const kx = 111320 * Math.cos((p.lat * Math.PI) / 180);
+  const ky = 110540;
+  let best = { along: 0, off: Infinity, seg: 0 };
+  for (let i = 0; i < line.length - 1; i++) {
+    const ax = (line[i].lng - p.lng) * kx, ay = (line[i].lat - p.lat) * ky;
+    const bx = (line[i + 1].lng - p.lng) * kx, by = (line[i + 1].lat - p.lat) * ky;
+    const dx = bx - ax, dy = by - ay;
+    const len2 = dx * dx + dy * dy;
+    const t = len2 > 0 ? Math.max(0, Math.min(1, -(ax * dx + ay * dy) / len2)) : 0;
+    const off = Math.hypot(ax + t * dx, ay + t * dy);
+    if (off < best.off) best = { along: cum[i] + t * (cum[i + 1] - cum[i]), off, seg: i };
+  }
+  return best;
+}
+
+/** A turn-by-turn route from A to B for the in-app navigator. Auto-rickshaws use the car route, a little slower. */
+export async function navRoute(mode: TravelMode, from: LatLng, to: LatLng, bearing?: number | null): Promise<NavRoute | null> {
+  if (!MAPBOX_TOKEN) return null;
+  const profile = mode === "walk" ? "walking" : "driving-traffic";
+  // The heading keeps a rerouted trip from telling a moving vehicle to turn round on the spot.
+  const bearings = bearing != null && bearing >= 0 && mode !== "walk" ? `&bearings=${Math.round(bearing)},60;` : "";
+  const url = `https://api.mapbox.com/directions/v5/mapbox/${profile}/${from.lng},${from.lat};${to.lng},${to.lat}?geometries=geojson&overview=full&steps=true${bearings}&access_token=${MAPBOX_TOKEN}`;
+  const res = await fetch(url);
+  if (!res.ok) return null;
+  const json = (await res.json()) as { routes?: { duration: number; distance: number; geometry: { coordinates: [number, number][] }; legs: { steps: RawStep[] }[] }[] };
+  const r = json.routes?.[0];
+  if (!r) return null;
+  const line = r.geometry.coordinates.map(([lng, lat]) => ({ lat, lng }));
+  const cum = [0];
+  for (let i = 1; i < line.length; i++) cum.push(cum[i - 1] + meters(line[i - 1], line[i]));
+  let seg = 0;
+  const steps: NavStep[] = [];
+  for (const s of r.legs.flatMap((l) => l.steps)) {
+    const at = { lat: s.maneuver.location[1], lng: s.maneuver.location[0] };
+    // Manoeuvres come in order, so look for each one from where the previous one was found.
+    let bestI = seg, bestD = Infinity;
+    for (let i = seg; i < line.length; i++) {
+      const dd = meters(at, line[i]);
+      if (dd < bestD) { bestD = dd; bestI = i; }
+      if (bestD < 2) break;
+    }
+    seg = bestI;
+    steps.push({ kind: stepKind(s.maneuver), road: (s.name ?? "").trim(), exit: s.maneuver.exit, at, along: cum[bestI] });
+  }
+  const seconds = mode === "auto" ? r.duration * AUTO_FACTOR : r.duration;
+  return { seconds, meters: r.distance, line, cum, steps };
+}
+
+/** Doctors further than this from the patient don't decide their "city"; the list just shows the nearest doctors anywhere. */
+export const NEAR_CITY_KM = 40;
+
+/**
+ * What the place under a point is called: the neighbourhood ("Sector 11") and the real town or city ("Ghaziabad"), in the
+ * patient's language where Mapbox has it. The town comes from the map, never from the doctor list, so it is right even
+ * where Doctor Dekho has no doctors yet.
+ */
+export async function placeNames(p: LatLng, locale: Locale): Promise<{ area: string | null; town: string | null } | null> {
   if (!MAPBOX_TOKEN) return null;
   const lang = locale === "hi" ? "hi" : locale === "bn" ? "bn" : "en";
   const url = `https://api.mapbox.com/search/geocode/v6/reverse?longitude=${p.lng}&latitude=${p.lat}&types=neighborhood,locality,place&limit=1&language=${lang}&access_token=${MAPBOX_TOKEN}`;
   try {
     const res = await fetch(url);
     if (!res.ok) return null;
-    const json = (await res.json()) as { features?: { properties?: { name?: string } }[] };
-    return json.features?.[0]?.properties?.name ?? null;
+    type Ctx = { name?: string };
+    const json = (await res.json()) as { features?: { properties?: { name?: string; feature_type?: string; context?: { place?: Ctx; district?: Ctx } } }[] };
+    const f = json.features?.[0]?.properties;
+    if (!f) return null;
+    const isTown = f.feature_type === "place";
+    return { area: isTown ? null : (f.name ?? null), town: isTown ? (f.name ?? null) : (f.context?.place?.name ?? f.context?.district?.name ?? null) };
   } catch {
     return null;
   }

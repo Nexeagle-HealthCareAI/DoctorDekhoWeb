@@ -39,7 +39,7 @@ export function DoctorCard({ doctor, onPress, onBook, why }: { doctor: Doctor; o
   const kind = plainSpecialty(doctor.specialtyId, locale);
   const km = doctor.distanceKm != null ? `${doctor.distanceKm < 10 ? doctor.distanceKm.toFixed(1) : Math.round(doctor.distanceKm)} km` : null;
   const langs = doctor.languages.slice(0, 2).join(", ");
-  const spoken = [doctor.name, kind, doctor.hospitalName, fee != null ? t("fullFee", { fee: rupees(fee) }) : null, doctor.isAvailableToday ? t("availableToday") : null].filter(Boolean).join(". ");
+  const spoken = [localName(doctor.name, locale), kind, doctor.hospitalName ? localName(doctor.hospitalName, locale) : null, fee != null ? t("fullFee", { fee: rupees(fee) }) : null, doctor.isAvailableToday ? t("availableToday") : null].filter(Boolean).join(". ");
 
   return (
     <View style={styles.card}>

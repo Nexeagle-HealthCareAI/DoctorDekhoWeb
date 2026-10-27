@@ -5,7 +5,7 @@ import { useMemo, useState } from "react";
 import { Alert, FlatList, Linking, Pressable, RefreshControl, StyleSheet, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { DoctorAvatar } from "../../components/DoctorCard";
-import { LiveDot } from "../../components/Motion";
+import { Journey } from "../../components/CareCards";
 import { Banner, Card, DateBlock, EmptyState, IconButton, Loading, Logo, Segmented, Txt, type IconName } from "../../components/ui";
 import type { Doctor } from "../../lib/api/doctors";
 import { cancelAppointment, getAppointmentDocuments } from "../../lib/api/patient";
@@ -210,7 +210,7 @@ function UpcomingCard({ a, doctor }: { a: MyAppointment; doctor?: Doctor }) {
       ) : null}
 
       <View style={{ flexDirection: "row", gap: space.sm }}>
-        {doctor?.hospitalPhone ? <Action icon="call" label={t("callHospital")} onPress={() => callNumber(doctor.hospitalPhone!)} /> : <Action icon="navigate" label={t("directions")} onPress={() => openDirections({ query: [a.hospitalName, doctor?.city].filter(Boolean).join(", ") })} />}
+        {doctor?.hospitalPhone ? <Action icon="call" label={t("callHospital")} onPress={() => callNumber(doctor.hospitalPhone!)} /> : <Action icon="navigate" label={t("directions")} onPress={() => (doctor?.latitude != null ? router.push({ pathname: "/route/[id]", params: { id: doctor.id, date: day, start: start ?? "" } }) : openDirections({ query: [a.hospitalName, doctor?.city].filter(Boolean).join(", ") }))} />}
         <Action icon="calendar" label={t("reschedule")} onPress={() => router.push({ pathname: "/reschedule/[id]", params: { id: a.appointmentId, date: a.apptDate.slice(0, 10), doctor: a.doctorName } })} />
         <Action icon="close-circle" label={t("cancel")} danger busy={busy} onPress={cancel} />
       </View>
@@ -248,32 +248,6 @@ function ForWhom({ name }: { name: string }) {
       <Txt variant="tinyBold" color={colors.primaryDark} numberOfLines={1} style={{ marginLeft: 5, fontSize: 13, flexShrink: 1 }}>
         {t("visitFor", { name: localName(name, locale) })}
       </Txt>
-    </View>
-  );
-}
-
-/** The request's real steps, each one known to the server: sent → seen by the hospital → the hospital calls → confirmed → visit day. */
-function Journey({ current }: { current: number }) {
-  const { t } = useI18n();
-  const steps = [t("jSent"), t("jSeen"), t("jCall"), t("jConfirmed"), t("jVisit")];
-  return (
-    <View style={styles.journey} accessibilityLabel={t("stepOf", { n: current + 1, total: steps.length, step: steps[current] })}>
-      {steps.map((label, i) => (
-        <View key={label} style={{ flex: 1, alignItems: "center", gap: 6 }}>
-          <View style={{ flexDirection: "row", alignItems: "center", width: "100%" }}>
-            <View style={[styles.bar, { backgroundColor: i === 0 ? "transparent" : i <= current ? colors.primary : colors.line }]} />
-            {i === current ? (
-              <LiveDot size={14} color={colors.primary} />
-            ) : (
-              <View style={[styles.dot, { backgroundColor: i < current ? colors.primary : colors.line }]}>{i < current ? <Ionicons name="checkmark" size={9} color="#fff" /> : null}</View>
-            )}
-            <View style={[styles.bar, { backgroundColor: i === steps.length - 1 ? "transparent" : i < current ? colors.primary : colors.line }]} />
-          </View>
-          <Txt variant="tinyBold" color={i <= current ? colors.primaryDark : colors.muted} center numberOfLines={1} style={{ fontSize: 12, fontWeight: i === current ? "800" : undefined }}>
-            {label}
-          </Txt>
-        </View>
-      ))}
     </View>
   );
 }
@@ -359,10 +333,7 @@ const styles = StyleSheet.create({
   head: { paddingHorizontal: space.lg, paddingTop: space.md, paddingBottom: space.sm, gap: space.md },
   titleRow: { flexDirection: "row", alignItems: "center", paddingHorizontal: 4 },
   status: { flexDirection: "row", alignItems: "center", borderRadius: radius.md - 2, paddingVertical: 10, paddingHorizontal: space.md },
-  journey: { flexDirection: "row" },
   forWhom: { flexDirection: "row", alignItems: "center", alignSelf: "flex-start", maxWidth: "100%", paddingHorizontal: 8, paddingVertical: 3, marginBottom: 4, borderRadius: 999, backgroundColor: colors.primarySoft },
-  bar: { flex: 1, height: 3, borderRadius: 2 },
-  dot: { width: 14, height: 14, borderRadius: 7, alignItems: "center", justifyContent: "center" },
   routeRow: { flexDirection: "row", alignItems: "center", minHeight: 52, paddingHorizontal: space.md, borderRadius: radius.md, backgroundColor: colors.bg },
   hiddenBox: { flexDirection: "row", alignItems: "center", justifyContent: "center", margin: space.lg, minHeight: 64, borderRadius: radius.lg, borderWidth: 1.5, borderStyle: "dashed", borderColor: colors.lineStrong, backgroundColor: colors.card },
   action: { flex: 1, minHeight: 64, borderRadius: radius.md, alignItems: "center", justifyContent: "center", paddingHorizontal: 4 },

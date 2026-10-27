@@ -3,6 +3,8 @@ import { useQueryClient } from "@tanstack/react-query";
 import * as Location from "expo-location";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { distanceKm, type Doctor } from "./api/doctors";
+import { useI18n } from "./i18n";
+import { NEAR_CITY_KM, placeNames } from "./map";
 import { saveAppProfile } from "./api/patient";
 import { keys, useAppProfile, useDoctors } from "./queries";
 
@@ -15,6 +17,8 @@ export interface HomePlace {
   lng?: number;
   /** Neighbourhood picked on the map ("Line Bazar"), shown before the city. Kept on the phone only. */
   area?: string | null;
+  /** The real town or city there ("Ghaziabad"), from the map. Shown in place of `city` when the nearest doctors are elsewhere. */
+  town?: string | null;
 }
 
 export interface CityOption {
@@ -44,6 +48,7 @@ export function useHomePlace() {
   const qc = useQueryClient();
   const app = useAppProfile();
   const doctors = useDoctors();
+  const { locale } = useI18n();
   const [place, setPlace] = useState<HomePlace | null>(null);
   const [locating, setLocating] = useState(false);
 
@@ -89,7 +94,7 @@ export function useHomePlace() {
       if (perm.status !== "granted") return false;
       const pos = (await Location.getLastKnownPositionAsync()) ?? (await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced }));
       const here = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-      // Nearest doctor with a pin decides the city.
+      // Nearest doctor with a pin decides the city, but only if they're close; otherwise the list shows the nearest doctors anywhere.
       let best: Doctor | undefined;
       let bestKm = Infinity;
       for (const d of doctors.data ?? []) {
@@ -100,14 +105,16 @@ export function useHomePlace() {
           best = d;
         }
       }
-      await save({ city: best?.city ?? null, state: best?.state ?? null, ...here });
+      const near = best && bestKm <= NEAR_CITY_KM ? best : undefined;
+      const names = await placeNames(here, locale);
+      await save({ city: near?.city ?? null, state: near?.state ?? null, ...here, area: names?.area ?? null, town: names?.town ?? null });
       return true;
     } catch {
       return false;
     } finally {
       setLocating(false);
     }
-  }, [doctors.data, save]);
+  }, [doctors.data, save, locale]);
 
   const cities = useMemo(() => citiesFrom(doctors.data), [doctors.data]);
   return { place, setPlace: save, locate, locating, cities };
