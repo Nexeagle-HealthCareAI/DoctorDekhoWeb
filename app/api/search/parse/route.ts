@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { CITIES, specialties } from "@/data/patient";
+import { bodyPartSpecialty } from "@/lib/bodyPartSearch";
 
 export const dynamic = "force-dynamic";
 
@@ -183,6 +184,21 @@ export async function POST(req: NextRequest) {
   const query = typeof body?.query === "string" ? body.query.trim() : "";
   if (!query) {
     return NextResponse.json({ error: "query is required" }, { status: 400 });
+  }
+
+  // "Baalon ka doctor", "daant ke dr": a body part plus "doctor" names one specialty outright (see bodyPartSearch.ts).
+  const direct = bodyPartSpecialty(query);
+  if (direct) {
+    console.info("search-parse: path=body-part");
+    return NextResponse.json({
+      specialtyId: direct,
+      specialtyIds: [direct],
+      city: extractCityFromQuery(query),
+      keywords: query.split(/\s+/).filter((w: string) => w.length >= 3),
+      method: "body-part",
+      confidence: null,
+      modelVersion: null,
+    });
   }
 
   const nlpResult = await callNlpRouter(query);
