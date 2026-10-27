@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { CITIES, specialties } from "@/data/patient";
+import { bodyPartSpecialty } from "@/lib/bodyPartSearch";
 
 export const dynamic = "force-dynamic";
 
@@ -326,6 +327,27 @@ export async function POST(req: NextRequest) {
   }
   if (safetyOnly) {
     return NextResponse.json({ safetyOnly: true, emergency: null });
+  }
+
+  // "Baalon ka doctor", "daant ke dr": a body part plus "doctor" names one specialty outright (see bodyPartSearch.ts).
+  // Checked after the emergency check above, so "chest doctor, saans nahi aa rahi" still gets the emergency banner.
+  const direct = bodyPartSpecialty(query);
+  if (direct) {
+    console.info("search-parse: path=body-part");
+    const intent: SearchIntent = {
+      specialtyId: direct,
+      specialtyIds: [direct],
+      city: extractCityFromQuery(query),
+      keywords: query.split(/\s+/).filter((w: string) => w.length >= 3),
+      decision: null,
+      emergency: null,
+      clarify: null,
+      reason: null,
+      method: "body-part",
+      confidence: null,
+      modelVersion: null,
+    };
+    return NextResponse.json(intent);
   }
 
   let clarifyForGroq: ClarifyInfo | null = null;
