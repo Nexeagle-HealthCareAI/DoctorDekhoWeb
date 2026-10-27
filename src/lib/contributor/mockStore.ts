@@ -3,6 +3,7 @@
 // The rules here (verification before submit, five open topics, a comment when changes are
 // requested) are the ones the real backend has to enforce too.
 
+import type { HealthArticleDto } from "../health-wiki/dto";
 import {
   OPEN_TOPIC_LIMIT,
   canSelfPublish,
@@ -240,6 +241,25 @@ export function listArticles(id: string): ArticleListResponse {
 }
 
 export const getArticle = (id: string, slug: string) => findArticle(id, slug);
+
+/** Example backend only: the published articles as the public Health Wiki lists them, so what a doctor publishes here shows on /health. */
+export function publishedForPublic(): HealthArticleDto[] {
+  const seen = new Set<string>();
+  const out: HealthArticleDto[] = [];
+  for (const p of state.people) {
+    for (const a of state.articles[p.id] ?? []) {
+      if (a.status !== "PUBLISHED" || a.myRole !== "AUTHOR" || a.awaitingVerification || seen.has(a.slug)) continue;
+      seen.add(a.slug);
+      out.push({
+        id: a.slug, type: a.type, title: a.title, description: a.description, content: a.content, coverImageUrl: a.coverImageUrl,
+        coverImageAlt: a.coverImageAlt, relatedConditionSlug: a.relatedConditionSlug, disclosure: a.disclosure, references: a.references,
+        author: { id: p.id, fullName: p.fullName, type: p.role, speciality: p.speciality, qualification: p.qualification },
+        reviewer: null, publishedAt: a.publishedAt ?? a.updatedAt, updatedAt: a.updatedAt,
+      });
+    }
+  }
+  return out;
+}
 
 const log = (slug: string, kind: string, action: string, who: { id: string; name: string } | null, detail: string | null = null) => {
   ((state.history ??= {})[slug] ??= []).push({ at: new Date().toISOString(), kind, action, actor: who ? who.name : "NexEagle team", actorId: who ? who.id : null, detail });

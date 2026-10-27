@@ -1,3 +1,4 @@
+import { revalidateTag } from "next/cache";
 import { NextRequest, NextResponse } from "next/server";
 import {
   CONTRIBUTOR_SESSION_COOKIE,
@@ -15,6 +16,9 @@ export const dynamic = "force-dynamic";
 // to the EasyHMS /contributor/* endpoints (see docs/health-wiki-api-contract.md). CONTRIBUTOR_MOCK=true answers
 // from the in-memory example store instead (local review). With neither the mock nor EASYHMS_API_BASE_URL
 // configured every call answers 503, so a deployment that has not opted in exposes nothing.
+
+// A doctor publishing (or a reviewer approving) changes what /health lists: drop the cached list now instead of after five minutes.
+const changesPublishedList = (method: string, a?: string, c?: string) => method === "POST" && a === "articles" && (c === "submit" || c === "review");
 
 const json = (body: unknown, status = 200) => NextResponse.json(body, { status });
 const fail = (e: unknown) =>
@@ -72,8 +76,8 @@ async function handle(req: NextRequest, segments: string[]): Promise<NextRespons
     if (method === "GET" && b && c === "history") return json(store.getHistory(who(), b));
     if (method === "POST" && !b) return json(store.createDraft(who(), await body<ArticleDraftInput>()), 201);
     if (method === "PATCH" && b && !c) return json(store.updateDraft(who(), b, await body<ArticleDraftInput>()));
-    if (method === "POST" && b && c === "submit") return json(store.submitArticle(who(), b));
-    if (method === "POST" && b && c === "review") return json(store.reviewArticle(who(), b, await body<ReviewDecision>()));
+    if (method === "POST" && b && c === "submit") { const r = store.submitArticle(who(), b); revalidateTag("health-articles"); return json(r); }
+    if (method === "POST" && b && c === "review") { const r = store.reviewArticle(who(), b, await body<ReviewDecision>()); revalidateTag("health-articles"); return json(r); }
   }
 
   // topics
@@ -155,6 +159,7 @@ async function proxy(req: NextRequest, segments: string[]): Promise<NextResponse
     res.cookies.delete(CONTRIBUTOR_SESSION_COOKIE);
     return res;
   }
+  if (changesPublishedList(req.method, first, segments[2])) revalidateTag("health-articles");
   return out(up.data, up.status);
 }
 
