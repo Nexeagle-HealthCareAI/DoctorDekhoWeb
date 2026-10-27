@@ -1,14 +1,15 @@
 // Server-only: reads published Health Wiki articles. Import from Server Components and route
 // handlers only (it reaches the EasyHMS API through easyhmsFetch).
 
+import { cache } from "react";
 import { unstable_cache } from "next/cache";
 import { easyhmsFetch, isConfigured } from "@/lib/api/server";
 import { isContributorMock } from "@/lib/contributor/session";
-import type { HealthArticlesResponseDto } from "./dto";
+import type { HealthArticleDto, HealthArticlesResponseDto } from "./dto";
 import { getInterimArticles } from "./interim";
-import { byNewest, mapArticles, mergeArticles } from "./mappers";
+import { byNewest, mapArticle, mapArticles, mergeArticles } from "./mappers";
 import { sampleArticles } from "./sample";
-import type { HealthArticle } from "./types";
+import { ARTICLE_SLUG_PATTERN, type HealthArticle } from "./types";
 
 /**
  * Interim (admin tool) articles. When they are the only source, a read failure must not turn into
@@ -63,8 +64,19 @@ async function fetchPublishedFromSource(): Promise<HealthArticle[]> {
 /** All published articles, newest first. */
 export const getPublishedArticles = () => fetchPublished();
 
+/**
+ * One article asked for by its slug straight from the backend, not from the cached list. An article published a moment ago (a doctor
+ * approving it in EasyHMS, or the team publishing it in the CMS) is not in the cached list yet, and Doctor Dekho would answer 404 for it
+ * (and keep that answer for five minutes). Only a slug that looks like a slug is asked for.
+ */
+const fetchOnePublished = cache(async (slug: string): Promise<HealthArticle | null> => {
+  if (!isConfigured() || process.env.HEALTH_WIKI_SAMPLE === "true" || !ARTICLE_SLUG_PATTERN.test(slug)) return null;
+  const result = await easyhmsFetch<HealthArticleDto>(`/public/health-articles/${encodeURIComponent(slug)}`, { cache: "no-store" });
+  return result.ok && result.data ? mapArticle(result.data) : null;
+});
+
 /** One published article, or null when the slug is unknown or not published. */
 export async function getPublishedArticle(slug: string): Promise<HealthArticle | null> {
   const all = await fetchPublished();
-  return all.find((a) => a.slug === slug) ?? null;
+  return all.find((a) => a.slug === slug) ?? (await fetchOnePublished(slug));
 }
