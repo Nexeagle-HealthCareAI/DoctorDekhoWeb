@@ -22,6 +22,9 @@ describe("bodyPartSpecialty", () => {
     expect(bodyPartSpecialty("pet aur aankh dono mein dard")).toBeNull();
     expect(bodyPartSpecialty("mere bachche ko teen din se bukhar hai aur khansi bhi")).toBeNull();
     expect(bodyPartSpecialty("fever")).toBeNull();
+    // Symptom phrases without a doctor word stay with the router, which knows symptoms better than this word list.
+    expect(bodyPartSpecialty("pet mein dard")).toBeNull();
+    expect(bodyPartSpecialty("skin pe daane")).toBeNull();
     expect(bodyPartSpecialty("")).toBeNull();
   });
 

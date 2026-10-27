@@ -3,8 +3,8 @@
  * specialty. These short phrases are matched here, before the symptom router and the AI. The router's training data has
  * almost no such phrases (and "bal" there means *child*, as in "bal rog"), so it guessed General.
  *
- * Deliberately narrow: used only for short queries (a doctor word, or at most three words) that point at exactly ONE
- * specialty. Anything longer or mixed ("pet aur sir dard") goes to the router and the AI as before.
+ * Deliberately narrow: used only for short queries that name a doctor ("ka doctor", "ke dr") or are nothing but body-part
+ * words ("kaan naak gala"), and that point at exactly ONE specialty. Symptom phrases ("pet mein dard") stay with the router. Anything longer or mixed ("pet aur sir dard") goes to the router and the AI as before.
  */
 
 const DOCTOR_WORDS = new Set([
@@ -46,7 +46,7 @@ export function bodyPartSpecialty(query: string): string | null {
     .filter(Boolean);
   if (!words.length) return null;
   const hasDoctorWord = words.some((w) => DOCTOR_WORDS.has(w));
-  if (!hasDoctorWord && words.length > 3) return null;
+  if (!hasDoctorWord && (words.length > 3 || !words.every((w) => WORD_TO_SPECIALTY.has(w)))) return null;
   const hits = new Set(words.map((w) => WORD_TO_SPECIALTY.get(w)).filter((x): x is string => !!x));
   return hits.size === 1 ? Array.from(hits)[0] : null;
 }
