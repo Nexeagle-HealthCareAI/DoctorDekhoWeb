@@ -82,6 +82,18 @@ export interface MyArticle {
   updatedAt: string;
 }
 
+/** One line of an article's history, as the author or reviewer sees it. Team actions arrive as "NexEagle team". */
+export interface ArticleHistoryEntry {
+  at: string;
+  /** The action code, to pick an icon and colour. */
+  kind: string;
+  action: string;
+  actor: string;
+  byMe: boolean;
+  /** A reason or comment written for the doctor (pull back, take down, put back live, changes asked). */
+  detail: string | null;
+}
+
 export type ArticleListTab = "pending" | "published" | "drafts";
 
 export interface ArticleListResponse {

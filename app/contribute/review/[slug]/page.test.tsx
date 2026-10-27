@@ -11,6 +11,7 @@ vi.mock("@/lib/contributor/hooks", () => ({
   messageOf: (e: unknown) => String(e),
 }));
 vi.mock("@/components/contributor/ArticlePreview", () => ({ default: () => <div>preview</div> }));
+vi.mock("@/components/contributor/ArticleHistory", () => ({ default: () => null }));
 
 import ReviewPage from "./page";
 

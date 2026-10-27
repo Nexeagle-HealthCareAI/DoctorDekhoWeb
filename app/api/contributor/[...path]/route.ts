@@ -30,6 +30,12 @@ async function handle(req: NextRequest, segments: string[]): Promise<NextRespons
   const who = () => store.contributorForSession(sessionId);
   const body = async <T,>() => (await req.json().catch(() => ({}))) as T;
 
+  // test helper: do what the NexEagle team does in the CMS to an article (example backend only)
+  if (method === "POST" && a === "mock-team" && b && c) {
+    const { reason } = await body<{ reason?: string }>();
+    return json(store.teamAction(who(), b, c, reason ?? null));
+  }
+
   // test helper: put the example data back to its start (example backend only)
   if (method === "POST" && a === "reset") {
     store.resetMock();
@@ -63,6 +69,7 @@ async function handle(req: NextRequest, segments: string[]): Promise<NextRespons
   if (a === "articles") {
     if (method === "GET" && !b) return json(store.listArticles(who()));
     if (method === "GET" && b && !c) return json(store.getArticle(who(), b));
+    if (method === "GET" && b && c === "history") return json(store.getHistory(who(), b));
     if (method === "POST" && !b) return json(store.createDraft(who(), await body<ArticleDraftInput>()), 201);
     if (method === "PATCH" && b && !c) return json(store.updateDraft(who(), b, await body<ArticleDraftInput>()));
     if (method === "POST" && b && c === "submit") return json(store.submitArticle(who(), b));

@@ -7,6 +7,7 @@ import {
   OPEN_TOPIC_LIMIT,
   canSelfPublish,
   type ArticleDraftInput,
+  type ArticleHistoryEntry,
   type ArticleListResponse,
   type ContributorMe,
   type EnrolRole,
@@ -58,6 +59,11 @@ interface State {
   articles: Record<string, MyArticle[]>; // by contributor id
   topics: Record<string, TopicRequest[]>;
   sessions: Record<string, string>; // session id -> contributor id
+  history: Record<string, MockHistoryEntry[]>; // by article slug
+}
+
+interface MockHistoryEntry extends Omit<ArticleHistoryEntry, "byMe"> {
+  actorId: string | null; // null = the NexEagle team
 }
 
 const seed = (): State => ({
@@ -87,6 +93,16 @@ const seed = (): State => ({
     ],
   },
   sessions: {},
+  history: {
+    "silent-heart-attack": [
+      { at: ago(16), kind: "CREATED", action: "Draft started", actor: "Dr. Imran Qureshi", actorId: "c-imran", detail: null },
+      { at: ago(15), kind: "SUBMITTED", action: "Sent for review", actor: "Dr. Imran Qureshi", actorId: "c-imran", detail: null },
+      { at: ago(14), kind: "REVIEWER_APPROVED", action: "Reviewer approved", actor: "Dr. Meera Nair", actorId: "c-meera", detail: null },
+      { at: ago(14), kind: "APPROVED", action: "Approved and published", actor: "NexEagle team", actorId: null, detail: null },
+      { at: ago(7), kind: "PULLED_BACK", action: "Pulled back to review", actor: "NexEagle team", actorId: null, detail: "Please name the sources you used for the symptoms list." },
+      { at: ago(6), kind: "PUT_BACK_LIVE", action: "Put back live", actor: "NexEagle team", actorId: null, detail: "Sources were added by the team and checked." },
+    ],
+  },
 });
 
 // Kept on globalThis: in `next dev` a route can be recompiled on first visit, which would otherwise
@@ -225,6 +241,39 @@ export function listArticles(id: string): ArticleListResponse {
 
 export const getArticle = (id: string, slug: string) => findArticle(id, slug);
 
+const log = (slug: string, kind: string, action: string, who: { id: string; name: string } | null, detail: string | null = null) => {
+  ((state.history ??= {})[slug] ??= []).push({ at: new Date().toISOString(), kind, action, actor: who ? who.name : "NexEagle team", actorId: who ? who.id : null, detail });
+};
+
+/** What the author or reviewer sees, newest first. */
+export function getHistory(id: string, slug: string): ArticleHistoryEntry[] {
+  findArticle(id, slug);
+  return [...(state.history?.[slug] ?? [])]
+    .sort((a, b) => b.at.localeCompare(a.at))
+    .map(({ actorId, ...e }) => ({ ...e, byMe: actorId === id }));
+}
+
+/**
+ * Example backend only: what the NexEagle team does in the CMS, so the doctor's history can be tried without the CMS.
+ * pull-back and take-down hold the article for review; pull-up puts it back live.
+ */
+export function teamAction(id: string, slug: string, action: string, reason: string | null) {
+  const a = findArticle(id, slug);
+  const note = reason?.trim() || null;
+  if (action === "pull-back") {
+    Object.assign(a, { status: "IN_REVIEW", holdForReview: true, waitingDays: 0 });
+    log(slug, "PULLED_BACK", "Pulled back to review", null, note);
+  } else if (action === "take-down") {
+    Object.assign(a, { status: "DRAFT", holdForReview: true });
+    log(slug, "UNPUBLISHED", "Taken offline", null, note);
+  } else if (action === "pull-up") {
+    Object.assign(a, { status: "PUBLISHED", holdForReview: false, waitingDays: null, publishedAt: a.publishedAt ?? new Date().toISOString() });
+    log(slug, "PUT_BACK_LIVE", "Put back live", null, note);
+  } else throw new MockError(400, "Unknown team action.");
+  a.updatedAt = new Date().toISOString();
+  return a;
+}
+
 const mustBeApproved = (p: Person) => {
   if (p.status !== "VERIFIED" && p.status !== "PENDING") throw new MockError(403, "Your profile has not been accepted yet.");
 };
@@ -237,6 +286,7 @@ export function createDraft(id: string, input: ArticleDraftInput): MyArticle {
   while (mine(id).some((a) => a.slug === slug)) slug += "-2";
   const a = article({ ...input, slug, status: "DRAFT", myRole: "AUTHOR", authorName: p.fullName || "You", updatedAt: new Date().toISOString() });
   mine(id).unshift(a);
+  log(slug, "CREATED", "Draft started", { id, name: p.fullName || "You" });
   return a;
 }
 
@@ -259,6 +309,9 @@ export function submitArticle(id: string, slug: string): MyArticle {
   // A verified doctor publishes their own article at once; everyone else goes through review.
   if (selfPublish) Object.assign(a, { status: "PUBLISHED", returnedComment: null, waitingDays: null, publishedAt: a.publishedAt ?? new Date().toISOString(), reviewerName: null, updatedAt: new Date().toISOString() });
   else Object.assign(a, { status: "IN_REVIEW", returnedComment: null, waitingDays: 0, updatedAt: new Date().toISOString() });
+  const who = { id, name: p.fullName || "You" };
+  if (selfPublish) log(a.slug, "SELF_PUBLISHED", "Published, no review needed", who);
+  else log(a.slug, "SUBMITTED", "Sent for review", who);
   return a;
 }
 
@@ -272,12 +325,14 @@ export function reviewArticle(id: string, slug: string, d: ReviewDecision): MyAr
     Object.assign(a, { status: "DRAFT", returnedComment: d.comment.trim(), myRole: "REVIEWER", updatedAt: new Date().toISOString() });
     // Back with the writer: it leaves this person's lists.
     state.articles[id] = mine(id).filter((x) => x !== a);
+    log(slug, "REVIEWER_REQUESTED_CHANGES", "Reviewer asked for changes", { id, name: p.fullName }, d.comment.trim());
     return a;
   }
   Object.assign(a, {
     status: "PUBLISHED", awaitingVerification: p.status !== "VERIFIED", views: 0, likes: 0,
     publishedAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
   });
+  log(slug, "REVIEWER_APPROVED", "Reviewer approved", { id, name: p.fullName });
   return a;
 }
 

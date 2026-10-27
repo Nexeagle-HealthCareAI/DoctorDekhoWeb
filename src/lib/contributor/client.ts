@@ -3,6 +3,7 @@
 
 import type {
   ArticleDraftInput,
+  ArticleHistoryEntry,
   ArticleListResponse,
   ContributorMe,
   EnrolRole,
@@ -77,6 +78,7 @@ export const contributorApi = {
 
   articles: () => call<ArticleListResponse>("articles"),
   article: (slug: string) => call<MyArticle>(`articles/${encodeURIComponent(slug)}`),
+  articleHistory: (slug: string) => call<ArticleHistoryEntry[]>(`articles/${encodeURIComponent(slug)}/history`),
   createArticle: (input: ArticleDraftInput) => call<MyArticle>("articles", send("POST", input)),
   updateArticle: (slug: string, input: ArticleDraftInput) => call<MyArticle>(`articles/${encodeURIComponent(slug)}`, send("PATCH", input)),
   /** The author has agreed that the reviewer may publish it (the API refuses without it). */

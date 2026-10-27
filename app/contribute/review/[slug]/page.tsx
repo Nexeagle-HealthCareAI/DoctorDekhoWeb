@@ -7,6 +7,7 @@ import { contributorApi } from "@/lib/contributor/client";
 import { messageOf, useContributor, useLoad } from "@/lib/contributor/hooks";
 import { toPreviewArticle } from "@/lib/contributor/preview";
 import { isDoctorRole, type MyArticle } from "@/lib/contributor/types";
+import ArticleHistory from "@/components/contributor/ArticleHistory";
 import ArticlePreview from "@/components/contributor/ArticlePreview";
 import { BackLink, Banner, ErrorBox, Loading, PageTitle, WaitingChip, card, primaryBtn, secondaryBtn, input } from "@/components/contributor/ui";
 
@@ -112,6 +113,7 @@ export default function ReviewPage({ params }: { params: { slug: string } }) {
           </aside>
         )}
       </div>
+      <ArticleHistory slug={a.slug} />
     </div>
   );
 }
