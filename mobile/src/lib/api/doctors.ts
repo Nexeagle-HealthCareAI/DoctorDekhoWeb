@@ -17,6 +17,8 @@ export interface Doctor {
   focusAreas: string[];
   languages: string[];
   verified: boolean;
+  /** Medical registration number as the doctor entered it; shown plainly when the CMS hasn't checked it yet. */
+  registrationNumber?: string;
   featured: boolean;
   rating?: number;
   reviewCount?: number;
@@ -131,6 +133,7 @@ export function mapDoctor(dto: DoctorDto): Doctor {
     focusAreas: dto.specializations ?? [],
     languages: dto.languages ?? [],
     verified: dto.isRegistrationVerified ?? false,
+    registrationNumber: dto.registrationNumber?.trim() || undefined,
     featured: dto.isFeatured ?? false,
     rating: dto.rating ? dto.rating : undefined,
     reviewCount: orUndef(dto.reviewCount),

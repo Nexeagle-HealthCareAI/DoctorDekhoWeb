@@ -149,7 +149,7 @@ export default function LoginScreen() {
                 <Text onPress={() => Linking.openURL(`${config.businessUrl}/privacy`)}>{t("privacy")}</Text>
               </Txt>
             </Txt>
-            <HelpButton context="sign-in" />
+            <HelpButton />
           </View>
         </View>
       </KeyboardScreen>

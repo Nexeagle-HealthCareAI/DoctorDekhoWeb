@@ -35,7 +35,7 @@ const BIG_TEXT_KEY = "dd_big_text";
  * Calm mode (stored under the old "bigger text" key, so people who turned that on keep it): every size is
  * multiplied by this on top of the phone's own font-size setting, nothing moves, and bars are solid.
  */
-const BIG_SCALE = 1.15;
+const BIG_SCALE = 1.3;
 
 type Ctx = {
   /** Font family for a weight in the current language's script; undefined until fonts load (system font meanwhile). */

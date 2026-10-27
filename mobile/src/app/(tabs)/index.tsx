@@ -13,6 +13,7 @@ import { distanceKm } from "../../lib/api/doctors";
 import { visitKind } from "../../lib/booking";
 import { formatShortDate, formatTime, istDateString } from "../../lib/format";
 import { useI18n } from "../../lib/i18n";
+import { localName } from "../../lib/translit";
 import { useHomePlace } from "../../lib/location";
 import { hasLiveMap, hasMapImages, km, leaveBy, minutes, useQuietPosition, useRoutes, type LatLng } from "../../lib/map";
 import { useAppProfile, useDoctors, useMyAppointments, useProfile } from "../../lib/queries";
@@ -169,11 +170,16 @@ export default function HomeScreen() {
               </View>
               <Pressable onPress={() => router.push("/appointments")} accessibilityRole="button">
                 <Txt variant="subheading" color="#fff" numberOfLines={1}>
-                  {next.doctorName}
+                  {localName(next.doctorName, locale)}
                 </Txt>
                 <Txt variant="small" color="#DDF1ED" numberOfLines={1}>
-                  {[nextDoctor ? plainSpecialty(nextDoctor.specialtyId, locale) : null, next.hospitalName].filter(Boolean).join(" · ")}
+                  {[nextDoctor ? plainSpecialty(nextDoctor.specialtyId, locale) : null, localName(next.hospitalName, locale)].filter(Boolean).join(" · ")}
                 </Txt>
+                {next.patientName ? (
+                  <Txt variant="smallBold" color="#fff" numberOfLines={1}>
+                    {t("visitFor", { name: localName(next.patientName, locale) })}
+                  </Txt>
+                ) : null}
               </Pressable>
               {nextDoctor ? (
                 <Pressable
@@ -244,7 +250,7 @@ export default function HomeScreen() {
                   {t("bookAgain")}
                 </Txt>
                 <Txt variant="bodyBold" numberOfLines={1}>
-                  {lastDoctor.name}
+                  {localName(lastDoctor.name, locale)}
                 </Txt>
                 <Txt variant="small" color={colors.muted} numberOfLines={1} style={{ fontSize: 13 }}>
                   {plainSpecialty(lastDoctor.specialtyId, locale)}

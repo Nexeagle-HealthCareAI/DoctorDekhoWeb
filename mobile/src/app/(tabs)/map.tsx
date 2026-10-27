@@ -9,6 +9,7 @@ import { RiseIn } from "../../components/Motion";
 import { Button, EmptyState, Logo, Txt } from "../../components/ui";
 import { distanceKm, type Doctor } from "../../lib/api/doctors";
 import { useI18n } from "../../lib/i18n";
+import { localName } from "../../lib/translit";
 import { useHomePlace } from "../../lib/location";
 import { askForPosition, getMapbox, MAP_STYLE, useQuietPosition, type LatLng } from "../../lib/map";
 import { useDoctors } from "../../lib/queries";
@@ -208,10 +209,10 @@ export default function MapScreen() {
             <DoctorAvatar doctor={sel} size={52} />
             <View style={{ flex: 1, minWidth: 0 }}>
               <Txt variant="subheading" numberOfLines={1}>
-                {sel.name}
+                {localName(sel.name, locale)}
               </Txt>
               <Txt variant="small" color={colors.muted} numberOfLines={1}>
-                {[plainSpecialty(sel.specialtyId, locale), sel.hospitalName].filter(Boolean).join(" · ")}
+                {[plainSpecialty(sel.specialtyId, locale), localName(sel.hospitalName, locale)].filter(Boolean).join(" · ")}
               </Txt>
             </View>
           </Pressable>

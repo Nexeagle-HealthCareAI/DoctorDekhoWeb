@@ -9,6 +9,7 @@ import { effectiveFee } from "../../lib/api/doctors";
 import { config } from "../../lib/config";
 import { rupees } from "../../lib/format";
 import { useI18n } from "../../lib/i18n";
+import { localName } from "../../lib/translit";
 import { hasMapImages } from "../../lib/map";
 import { useDoctor } from "../../lib/queries";
 import { useReadAloud } from "../../lib/speech";
@@ -57,8 +58,13 @@ export default function DoctorScreen() {
         <View style={styles.hero}>
           <DoctorAvatar doctor={d} size={88} />
           <Txt variant="title" center style={{ marginTop: space.md }}>
-            {d.name}
+            {localName(d.name, locale)}
           </Txt>
+          {localName(d.name, locale) !== d.name ? (
+            <Txt variant="small" color={colors.muted} center>
+              {d.name}
+            </Txt>
+          ) : null}
           <Txt color={colors.muted} center>
             {[hasPlainName(d.specialtyId) && plain !== formal ? `${plain} (${formal})` : plain, d.qualifications].filter(Boolean).join(" · ")}
           </Txt>
@@ -69,6 +75,10 @@ export default function DoctorScreen() {
                 {t("verifiedBy")}
               </Txt>
             </View>
+          ) : d.registrationNumber ? (
+            <Txt variant="small" color={colors.muted} center style={{ marginTop: space.sm }}>
+              {t("regNo", { number: d.registrationNumber })}
+            </Txt>
           ) : null}
         </View>
 
@@ -119,7 +129,7 @@ export default function DoctorScreen() {
               />
             ) : null}
             <View style={{ paddingHorizontal: space.lg, paddingTop: d.latitude != null ? 0 : space.lg }}>
-              <Txt variant="bodyBold">{d.hospitalName}</Txt>
+              <Txt variant="bodyBold">{localName(d.hospitalName, locale)}</Txt>
               <Txt variant="small" color={colors.muted}>
                 {[d.address, d.city, d.state, d.pincode].filter(Boolean).join(", ")}
                 {d.distanceKm != null ? ` · ${d.distanceKm.toFixed(1)} km` : ""}

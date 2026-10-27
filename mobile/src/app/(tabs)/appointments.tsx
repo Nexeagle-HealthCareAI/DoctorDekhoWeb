@@ -13,6 +13,7 @@ import type { MyAppointment } from "../../lib/api/types";
 import { useSession } from "../../lib/auth/session";
 import { formatShortDate, formatTime, istDateString } from "../../lib/format";
 import { useI18n } from "../../lib/i18n";
+import { localName } from "../../lib/translit";
 import type { StringKey } from "../../lib/i18n/strings";
 import { visitKind, type VisitKind } from "../../lib/booking";
 import { km, leaveBy, minutes, useQuietPosition, useRoutes } from "../../lib/map";
@@ -159,8 +160,9 @@ function UpcomingCard({ a, doctor }: { a: MyAppointment; doctor?: Doctor }) {
           <DateBlock date={a.apptDate} dark />
         </View>
         <View style={{ flex: 1, minWidth: 0 }}>
+          {a.patientName ? <ForWhom name={a.patientName} /> : null}
           <Txt variant="subheading" numberOfLines={1}>
-            {a.doctorName}
+            {localName(a.doctorName, locale)}
           </Txt>
           {time ? (
             <Txt variant="small" color={colors.muted}>
@@ -168,7 +170,7 @@ function UpcomingCard({ a, doctor }: { a: MyAppointment; doctor?: Doctor }) {
             </Txt>
           ) : null}
           <Txt variant="small" color={colors.muted} numberOfLines={1}>
-            {a.hospitalName}
+            {localName(a.hospitalName, locale)}
           </Txt>
         </View>
       </View>
@@ -235,6 +237,19 @@ function seenLabel(iso: string, t: (k: StringKey) => string): string {
   const time = `${((h + 11) % 12) + 1}:${String(ist.getMinutes()).padStart(2, "0")} ${h < 12 ? "AM" : "PM"}`;
   const when = day === istDateString() ? t("today") : day === istDateString(-1) ? t("yesterday") : `${ist.getDate()} ${ist.toLocaleString("en-IN", { month: "short" })}`;
   return `${when}, ${time}`;
+}
+
+/** "For Sunita Devi": whose visit this is, so a family with several bookings can tell them apart at a glance. */
+function ForWhom({ name }: { name: string }) {
+  const { t, locale } = useI18n();
+  return (
+    <View style={styles.forWhom}>
+      <Ionicons name="person" size={13} color={colors.primaryDark} />
+      <Txt variant="tinyBold" color={colors.primaryDark} numberOfLines={1} style={{ marginLeft: 5, fontSize: 13, flexShrink: 1 }}>
+        {t("visitFor", { name: localName(name, locale) })}
+      </Txt>
+    </View>
+  );
 }
 
 /** The request's real steps, each one known to the server: sent → seen by the hospital → the hospital calls → confirmed → visit day. */
@@ -318,8 +333,9 @@ function PastRow({ a, doctor }: { a: MyAppointment; doctor?: Doctor }) {
     <Card style={{ flexDirection: "row", alignItems: "center", gap: space.md, padding: space.md + 2 }}>
       {doctor ? <DoctorAvatar doctor={doctor} size={44} /> : null}
       <View style={{ flex: 1, minWidth: 0 }}>
+        {a.patientName ? <ForWhom name={a.patientName} /> : null}
         <Txt variant="bodyBold" numberOfLines={1} style={{ fontSize: 15 }}>
-          {a.doctorName}
+          {localName(a.doctorName, locale)}
         </Txt>
         <Txt variant="small" color={colors.muted} numberOfLines={1} style={{ fontSize: 13 }}>
           {formatShortDate(a.apptDate, locale)} ·{" "}
@@ -344,6 +360,7 @@ const styles = StyleSheet.create({
   titleRow: { flexDirection: "row", alignItems: "center", paddingHorizontal: 4 },
   status: { flexDirection: "row", alignItems: "center", borderRadius: radius.md - 2, paddingVertical: 10, paddingHorizontal: space.md },
   journey: { flexDirection: "row" },
+  forWhom: { flexDirection: "row", alignItems: "center", alignSelf: "flex-start", maxWidth: "100%", paddingHorizontal: 8, paddingVertical: 3, marginBottom: 4, borderRadius: 999, backgroundColor: colors.primarySoft },
   bar: { flex: 1, height: 3, borderRadius: 2 },
   dot: { width: 14, height: 14, borderRadius: 7, alignItems: "center", justifyContent: "center" },
   routeRow: { flexDirection: "row", alignItems: "center", minHeight: 52, paddingHorizontal: space.md, borderRadius: radius.md, backgroundColor: colors.bg },

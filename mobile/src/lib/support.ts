@@ -1,4 +1,4 @@
-import { Linking } from "react-native";
+import { Alert, Linking } from "react-native";
 import { config } from "./config";
 
 /**
@@ -6,12 +6,36 @@ import { config } from "./config";
  * cut booking errors about tenfold, so "Help" and "Call to book" are on the main screens.
  */
 export function contactSupport(channel: "whatsapp" | "call", message?: string) {
-  if (channel === "call") {
-    void Linking.openURL(`tel:${config.supportPhone}`);
-    return;
+  // Run after the Help sheet has finished closing: Android can drop an app switch started while a modal is animating away.
+  setTimeout(() => void (channel === "call" ? callSupport() : openWhatsApp(message)), 250);
+}
+
+async function callSupport() {
+  try {
+    await Linking.openURL(`tel:${config.supportPhone}`);
+  } catch {
+    Alert.alert("Call us", config.supportPhone);
   }
-  const text = message ? `?text=${encodeURIComponent(message)}` : "";
-  void Linking.openURL(`https://wa.me/${config.whatsappNumber}${text}`);
+}
+
+/**
+ * Open a WhatsApp chat with Doctor Dekho. The app itself first (whatsapp://, handled by WhatsApp and WhatsApp Business,
+ * no browser hop); then the wa.me web link; and if neither opens, show the number so the patient can still reach us.
+ */
+async function openWhatsApp(message?: string) {
+  const number = config.whatsappNumber.replace(/\D/g, "");
+  const text = message ? encodeURIComponent(message) : "";
+  try {
+    await Linking.openURL(`whatsapp://send?phone=${number}${text ? `&text=${text}` : ""}`);
+    return;
+  } catch {
+    // WhatsApp not installed, or the scheme isn't handled: try the web link.
+  }
+  try {
+    await Linking.openURL(`https://wa.me/${number}${text ? `?text=${text}` : ""}`);
+  } catch {
+    Alert.alert("WhatsApp", `+${number}`);
+  }
 }
 
 /**

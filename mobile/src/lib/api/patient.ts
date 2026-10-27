@@ -1,4 +1,4 @@
-import { api, ApiError } from "./http";
+import { api, ApiError, apiUpload } from "./http";
 import type {
   AppointmentDocumentsResponse,
   AppProfile,
@@ -101,6 +101,8 @@ export const saveFamilyMember = (input: FamilyMemberInput, memberId?: string) =>
   api<FamilyResponse>(memberId ? `/public/patients/me/family/${memberId}` : "/public/patients/me/family", {
     method: memberId ? "PUT" : "POST",
     body: input,
+    // The dev server can be slow; give it longer before saying it timed out (the screen then checks whether it saved).
+    timeoutMs: 30000,
   });
 
 export const deleteFamilyMember = (memberId: string) =>
@@ -140,14 +142,10 @@ export interface LockerUpload {
 }
 
 export async function uploadLockerDocument(u: LockerUpload): Promise<SimpleResult> {
-  const form = new FormData();
-  // React Native's FormData takes { uri, name, type } for a file part.
-  form.append("File", { uri: u.uri, name: u.name, type: u.mimeType } as unknown as Blob);
-  form.append("FileName", u.name);
-  form.append("DocumentType", u.documentType);
-  if (u.notes) form.append("Notes", u.notes);
-  if (u.memberId) form.append("MemberId", u.memberId);
-  return api<SimpleResult>("/public/patients/me/documents", { body: form, timeoutMs: 60000 });
+  const parameters: Record<string, string> = { FileName: u.name, DocumentType: u.documentType };
+  if (u.notes) parameters.Notes = u.notes;
+  if (u.memberId) parameters.MemberId = u.memberId;
+  return apiUpload<SimpleResult>("/public/patients/me/documents", { uri: u.uri, name: u.name, mimeType: u.mimeType }, { fieldName: "File", parameters, timeoutMs: 120000 });
 }
 
 export const deleteLockerDocument = (documentId: string) =>

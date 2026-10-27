@@ -17,6 +17,7 @@ import { useSession } from "../../lib/auth/session";
 import { bookableDays, bookingReason, patientFromMember, patientFromProfile, REASONS, relationLabel, TIME_WINDOWS, windowOpen } from "../../lib/booking";
 import { dayChipParts, formatShortDate, istDateString, rupees } from "../../lib/format";
 import { useI18n } from "../../lib/i18n";
+import { localName } from "../../lib/translit";
 import { staticMapUrl } from "../../lib/map";
 import { keys, useAppProfile, useDoctor, useFamily, useProfile } from "../../lib/queries";
 import { useReadAloud } from "../../lib/speech";
@@ -138,12 +139,12 @@ export default function BookScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
-      <TopBar back="close" solid title={d.name} />
+      <TopBar back="close" solid title={localName(d.name, locale)} />
       <ScrollView contentContainerStyle={styles.content}>
         <View style={styles.docRow}>
           <DoctorAvatar doctor={d} size={44} />
           <Txt variant="small" color={colors.muted} style={{ flex: 1 }} numberOfLines={2}>
-            {[plainSpecialty(d.specialtyId, locale), d.hospitalName].filter(Boolean).join(" · ")}
+            {[plainSpecialty(d.specialtyId, locale), localName(d.hospitalName, locale)].filter(Boolean).join(" · ")}
           </Txt>
           {fee != null ? <Txt variant="subheading">{rupees(fee)}</Txt> : null}
         </View>
@@ -376,7 +377,7 @@ function Booked({ doctor, date, windowLabel, patientName, reference, mobile, sta
             <DateBlock date={date} />
             <View style={{ flex: 1, minWidth: 0 }}>
               <Txt variant="subheading" numberOfLines={1}>
-                {doctor.name}
+                {localName(doctor.name, locale)}
               </Txt>
               <Txt variant="small" color={colors.muted}>
                 {[windowLabel, t("forName", { name: patientName })].filter(Boolean).join(" · ")}
@@ -402,7 +403,7 @@ function Booked({ doctor, date, windowLabel, patientName, reference, mobile, sta
             )}
             <View style={{ flex: 1, minWidth: 0 }}>
               <Txt variant="bodyBold" numberOfLines={1}>
-                {doctor.hospitalName ?? t("directions")}
+                {doctor.hospitalName ? localName(doctor.hospitalName, locale) : t("directions")}
               </Txt>
               <Txt variant="small" color={colors.muted} numberOfLines={1}>
                 {[doctor.city, t("seeRoute")].filter(Boolean).join(" · ")}

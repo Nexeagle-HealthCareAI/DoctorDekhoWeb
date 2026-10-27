@@ -8,6 +8,7 @@ import { Pulse } from "../../components/Motion";
 import { Button, Loading, Logo, Txt } from "../../components/ui";
 import { formatShortDate, istDateString } from "../../lib/format";
 import { useI18n } from "../../lib/i18n";
+import { localName } from "../../lib/translit";
 import { useHomePlace } from "../../lib/location";
 import { askForPosition, getMapbox, km, leaveBy, MAP_STYLE, minutes, useRoutes, type LatLng, type TravelMode } from "../../lib/map";
 import { useDoctors } from "../../lib/queries";
@@ -83,7 +84,7 @@ export default function RouteScreen() {
             </M.MarkerView>
           ) : null}
           <M.MarkerView coordinate={[to.lng, to.lat]} anchor={{ x: 0.5, y: 1 }} allowOverlap>
-            <View style={styles.clinicPin} accessibilityLabel={d.hospitalName ?? d.name}>
+            <View style={styles.clinicPin} accessibilityLabel={localName(d.hospitalName ?? d.name, locale)}>
               <Ionicons name="medkit" size={20} color="#fff" />
             </View>
           </M.MarkerView>
@@ -104,10 +105,10 @@ export default function RouteScreen() {
         <View style={styles.grip} />
         <View style={{ gap: 3 }}>
           <Txt variant="eyebrow" color={colors.muted} numberOfLines={1}>
-            {[dayLabel, d.name, startLabel].filter(Boolean).join(" · ")}
+            {[dayLabel, localName(d.name, locale), startLabel].filter(Boolean).join(" · ")}
           </Txt>
           <Txt variant="heading" numberOfLines={2}>
-            {d.hospitalName ?? d.name}
+            {localName(d.hospitalName ?? d.name, locale)}
           </Txt>
           <Txt variant="bodyBold" color={colors.success}>
             {cur

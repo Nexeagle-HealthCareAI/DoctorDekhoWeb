@@ -4,6 +4,7 @@ import { effectiveFee, type Doctor } from "../lib/api/doctors";
 import { rupees } from "../lib/format";
 import { openState } from "../lib/hours";
 import { useI18n } from "../lib/i18n";
+import { localName } from "../lib/translit";
 import { useReadAloud } from "../lib/speech";
 import { plainSpecialty } from "../lib/specialties";
 import { colors, space, TINT_ORDER, type Tint } from "../lib/theme";
@@ -47,10 +48,10 @@ export function DoctorCard({ doctor, onPress, onBook, why }: { doctor: Doctor; o
           <DoctorAvatar doctor={doctor} size={52} />
           <View style={{ flex: 1, minWidth: 0 }}>
             <Txt variant="subheading" numberOfLines={1}>
-              {doctor.name}
+              {localName(doctor.name, locale)}
             </Txt>
             <Txt variant="small" color={colors.muted} numberOfLines={1}>
-              {[kind, doctor.hospitalName ?? doctor.city].filter(Boolean).join(" · ")}
+              {[kind, localName(doctor.hospitalName ?? doctor.city, locale)].filter(Boolean).join(" · ")}
             </Txt>
           </View>
         </Pressable>
@@ -66,6 +67,11 @@ export function DoctorCard({ doctor, onPress, onBook, why }: { doctor: Doctor; o
             <Txt variant="tinyBold" color={colors.success} style={{ marginLeft: 3 }}>
               {t("registrationChecked")}
             </Txt>
+          </View>
+        ) : doctor.registrationNumber ? (
+          // Not checked by Doctor Dekho yet: show the number the doctor gave, without a tick.
+          <View style={styles.fact}>
+            <Txt variant="tinyBold">{t("regNo", { number: doctor.registrationNumber })}</Txt>
           </View>
         ) : null}
         {fee != null ? (

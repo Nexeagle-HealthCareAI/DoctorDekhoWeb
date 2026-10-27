@@ -19,7 +19,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRevealField } from "./KeyboardScreen";
-import { useTextStyle, type Weight } from "../lib/appearance";
+import { useAppearance, useTextStyle, type Weight } from "../lib/appearance";
 import { dateParts } from "../lib/format";
 import { useI18n } from "../lib/i18n";
 import type { Locale } from "../lib/i18n/types";
@@ -50,6 +50,9 @@ const VARIANTS: Record<Variant, [number, Weight]> = {
 };
 
 /** All text in the app goes through Txt so the language's script font and "Bigger text" apply everywhere. */
+/** Calm mode's darker grey for hint text (8.6:1 on white instead of 5.9:1). */
+const CALM_MUTED = "#3D4A46";
+
 export function Txt({
   children,
   variant = "body",
@@ -68,13 +71,23 @@ export function Txt({
   selectable?: boolean;
 }) {
   const ts = useTextStyle();
+  const { scale, lineFactor, calm } = useAppearance();
   const [size, weight] = VARIANTS[variant];
+  // A size passed in `style` (e.g. fontSize: 15) must grow in Calm mode too, or half the labels stay small.
+  const flat = (StyleSheet.flatten(style) ?? {}) as TextStyle;
+  let scaled: TextStyle | null = null;
+  if (scale !== 1 && typeof flat.fontSize === "number") {
+    const fontSize = Math.round(flat.fontSize * scale);
+    scaled = { fontSize, lineHeight: "lineHeight" in flat ? (typeof flat.lineHeight === "number" ? Math.round(flat.lineHeight * scale) : flat.lineHeight) : Math.round(fontSize * lineFactor) };
+  }
+  // Calm mode: grey hint text gets darker so it reads easily outdoors and for older eyes.
+  const tone = calm && (color === colors.muted || color === colors.faint) ? CALM_MUTED : color;
   return (
     <Text
       numberOfLines={numberOfLines}
       selectable={selectable}
       maxFontSizeMultiplier={1.6}
-      style={[{ color: colors.ink }, ts(size, weight), variant === "eyebrow" ? { textTransform: "uppercase", letterSpacing: 0.6 } : null, center ? { textAlign: "center" } : null, color ? { color } : null, style]}
+      style={[{ color: colors.ink }, ts(size, weight), variant === "eyebrow" ? { textTransform: "uppercase", letterSpacing: 0.6 } : null, center ? { textAlign: "center" } : null, tone ? { color: tone } : null, style, scaled, tone && tone !== color ? { color: tone } : null]}
     >
       {children}
     </Text>

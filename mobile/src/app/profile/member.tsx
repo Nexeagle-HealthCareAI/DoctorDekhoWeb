@@ -5,7 +5,7 @@ import { Alert, StyleSheet, View } from "react-native";
 import { KeyboardScreen } from "../../components/KeyboardScreen";
 import { Banner, Button, Chip, Field, Label, TopBar } from "../../components/ui";
 import { ApiError } from "../../lib/api/http";
-import { deleteFamilyMember, saveFamilyMember } from "../../lib/api/patient";
+import { deleteFamilyMember, getFamily, saveFamilyMember } from "../../lib/api/patient";
 import type { AgeUnit, FamilyResponse, Sex } from "../../lib/api/types";
 import { RELATIONS, relationLabel } from "../../lib/booking";
 import { useI18n } from "../../lib/i18n";
@@ -74,7 +74,22 @@ export default function MemberScreen() {
       void qc.invalidateQueries({ queryKey: keys.family });
       router.back();
     } catch (e) {
-      setError(e instanceof ApiError && !e.isNetwork ? e.message : t("retry"));
+      // A slow server or a dropped connection may still have saved it: look before saying it failed, so the patient
+      // doesn't add the same person twice.
+      if (e instanceof ApiError && e.isNetwork) {
+        const fresh = await getFamily().catch(() => null);
+        const found = fresh?.members?.find((m) =>
+          existing ? m.memberId === existing.memberId : m.firstName.trim().toLowerCase() === firstName.trim().toLowerCase() && m.relation === relation,
+        );
+        if (fresh && found) {
+          qc.setQueryData(keys.family, fresh);
+          router.back();
+          return;
+        }
+      }
+      const msg = e instanceof ApiError ? e.message : t("retry");
+      setError(msg);
+      Alert.alert(existing ? existing.firstName : t("addMember"), msg);
     } finally {
       setBusy(false);
     }
@@ -139,7 +154,7 @@ export default function MemberScreen() {
         <Field label={`${t("allergies")} (${t("optional")})`} value={allergies} onChangeText={setAllergies} maxLength={500} style={{ marginTop: space.lg }} />
 
         {error ? <Banner tone="danger" icon="alert-circle" text={error} /> : null}
-        <Button label={t("save")} icon="checkmark-circle" loading={busy} onPress={save} />
+        <Button label={busy ? t("saving") : t("save")} icon="checkmark-circle" loading={busy} onPress={save} />
         {existing ? <Button label={t("remove")} variant="danger" icon="trash" onPress={remove} style={{ marginTop: space.sm }} /> : null}
       </KeyboardScreen>
     </View>
