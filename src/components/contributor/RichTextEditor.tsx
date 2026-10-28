@@ -31,7 +31,6 @@ export default function RichTextEditor({ initialMarkdown, disabled, onChange, la
   const [linkError, setLinkError] = useState("");
   const [pending, setPending] = useState<string | null>(null);
   const [alt, setAlt] = useState("");
-  const [altError, setAltError] = useState("");
 
   const editor = useEditor({
     immediatelyRender: false,
@@ -80,14 +79,12 @@ export default function RichTextEditor({ initialMarkdown, disabled, onChange, la
     try {
       setPending(await contributorApi.uploadImage(file));
       setAlt("");
-      setAltError("");
     } catch (e) {
       toast.error(messageOf(e));
     }
   };
   const insertImage = () => {
     if (!pending) return;
-    if (!alt.trim()) return setAltError("Add alt text so everyone can read the page.");
     editor.chain().focus().setImage({ src: pending, alt: alt.trim() }).run();
     setPending(null);
   };
@@ -134,9 +131,8 @@ export default function RichTextEditor({ initialMarkdown, disabled, onChange, la
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={pending} alt="" className="w-16 h-16 object-cover rounded-lg border border-slate-200" />
           <div className="flex-1 min-w-[12rem] space-y-1">
-            <label htmlFor="rte-alt" className="block text-xs font-bold text-slate-700">Alt text</label>
-            <input id="rte-alt" className={input} placeholder="What the image shows" maxLength={200} value={alt} autoFocus onChange={(e) => setAlt(e.target.value)} onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), insertImage())} />
-            {altError && <p role="alert" className="text-xs font-medium text-red-600">{altError}</p>}
+            <label htmlFor="rte-alt" className="block text-xs font-bold text-slate-700">Alt text <span className="font-normal text-slate-400">(optional)</span></label>
+            <input id="rte-alt" className={input} placeholder="What the image shows, for screen readers" maxLength={200} value={alt} autoFocus onChange={(e) => setAlt(e.target.value)} onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), insertImage())} />
           </div>
           <button type="button" className={`${primaryBtn} !py-2`} onClick={insertImage}>Insert</button>
           <button type="button" className={`${secondaryBtn} !py-2`} onClick={() => setPending(null)}>Cancel</button>

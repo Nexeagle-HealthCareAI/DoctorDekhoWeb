@@ -13,7 +13,7 @@ export default function ArticlePreview({ article }: { article: HealthArticle }) 
       <div className="mb-4"><TypeBadge type={article.type} /></div>
       <h2 className="font-display text-3xl font-extrabold text-slate-900 leading-tight mb-4 break-words">{article.title || "Untitled"}</h2>
       {article.description && <p className="text-lg text-slate-600 mb-6 leading-relaxed">{article.description}</p>}
-      {article.coverImageUrl && <ArticleCover src={article.coverImageUrl} alt={article.coverImageAlt ?? ""} className="rounded-2xl border border-slate-100 mb-6" />}
+      {article.coverImageUrl && <ArticleCover src={article.coverImageUrl} alt={article.coverImageAlt || article.title} className="rounded-2xl border border-slate-100 mb-6" />}
       <ArticleByline article={article} />
       {article.type === "SECTOR_UPDATE" && <SectorNotice />}
       {article.disclosure && <Disclosure text={article.disclosure} />}

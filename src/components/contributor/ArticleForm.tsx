@@ -72,7 +72,7 @@ export default function ArticleForm({ me, existing }: Props) {
 
   const payload = (): ArticleDraftInput => ({
     type, title: title.trim(), description: description.trim(), content,
-    coverImageUrl: coverUrl, coverImageAlt: coverUrl ? coverAlt.trim() : null,
+    coverImageUrl: coverUrl, coverImageAlt: coverUrl ? coverAlt.trim() || null : null,
     relatedConditionSlug: medical ? condition : null, disclosure: disclosure.trim() || null, references: references.trim() || null,
   });
 
@@ -80,7 +80,6 @@ export default function ArticleForm({ me, existing }: Props) {
     const e: Errors = {};
     if (!title.trim()) e.title = "Add a title.";
     if (submit && !content.trim()) e.content = "Write some content before you submit.";
-    if (coverUrl && !coverAlt.trim()) e.cover = "Add alt text for the cover image.";
     return e;
   };
 
@@ -152,7 +151,7 @@ export default function ArticleForm({ me, existing }: Props) {
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={coverUrl} alt="" className="w-full aspect-video object-cover rounded-xl border border-slate-200" />
             <div className="space-y-3">
-              <Field label="Alt text" htmlFor="af-alt" error={errors.cover}>
+              <Field label="Alt text" htmlFor="af-alt" optional hint="Helps people who use a screen reader. Add it if you can." error={errors.cover}>
                 <input id="af-alt" className={input} maxLength={200} value={coverAlt} disabled={locked} onChange={(e) => setCoverAlt(e.target.value)} placeholder="Describe the image for screen readers" />
               </Field>
               <div className="flex gap-2">
