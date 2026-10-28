@@ -98,6 +98,7 @@ function RootNavigator() {
         <Stack.Screen name="route/[id]" />
         <Stack.Screen name="navigate/[id]" options={{ gestureEnabled: false }} />
         <Stack.Screen name="area" />
+        <Stack.Screen name="vita" />
       </Stack.Protected>
     </Stack>
   );

@@ -8,6 +8,10 @@ export const config = {
   apiBaseUrl: trimSlash(process.env.EXPO_PUBLIC_API_BASE_URL ?? "https://1hms-dev-api.nexeagle.com"),
   /** Doctor Dekho's symptom-search endpoint (NLP router + Groq live server-side, so no AI keys ship in the app). */
   searchParseUrl: process.env.EXPO_PUBLIC_SEARCH_PARSE_URL ?? "https://doctordekho-dev.nexeagle.com/api/search/parse",
+  /** Vita, the in-app assistant: the website relays it to the NLP router's /chat agent (the router key stays on the server). */
+  vitaChatUrl:
+    process.env.EXPO_PUBLIC_VITA_CHAT_URL ??
+    (process.env.EXPO_PUBLIC_SEARCH_PARSE_URL ?? "https://doctordekho-dev.nexeagle.com/api/search/parse").replace(/\/api\/search\/parse$/, "/api/vita/app-chat"),
   /** Website, for privacy / terms links and sharing doctor pages. */
   siteUrl: trimSlash(process.env.EXPO_PUBLIC_SITE_URL ?? "https://doctordekho.nexeagle.com"),
   businessUrl: trimSlash(process.env.EXPO_PUBLIC_BUSINESS_URL ?? "https://nexeagle.com"),

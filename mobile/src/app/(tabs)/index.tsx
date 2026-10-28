@@ -6,6 +6,7 @@ import { Pressable, RefreshControl, ScrollView, StyleSheet, View } from "react-n
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { AfterVisitCard, BringList, FamilyChips, Journey, OtherVisits } from "../../components/CareCards";
 import { CityPicker } from "../../components/CityPicker";
+import { VitaFace } from "../../components/VitaFace";
 import { DoctorAvatar, DoctorCard } from "../../components/DoctorCard";
 import { LanguageLink } from "../../components/LanguagePicker";
 import { MapPreview } from "../../components/MapPreview";
@@ -196,6 +197,20 @@ export default function HomeScreen() {
                 </Txt>
               </Pressable>
             ) : null}
+          </Pressable>
+
+          {/* Vita: say what's wrong, get the right doctor. */}
+          <Pressable onPress={() => router.push("/vita")} accessibilityRole="button" accessibilityLabel={`${t("vitaAsk")}. ${t("vitaAskSub")}`} style={({ pressed }) => [styles.vita, { transform: [{ scale: pressed ? 0.98 : 1 }] }]}>
+            <VitaFace size={46} />
+            <View style={{ flex: 1, minWidth: 0 }}>
+              <Txt variant="bodyBold">{t("vitaAsk")}</Txt>
+              <Txt variant="small" color={colors.muted} numberOfLines={2}>
+                {t("vitaAskSub")}
+              </Txt>
+            </View>
+            <View style={styles.vitaMic}>
+              <Ionicons name="chatbubble-ellipses" size={22} color="#fff" />
+            </View>
           </Pressable>
 
           {chips.length ? <FamilyChips chips={chips} value={who} onChange={setWho} /> : null}
@@ -399,6 +414,8 @@ const styles = StyleSheet.create({
   rowBetween: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: space.sm },
   pill: { borderRadius: radius.pill, paddingHorizontal: 10, paddingVertical: 4 },
   routeRow: { flexDirection: "row", alignItems: "center", gap: space.md, padding: space.md, borderRadius: 16, backgroundColor: "rgba(255,255,255,0.12)" },
+  vita: { flexDirection: "row", alignItems: "center", gap: space.md, padding: space.md, borderRadius: radius.lg, backgroundColor: colors.card, borderWidth: 1.5, borderColor: colors.primarySoft },
+  vitaMic: { width: 46, height: 46, borderRadius: 23, alignItems: "center", justifyContent: "center", backgroundColor: colors.primary },
   placeholder: { height: 190, borderRadius: radius.xl, backgroundColor: colors.line },
   leaveBlock: { padding: space.md, borderRadius: 16, backgroundColor: "rgba(255,255,255,0.12)", gap: 2 },
   routeIcon: { width: 40, height: 40, borderRadius: 20, backgroundColor: "rgba(255,255,255,0.16)", alignItems: "center", justifyContent: "center" },
