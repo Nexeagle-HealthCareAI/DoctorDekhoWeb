@@ -106,7 +106,8 @@ export default function AccountMenu() {
                 <span className={ICON}><FolderHeart className="w-4 h-4" aria-hidden="true" /></span> Health Locker
               </Link>
             )}
-            <Link href="/health" onClick={() => setOpen(false)} role="menuitem" className={ITEM}>
+            {/* A contributor goes to their own Health Wiki area; anyone else reads the Health Wiki. */}
+            <Link href={tag?.isContributor ? "/contribute" : "/health"} onClick={() => setOpen(false)} role="menuitem" className={ITEM}>
               <span className={ICON}><BookOpen className="w-4 h-4" aria-hidden="true" /></span> Health Wiki
             </Link>
             <Link href="/about" onClick={() => setOpen(false)} role="menuitem" className={ITEM}>

@@ -35,6 +35,20 @@ describe("Account menu in the top bar", () => {
     expect(screen.getByRole("menuitem", { name: /Dr. Asha Rao/ })).toHaveAttribute("href", "/profile");
   });
 
+  it("sends a contributor from Health Wiki to their contributor area", async () => {
+    signedIn();
+    render(<AccountMenu />);
+    await userEvent.click(screen.getByRole("button", { name: "Account menu" }));
+    expect(screen.getByRole("menuitem", { name: "Health Wiki" })).toHaveAttribute("href", "/contribute");
+  });
+
+  it("sends someone who is not a contributor from Health Wiki to the Health Wiki", async () => {
+    signedIn({ tag: undefined });
+    render(<AccountMenu />);
+    await userEvent.click(screen.getByRole("button", { name: "Account menu" }));
+    expect(screen.getByRole("menuitem", { name: "Health Wiki" })).toHaveAttribute("href", "/health");
+  });
+
   it("is where Sign out is: it signs out and goes to the home page", async () => {
     signedIn();
     render(<AccountMenu />);
