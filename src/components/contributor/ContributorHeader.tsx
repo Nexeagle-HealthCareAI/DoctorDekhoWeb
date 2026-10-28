@@ -32,11 +32,16 @@ export default function ContributorHeader() {
   return (
     <header className="bg-white border-b border-slate-200">
       <div className="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-3">
-        <Link href={me ? "/contribute" : "/health"} className="flex items-center gap-3 shrink-0" aria-label="Health Wiki contributors home">
-          <span className="sm:hidden"><Logo iconOnly iconClassName="w-11 h-11" /></span>
-          <span className="hidden sm:inline-flex"><Logo textSize="text-lg" /></span>
-          <span className="hidden md:inline text-xs font-bold uppercase tracking-widest text-slate-400 border-l border-slate-200 pl-3">Health Wiki contributors</span>
-        </Link>
+        {/* The logo goes to the Doctor Dekho home page, like on every other page; the words next to it are the way back to this area. */}
+        <div className="flex items-center gap-3 shrink-0">
+          <Link href="/" className="flex items-center" aria-label="Doctor Dekho home">
+            <span className="sm:hidden"><Logo iconOnly iconClassName="w-11 h-11" /></span>
+            <span className="hidden sm:inline-flex"><Logo textSize="text-lg" /></span>
+          </Link>
+          <Link href={me ? "/contribute" : "/health"} className="hidden md:inline text-xs font-bold uppercase tracking-widest text-slate-400 hover:text-brand-teal border-l border-slate-200 pl-3" aria-label="Health Wiki contributors home">
+            Health Wiki contributors
+          </Link>
+        </div>
         {/* Signed in on Doctor Dekho: the same account menu as everywhere (Sign out is there). Joined only through the Health Wiki: its own sign out. */}
         {isLoggedIn ? <AccountMenu /> : me && (
           <div className="flex items-center gap-3 min-w-0">
