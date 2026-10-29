@@ -1,0 +1,11 @@
+.venv/
+.npm/
+kokoro/
+feat/
+data/
+feats/
+out/
+real/
+real-val/
+jobs.json
+*.log

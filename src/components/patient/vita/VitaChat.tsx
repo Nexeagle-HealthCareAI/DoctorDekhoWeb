@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import {
-  Activity, AlertTriangle, ArrowDown, ChevronDown, GraduationCap, Headphones, History, LocateFixed, MapPin, Maximize2, MessageCircle, Mic,
+  Activity, AlertTriangle, ArrowDown, ChevronDown, Ear, GraduationCap, Headphones, History, LocateFixed, MapPin, Maximize2, MessageCircle, Mic,
   Minimize2, MoreVertical, RotateCcw, Send, Square, Stethoscope, User as UserRound, Volume2, X,
 } from "lucide-react";
 import { useVitaChat, type VitaEntry } from "@/hooks/useVitaChat";
@@ -24,6 +24,8 @@ import { addRecent, clearRecent, loadRecent } from "@/lib/vita/memory";
 import { REFINE_LABEL, refinePhrase, suggest } from "@/lib/vita/refine";
 import { LOCALES, type Locale } from "@/lib/i18n/types";
 import { trackEvent } from "@/lib/analytics";
+import type { WakeStatus } from "@/hooks/useWakeWord";
+import { preloadWakeWord } from "@/lib/wakeword/engine";
 
 // The Vita chat panel (UI-1 to UI-8): header with the eagle, the place chip, the options menu (new chat,
 // language, text size, read aloud, a person); the welcome home with recent searches; the conversation
@@ -58,12 +60,23 @@ const MOOD_STATUS: Record<VitaMood, TranslationKey> = {
   emergency: "vita.statusEmergency",
 };
 
-export default function VitaChat({ chat, onClose, expanded = false, onToggleExpand }: {
+/** "Hey Vita" from the widget: whether this device can listen for it, how it is doing, and a wake to act on. */
+export interface VitaWake {
+  supported: boolean;
+  status: WakeStatus;
+  pending: boolean;
+  handled: () => void;
+}
+
+export default function VitaChat({ chat, onClose, expanded = false, onToggleExpand, wake, onListeningChange }: {
   chat: VitaChatState;
   onClose?: () => void;
   /** Desktop only: the panel is in its bigger size. */
   expanded?: boolean;
   onToggleExpand?: () => void;
+  wake?: VitaWake;
+  /** Vita has the microphone (a voice conversation or the mic button): the widget pauses "Hey Vita". */
+  onListeningChange?: (listening: boolean) => void;
 }) {
   const { t, locale, setLocale } = useTranslation();
   const [draft, setDraft] = useState("");
@@ -151,6 +164,23 @@ export default function VitaChat({ chat, onClose, expanded = false, onToggleExpa
   // Talk with Vita, hands-free (Groq speech): the replies are spoken by it, not by "read aloud".
   const live = useVitaLive({ entries: chat.entries, busy: chat.busy, locale, send: (text) => send(text), t });
   liveOn.current = live.on;
+
+  // "Hey Vita" was heard: start talking (once Groq voice is known to be there).
+  useEffect(() => {
+    if (!wake?.pending || !live.available) return;
+    wake.handled();
+    if (!live.on) {
+      voice.stop();
+      if (speech.listening) speech.stop();
+      void live.start();
+    }
+  }, [wake, live, voice, speech]);
+
+  const micBusy = live.on || speech.listening;
+  useEffect(() => {
+    onListeningChange?.(micBusy);
+  }, [micBusy, onListeningChange]);
+  useEffect(() => () => onListeningChange?.(false), [onListeningChange]);
 
   // Vita asked for something to type (number, code, name, age): put the cursor there.
   useEffect(() => {
@@ -279,6 +309,7 @@ export default function VitaChat({ chat, onClose, expanded = false, onToggleExpa
           update={update}
           canSpeak={voice.supported}
           onStopSpeaking={voice.stop}
+          wake={wake?.supported && live.available ? wake.status : null}
         />
       )}
 
@@ -462,7 +493,14 @@ function ago(at: number, t: ReturnType<typeof useTranslation>["t"]): string {
   return minutes < 60 ? t("vita.minutesAgo", { n: minutes }) : t("vita.hoursAgo", { n: Math.round(minutes / 60) });
 }
 
-function ChatMenu({ onClose, onNewChat, locale, setLocale, prefs, update, canSpeak, onStopSpeaking }: {
+const WAKE_STATUS: Partial<Record<WakeStatus, TranslationKey>> = {
+  starting: "vita.wakeStarting",
+  listening: "vita.wakeListening",
+  blocked: "vita.wakeBlocked",
+  error: "vita.wakeError",
+};
+
+function ChatMenu({ onClose, onNewChat, locale, setLocale, prefs, update, canSpeak, onStopSpeaking, wake }: {
   onClose: () => void;
   onNewChat: () => void;
   locale: Locale;
@@ -471,6 +509,8 @@ function ChatMenu({ onClose, onNewChat, locale, setLocale, prefs, update, canSpe
   update: (p: Partial<VitaPrefs>) => void;
   canSpeak: boolean;
   onStopSpeaking: () => void;
+  /** null: this device or server can't do "Hey Vita". */
+  wake: WakeStatus | null;
 }) {
   const { t } = useTranslation();
   const [recentCleared, setRecentCleared] = useState(false);
@@ -523,6 +563,18 @@ function ChatMenu({ onClose, onNewChat, locale, setLocale, prefs, update, canSpe
           className="inline-flex min-h-[40px] items-center gap-2 rounded-xl px-3 text-left text-sm text-slate-700 hover:bg-slate-50 disabled:opacity-50">
           <History className="h-4 w-4" aria-hidden="true" /> {t("vita.clearRecent")}
         </button>
+        {wake !== null && (
+          <div className="rounded-xl bg-[#F1F6F5] px-3 py-2">
+            <label className="flex min-h-[40px] cursor-pointer items-center justify-between gap-3 text-sm font-semibold">
+              <span className="inline-flex items-center gap-2"><Ear className="h-4 w-4" aria-hidden="true" /> {t("vita.wakeToggle")}</span>
+              <input type="checkbox" role="switch" checked={prefs.wakeWord} className="h-5 w-5 accent-[#0B5E57]"
+                onChange={(e) => { if (e.target.checked) preloadWakeWord(); update({ wakeWord: e.target.checked }); }} />
+            </label>
+            <p className="text-xs leading-snug text-slate-600">
+              {prefs.wakeWord && WAKE_STATUS[wake] ? t(WAKE_STATUS[wake]!) : t("vita.wakeHelp")}
+            </p>
+          </div>
+        )}
         <p className="border-t border-slate-100 pt-2 text-xs text-slate-500">{t("vita.disclaimer")}</p>
       </div>
     </>

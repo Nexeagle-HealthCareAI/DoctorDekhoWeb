@@ -1,0 +1,7 @@
+{
+  "model": "hey_vita.onnx",
+  "version": "2026-10-29-synthetic-v2",
+  "threshold": 0.7,
+  "patience": 2,
+  "cooldownMs": 2500
+}
