@@ -213,26 +213,47 @@ export async function navRoute(mode: TravelMode, from: LatLng, to: LatLng, beari
 }
 
 /** Doctors further than this from the patient don't decide their "city"; the list just shows the nearest doctors anywhere. */
-export const NEAR_CITY_KM = 40;
+export { NEAR_CITY_KM } from "./doctorCity";
 
 /**
  * What the place under a point is called: the neighbourhood ("Sector 11") and the real town or city ("Ghaziabad"), in the
  * patient's language where Mapbox has it. The town comes from the map, never from the doctor list, so it is right even
  * where Doctor Dekho has no doctors yet.
  */
-export async function placeNames(p: LatLng, locale: Locale): Promise<{ area: string | null; town: string | null } | null> {
+export interface PlaceNames {
+  /** The neighbourhood people know ("Kavi Nagar", "Indirapuram"), shown before the town. */
+  area: string | null;
+  /** The real town or city ("Ghaziabad"), in the app language. */
+  town: string | null;
+  /** Town and district in English, only to match against the doctor directory's city names. */
+  match: string[];
+}
+
+async function reverse(p: LatLng, lang: "en" | "hi" | "bn") {
+  const url = `https://api.mapbox.com/search/geocode/v6/reverse?longitude=${p.lng}&latitude=${p.lat}&types=neighborhood,locality,place&limit=1&language=${lang}&access_token=${MAPBOX_TOKEN}`;
+  const res = await fetch(url);
+  if (!res.ok) return null;
+  type Ctx = { name?: string };
+  const json = (await res.json()) as { features?: { properties?: { name?: string; feature_type?: string; context?: { place?: Ctx; district?: Ctx; locality?: Ctx } } }[] };
+  return json.features?.[0]?.properties ?? null;
+}
+
+/**
+ * What the map calls this spot. Mapbox's own first answer is often a bare "Sector 18" or "Niti Khand 2", so the
+ * locality around it ("Kavi Nagar", "Indirapuram") is preferred when there is one.
+ */
+export async function placeNames(p: LatLng, locale: Locale): Promise<PlaceNames | null> {
   if (!MAPBOX_TOKEN) return null;
   const lang = locale === "hi" ? "hi" : locale === "bn" ? "bn" : "en";
-  const url = `https://api.mapbox.com/search/geocode/v6/reverse?longitude=${p.lng}&latitude=${p.lat}&types=neighborhood,locality,place&limit=1&language=${lang}&access_token=${MAPBOX_TOKEN}`;
   try {
-    const res = await fetch(url);
-    if (!res.ok) return null;
-    type Ctx = { name?: string };
-    const json = (await res.json()) as { features?: { properties?: { name?: string; feature_type?: string; context?: { place?: Ctx; district?: Ctx } } }[] };
-    const f = json.features?.[0]?.properties;
+    const [f, en] = await Promise.all([reverse(p, lang), lang === "en" ? Promise.resolve(null) : reverse(p, "en").catch(() => null)]);
     if (!f) return null;
     const isTown = f.feature_type === "place";
-    return { area: isTown ? null : (f.name ?? null), town: isTown ? (f.name ?? null) : (f.context?.place?.name ?? f.context?.district?.name ?? null) };
+    const area = isTown ? null : (f.feature_type === "neighborhood" ? f.context?.locality?.name : undefined) ?? f.name ?? null;
+    const town = isTown ? (f.name ?? null) : (f.context?.place?.name ?? f.context?.district?.name ?? null);
+    const e = en ?? f;
+    const match = [e.feature_type === "place" ? e.name : e.context?.place?.name, e.context?.district?.name].filter((x): x is string => !!x);
+    return { area, town, match };
   } catch {
     return null;
   }

@@ -138,7 +138,7 @@ export default function DoctorsScreen() {
           </View>
         </View>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips} keyboardShouldPersistTaps="handled">
-          <Chip label={place?.city ?? t("allIndia")} icon="location" selected onPress={() => setPickCity(true)} />
+          <Chip label={place?.city ?? (place?.town ? t("nearTown", { town: place.town }) : t("allIndia"))} icon="location" selected onPress={() => setPickCity(true)} />
           <Chip label={t("availableToday")} selected={todayOnly} onPress={() => setTodayOnly(!todayOnly)} tone="ink" />
           <Chip label={t("lowestFee")} selected={cheapest} onPress={() => setCheapest(!cheapest)} tone="ink" />
           {myLang ? <Chip label={t("speaksMyLanguage")} selected={mine} onPress={() => setMine(!mine)} tone="ink" /> : null}

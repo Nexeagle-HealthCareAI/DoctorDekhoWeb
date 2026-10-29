@@ -4,7 +4,8 @@ import * as Location from "expo-location";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { distanceKm, type Doctor } from "./api/doctors";
 import { useI18n } from "./i18n";
-import { NEAR_CITY_KM, placeNames } from "./map";
+import { doctorCityNear } from "./doctorCity";
+import { placeNames } from "./map";
 import { saveAppProfile } from "./api/patient";
 import { keys, useAppProfile, useDoctors } from "./queries";
 
@@ -60,6 +61,25 @@ export function useHomePlace() {
       .catch(() => {});
   }, []);
 
+  // An area saved by an older app version has no town, and its city came from the nearest doctor's record (which
+  // could be wrong: "Sector 11, Kishanganj" in Ghaziabad). Name it again from the map once, and re-pick the city.
+  useEffect(() => {
+    if (!place || place.lat == null || place.lng == null || place.town !== undefined || !doctors.data) return;
+    let live = true;
+    const here = { lat: place.lat, lng: place.lng };
+    placeNames(here, locale)
+      .then((names) => {
+        if (!live) return;
+        const near = doctorCityNear(here, names?.match, doctors.data ?? []);
+        void save({ ...place, city: near?.city ?? null, state: near?.state ?? null, area: names?.area ?? place.area ?? null, town: names?.town ?? null });
+      })
+      .catch(() => {});
+    return () => {
+      live = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [place, doctors.data, locale]);
+
   // A fresh install on a known account picks the city up from the server.
   useEffect(() => {
     if (place || !app.data?.homeCity) return;
@@ -94,19 +114,9 @@ export function useHomePlace() {
       if (perm.status !== "granted") return false;
       const pos = (await Location.getLastKnownPositionAsync()) ?? (await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced }));
       const here = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-      // Nearest doctor with a pin decides the city, but only if they're close; otherwise the list shows the nearest doctors anywhere.
-      let best: Doctor | undefined;
-      let bestKm = Infinity;
-      for (const d of doctors.data ?? []) {
-        if (d.latitude == null || d.longitude == null) continue;
-        const km = distanceKm(here, { lat: d.latitude, lng: d.longitude });
-        if (km < bestKm) {
-          bestKm = km;
-          best = d;
-        }
-      }
-      const near = best && bestKm <= NEAR_CITY_KM ? best : undefined;
+      // The map names the town; a directory city is used only when it is that town (see doctorCity.ts).
       const names = await placeNames(here, locale);
+      const near = doctorCityNear(here, names?.match, doctors.data ?? []);
       await save({ city: near?.city ?? null, state: near?.state ?? null, ...here, area: names?.area ?? null, town: names?.town ?? null });
       return true;
     } catch {

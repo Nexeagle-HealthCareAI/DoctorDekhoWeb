@@ -9,7 +9,8 @@ import { Button, Chip, Logo, Txt } from "../components/ui";
 import { distanceKm, type Doctor } from "../lib/api/doctors";
 import { useI18n } from "../lib/i18n";
 import { useHomePlace } from "../lib/location";
-import { askForPosition, NEAR_CITY_KM, placeNames, getMapbox, MAP_STYLE, type LatLng } from "../lib/map";
+import { doctorCityNear } from "../lib/doctorCity";
+import { askForPosition, placeNames, getMapbox, MAP_STYLE, type LatLng, type PlaceNames } from "../lib/map";
 import { useDoctors } from "../lib/queries";
 import { colors, space } from "../lib/theme";
 
@@ -32,7 +33,7 @@ export default function AreaScreen() {
   const reduce = useReduceMotion();
   const camera = useRef<CameraHandle | null>(null);
   const [center, setCenter] = useState<LatLng | null>(null);
-  const [names, setNames] = useState<{ area: string | null; town: string | null } | null>(place?.area || place?.town ? { area: place?.area ?? null, town: place?.town ?? null } : null);
+  const [names, setNames] = useState<PlaceNames | null>(place?.area || place?.town ? { area: place?.area ?? null, town: place?.town ?? null, match: place?.town ? [place.town] : [] } : null);
   // The city chip just tapped: lit at once, before the map finishes moving there.
   const [picked, setPicked] = useState<string | null>(null);
   const drop = useRef(new Animated.Value(0)).current;
@@ -51,19 +52,8 @@ export default function AreaScreen() {
     }
     return [...m.values()].map((e) => ({ city: e.city, state: e.state, lat: e.lat / e.n, lng: e.lng / e.n, n: e.n }));
   }, [pinned]);
-  // The nearest doctor, only if within NEAR_CITY_KM: further away, the place has no "doctor city" and the list goes by distance.
-  const nearestDoctor = (p: LatLng): Doctor | undefined => {
-    let best: Doctor | undefined;
-    let bestKm = Infinity;
-    for (const d of pinned) {
-      const k = distanceKm(p, { lat: d.latitude!, lng: d.longitude! });
-      if (k < bestKm) {
-        bestKm = k;
-        best = d;
-      }
-    }
-    return bestKm <= NEAR_CITY_KM ? best : undefined;
-  };
+  // The doctor city here: only a directory city the map agrees is this town (see lib/doctorCity.ts).
+  const nearestDoctor = (p: LatLng): Doctor | undefined => doctorCityNear(p, names?.match, pinned);
 
   const startAt: LatLng | null =
     place?.lat != null && place?.lng != null ? { lat: place.lat, lng: place.lng } : (cityCentres.find((c) => c.city.toLowerCase() === place?.city?.toLowerCase()) ?? cityCentres[0] ?? null);
@@ -90,7 +80,7 @@ export default function AreaScreen() {
   const moveTo = (p: LatLng, zoom = 14) => camera.current?.setCamera({ centerCoordinate: [p.lng, p.lat], zoomLevel: zoom, animationDuration: 600 });
 
   const M = getMapbox();
-  const city = useMemo(() => (center ? nearestDoctor(center) : undefined), [center, pinned]); // eslint-disable-line react-hooks/exhaustive-deps
+  const city = useMemo(() => (center ? nearestDoctor(center) : undefined), [center, pinned, names]); // eslint-disable-line react-hooks/exhaustive-deps
   // Chips stay in one order (nearest to where the screen opened), so they don't jump about under the finger.
   const chips = useMemo(
     () =>
@@ -172,7 +162,7 @@ export default function AreaScreen() {
             {t("yourArea")}
           </Txt>
           <Txt variant="heading" numberOfLines={1}>
-            {[names?.area, names?.town ?? city?.city].filter(Boolean).join(", ") || "…"}
+            {[names?.area, names ? names.town : city?.city].filter(Boolean).join(", ") || "…"}
           </Txt>
         </View>
         <Button
