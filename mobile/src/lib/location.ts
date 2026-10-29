@@ -1,7 +1,7 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useQueryClient } from "@tanstack/react-query";
 import * as Location from "expo-location";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { distanceKm, type Doctor } from "./api/doctors";
 import { useI18n } from "./i18n";
 import { doctorCityNear } from "./doctorCity";
@@ -61,10 +61,13 @@ export function useHomePlace() {
       .catch(() => {});
   }, []);
 
-  // An area saved by an older app version has no town, and its city came from the nearest doctor's record (which
-  // could be wrong: "Sector 11, Kishanganj" in Ghaziabad). Name it again from the map once, and re-pick the city.
+  // An area with no town (saved by an older version, or when the map couldn't name the spot) may carry a city taken
+  // from a mislabelled doctor ("Sector 11, Kishanganj" in Ghaziabad). Name it again once per app start, and re-pick
+  // the city with today's rules. Once only, so a lookup that keeps failing can't loop.
+  const renamed = useRef(false);
   useEffect(() => {
-    if (!place || place.lat == null || place.lng == null || place.town !== undefined || !doctors.data) return;
+    if (renamed.current || !place || place.lat == null || place.lng == null || place.town || !doctors.data) return;
+    renamed.current = true;
     let live = true;
     const here = { lat: place.lat, lng: place.lng };
     placeNames(here, locale)

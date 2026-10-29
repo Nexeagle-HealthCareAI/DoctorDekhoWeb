@@ -10,7 +10,7 @@ import { distanceKm, type Doctor } from "../lib/api/doctors";
 import { useI18n } from "../lib/i18n";
 import { useHomePlace } from "../lib/location";
 import { doctorCityNear } from "../lib/doctorCity";
-import { askForPosition, placeNames, getMapbox, MAP_STYLE, type LatLng, type PlaceNames } from "../lib/map";
+import { askForPosition, lookupProblem, placeNames, getMapbox, MAP_STYLE, type LatLng, type PlaceNames } from "../lib/map";
 import { useDoctors } from "../lib/queries";
 import { colors, space } from "../lib/theme";
 
@@ -191,6 +191,12 @@ export default function AreaScreen() {
           <Txt variant="heading" numberOfLines={1}>
             {naming ? "…" : [names?.area, names ? names.town : city?.city].filter(Boolean).join(", ") || "…"}
           </Txt>
+          {/* For testers: why this spot has no name (both the map's and the phone's lookups failed). */}
+          {!naming && !names && lookupProblem() ? (
+            <Txt variant="tiny" color={colors.muted} numberOfLines={2}>
+              {t("placeLookupFailed", { why: lookupProblem() ?? "" })}
+            </Txt>
+          ) : null}
         </View>
         <Button
           label={t("useWhereIAm")}

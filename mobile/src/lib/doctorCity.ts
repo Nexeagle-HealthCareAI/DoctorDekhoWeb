@@ -6,7 +6,8 @@
  * Ghaziabad they were in Kishanganj. So:
  * - with the map's town/district names: a directory city is used only if it matches one of them (and has a doctor
  *   within NEAR_CITY_KM); otherwise there is no doctor city and lists simply go nearest-first;
- * - without them (no map token, offline): the nearest doctor's city, if within NEAR_CITY_KM (the old behaviour).
+ * - without them (both lookups failed): a nearby doctor's city, but only if that city's real centre (`cityHubs`) is
+ *   within NEAR_CITY_KM too — so a mislabelled pin can never name the patient's town.
  */
 export const NEAR_CITY_KM = 40;
 
@@ -32,6 +33,44 @@ function km(a: { lat: number; lng: number }, b: { lat: number; lng: number }): n
   return 2 * R * Math.asin(Math.sqrt(s));
 }
 
+type Hubs = Map<string, { lat: number; lng: number }>;
+const hubCache = new WeakMap<readonly CityDoctor[], Hubs>();
+
+/**
+ * Where each directory city really is: the spot with the most of that city's doctors within 25 km. A handful of
+ * mislabelled pins (the dev "Kishanganj" test hospitals in East Delhi) can't move it, because most Kishanganj
+ * doctors are in Kishanganj.
+ */
+export function cityHubs(doctors: readonly CityDoctor[]): Hubs {
+  const cached = hubCache.get(doctors);
+  if (cached) return cached;
+  const byCity = new Map<string, { lat: number; lng: number }[]>();
+  for (const d of doctors) {
+    if (d.latitude == null || d.longitude == null) continue;
+    const k = key(d.city);
+    const list = byCity.get(k) ?? [];
+    list.push({ lat: d.latitude, lng: d.longitude });
+    byCity.set(k, list);
+  }
+  const hubs: Hubs = new Map();
+  for (const [k, pins] of byCity) {
+    const spots = new Map<string, { lat: number; lng: number }>();
+    for (const p of pins) spots.set(`${p.lat.toFixed(2)},${p.lng.toFixed(2)}`, p);
+    let best = pins[0];
+    let bestN = -1;
+    for (const s of spots.values()) {
+      const n = pins.filter((p) => km(s, p) <= 25).length;
+      if (n > bestN) {
+        bestN = n;
+        best = s;
+      }
+    }
+    hubs.set(k, best);
+  }
+  hubCache.set(doctors, hubs);
+  return hubs;
+}
+
 export function doctorCityNear<D extends CityDoctor>(here: { lat: number; lng: number }, mapNames: string[] | null | undefined, doctors: readonly D[]): D | undefined {
   const near = doctors
     .filter((d) => d.latitude != null && d.longitude != null)
@@ -40,6 +79,11 @@ export function doctorCityNear<D extends CityDoctor>(here: { lat: number; lng: n
     .sort((a, b) => a.k - b.k);
   if (!near.length) return undefined;
   const names = (mapNames ?? []).map(key).filter(Boolean);
-  if (!names.length) return near[0].d;
-  return near.find((x) => names.includes(key(x.d.city)))?.d;
+  if (names.length) return near.find((x) => names.includes(key(x.d.city)))?.d;
+  // No name from any map: trust a nearby doctor's city only if that city's real centre is near too.
+  const hubs = cityHubs(doctors);
+  return near.find((x) => {
+    const hub = hubs.get(key(x.d.city));
+    return hub != null && km(here, hub) <= NEAR_CITY_KM;
+  })?.d;
 }

@@ -232,18 +232,27 @@ export interface PlaceNames {
 async function reverse(p: LatLng, lang: "en" | "hi" | "bn") {
   const url = `https://api.mapbox.com/search/geocode/v6/reverse?longitude=${p.lng}&latitude=${p.lat}&types=neighborhood,locality,place&limit=1&language=${lang}&access_token=${MAPBOX_TOKEN}`;
   const res = await fetch(url);
-  if (!res.ok) return null;
+  if (!res.ok) {
+    lastLookupProblem = `Mapbox ${res.status}`;
+    return null;
+  }
   type Ctx = { name?: string };
   const json = (await res.json()) as { features?: { properties?: { name?: string; feature_type?: string; context?: { place?: Ctx; district?: Ctx; locality?: Ctx } } }[] };
-  return json.features?.[0]?.properties ?? null;
+  const f = json.features?.[0]?.properties ?? null;
+  if (!f) lastLookupProblem = "Mapbox: no place here";
+  return f;
 }
 
-/**
- * What the map calls this spot. Mapbox's own first answer is often a bare "Sector 18" or "Niti Khand 2", so the
- * locality around it ("Kavi Nagar", "Indirapuram") is preferred when there is one.
- */
-export async function placeNames(p: LatLng, locale: Locale): Promise<PlaceNames | null> {
-  if (!MAPBOX_TOKEN) return null;
+/** Why the last place-name lookup found nothing (shown small in the area picker, for testers). Null when it worked. */
+let lastLookupProblem: string | null = null;
+export const lookupProblem = () => lastLookupProblem;
+
+/** Mapbox's answer for this spot, or null (no token, offline, refused). */
+async function mapboxNames(p: LatLng, locale: Locale): Promise<PlaceNames | null> {
+  if (!MAPBOX_TOKEN) {
+    lastLookupProblem = "no Mapbox key in this build";
+    return null;
+  }
   const lang = locale === "hi" ? "hi" : locale === "bn" ? "bn" : "en";
   try {
     const [f, en] = await Promise.all([reverse(p, lang), lang === "en" ? Promise.resolve(null) : reverse(p, "en").catch(() => null)]);
@@ -254,9 +263,36 @@ export async function placeNames(p: LatLng, locale: Locale): Promise<PlaceNames 
     const e = en ?? f;
     const match = [e.feature_type === "place" ? e.name : e.context?.place?.name, e.context?.district?.name].filter((x): x is string => !!x);
     return { area, town, match };
-  } catch {
+  } catch (err) {
+    lastLookupProblem = `Mapbox: ${(err as Error)?.message ?? "network error"}`;
     return null;
   }
+}
+
+/** The phone's own geocoder (Google's on Android): no key needed, names in English. */
+async function phoneNames(p: LatLng): Promise<PlaceNames | null> {
+  try {
+    const [a] = await Location.reverseGeocodeAsync({ latitude: p.lat, longitude: p.lng });
+    if (!a) return null;
+    const town = a.city ?? a.subregion ?? null;
+    const area = a.district && a.district !== town ? a.district : null;
+    const match = [a.city, a.subregion].filter((x): x is string => !!x);
+    return town || area ? { area, town, match } : null;
+  } catch (err) {
+    lastLookupProblem = `${lastLookupProblem ?? ""}; phone: ${(err as Error)?.message ?? "failed"}`;
+    return null;
+  }
+}
+
+/**
+ * What the map calls this spot. Mapbox first (its first answer is often a bare "Sector 18" or "Niti Khand 2", so the
+ * locality around it — "Kavi Nagar", "Indirapuram" — is preferred); if Mapbox can't answer, the phone's own geocoder.
+ */
+export async function placeNames(p: LatLng, locale: Locale): Promise<PlaceNames | null> {
+  lastLookupProblem = null;
+  const names = (await mapboxNames(p, locale)) ?? (await phoneNames(p));
+  if (names) lastLookupProblem = null;
+  return names;
 }
 
 /**
