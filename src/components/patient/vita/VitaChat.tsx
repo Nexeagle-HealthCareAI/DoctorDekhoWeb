@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import {
-  Activity, AlertTriangle, ArrowDown, ChevronDown, GraduationCap, History, LocateFixed, MapPin, Maximize2, MessageCircle, Mic,
+  Activity, AlertTriangle, ArrowDown, ChevronDown, GraduationCap, Headphones, History, LocateFixed, MapPin, Maximize2, MessageCircle, Mic,
   Minimize2, MoreVertical, RotateCcw, Send, Square, Stethoscope, User as UserRound, Volume2, X,
 } from "lucide-react";
 import { useVitaChat, type VitaEntry } from "@/hooks/useVitaChat";
@@ -18,6 +18,7 @@ import { WHATSAPP_BUSINESS_NUMBER } from "@/lib/site";
 import VitaReplyView, { type ReplyActions, type ReplySpeech } from "@/components/patient/vita/VitaReplyView";
 import { doctorHref } from "@/components/patient/vita/VitaDoctorCard";
 import { useSpeechOutput } from "@/hooks/useSpeechOutput";
+import { useVitaLive, type LiveStatus } from "@/components/patient/vita/useVitaLive";
 import { TEXT_ZOOM, useVitaPrefs, type TextSize, type VitaPrefs } from "@/lib/vita/prefs";
 import { addRecent, clearRecent, loadRecent } from "@/lib/vita/memory";
 import { REFINE_LABEL, refinePhrase, suggest } from "@/lib/vita/refine";
@@ -81,6 +82,7 @@ export default function VitaChat({ chat, onClose, expanded = false, onToggleExpa
   const voice = useSpeechOutput();
   const { prefs, update } = useVitaPrefs();
   const spokenId = useRef<number | null>(null);
+  const liveOn = useRef(false);
 
   // Where to look after each change: a new Vita reply is read from its start (its message and filter
   // chips first, then the cards); while waiting, or after the patient's own message, the end.
@@ -121,7 +123,7 @@ export default function VitaChat({ chat, onClose, expanded = false, onToggleExpa
     }
     if (lastEntry.id === spokenId.current && lastEntry.role !== "user") return;
     spokenId.current = lastEntry.id;
-    if (prefs.readAloud && lastEntry.role === "vita" && lastEntry.reply) {
+    if (prefs.readAloud && !liveOn.current && lastEntry.role === "vita" && lastEntry.reply) {
       voice.speak(lastEntry.id, lastEntry.reply.message, lastEntry.reply.language);
     }
   }, [chat.entries, prefs.readAloud, voice]);
@@ -146,6 +148,10 @@ export default function VitaChat({ chat, onClose, expanded = false, onToggleExpa
     void chat.send(text, { shownAs, bookingStep: bookStep });
   };
 
+  // Talk with Vita, hands-free (Groq speech): the replies are spoken by it, not by "read aloud".
+  const live = useVitaLive({ entries: chat.entries, busy: chat.busy, locale, send: (text) => send(text), t });
+  liveOn.current = live.on;
+
   // Vita asked for something to type (number, code, name, age): put the cursor there.
   useEffect(() => {
     if (typed && !chat.busy) inputRef.current?.focus();
@@ -153,6 +159,7 @@ export default function VitaChat({ chat, onClose, expanded = false, onToggleExpa
 
   const newChat = () => {
     voice.stop();
+    live.stop();
     chat.reset();
     setMenuOpen(false);
     setPinHidden(false);
@@ -352,6 +359,20 @@ export default function VitaChat({ chat, onClose, expanded = false, onToggleExpa
         </div>
       )}
 
+      {live.notice && !live.on && (
+        <div role="status" className="flex shrink-0 items-center gap-2 border-t border-[#DCE7E4] bg-[#FFF8E6] px-3 py-2 text-sm text-[#5C4400]">
+          <span className="min-w-0 flex-1">{t(live.notice)}</span>
+          <button type="button" onClick={live.dismiss} aria-label={t("vita.hide")} className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full hover:bg-black/5">
+            <X className="h-4 w-4" aria-hidden="true" />
+          </button>
+        </div>
+      )}
+
+      {live.on && (
+        <LiveBar status={live.status} level={live.level} notice={live.notice ? t(live.notice) : null}
+          onStop={live.stop} onInterrupt={live.interrupt} />
+      )}
+
       <form onSubmit={submit} className="flex shrink-0 items-center gap-2 border-t border-[#DCE7E4] bg-white px-3 py-2 pb-[max(0.5rem,env(safe-area-inset-bottom))]">
         <input
           ref={inputRef}
@@ -365,7 +386,14 @@ export default function VitaChat({ chat, onClose, expanded = false, onToggleExpa
           maxLength={typed?.maxLength ?? 1000}
           className="min-h-[48px] min-w-0 flex-1 rounded-full border border-[#C9DAD6] bg-[#F7FAF9] px-4 text-base text-slate-900 placeholder:text-slate-500 focus:border-[#0B5E57] focus:outline-none"
         />
-        {speech.supported && (
+        {live.available && !live.on && (
+          <button type="button" onClick={() => { if (speech.listening) speech.stop(); voice.stop(); void live.start(); }} aria-label={t("vita.liveStart")}
+            title={t("vita.liveStart")}
+            className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full border border-[#C9DAD6] bg-white text-[#0B5E57]">
+            <Headphones className="h-5 w-5" aria-hidden="true" />
+          </button>
+        )}
+        {speech.supported && !live.on && (
           <button type="button" onClick={speech.listening ? speech.stop : speech.start}
             aria-label={speech.listening ? t("vita.micStop") : t("vita.micStart")} aria-pressed={speech.listening}
             className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-full border ${speech.listening ? "border-[#B3141E] bg-red-50 text-[#B3141E]" : "border-[#C9DAD6] bg-white text-[#0B5E57]"}`}>
@@ -377,6 +405,44 @@ export default function VitaChat({ chat, onClose, expanded = false, onToggleExpa
           <Send className="h-5 w-5" aria-hidden="true" />
         </button>
       </form>
+    </div>
+  );
+}
+
+const LIVE_TEXT: Record<Exclude<LiveStatus, "off">, TranslationKey> = {
+  listening: "vita.liveListening",
+  hearing: "vita.liveHearing",
+  thinking: "vita.liveThinking",
+  speaking: "vita.liveSpeaking",
+  waiting: "vita.liveWaiting",
+};
+
+/** The live conversation: what Vita is doing, how loud the patient is, stop. Tapping while Vita speaks makes her listen. */
+function LiveBar({ status, level, notice, onStop, onInterrupt }: {
+  status: LiveStatus; level: number; notice: string | null; onStop: () => void; onInterrupt: () => void;
+}) {
+  const { t } = useTranslation();
+  const key = status === "off" ? "vita.liveWaiting" : LIVE_TEXT[status];
+  const listening = status === "listening" || status === "hearing";
+  return (
+    <div className="flex shrink-0 flex-col gap-1 border-t border-[#DCE7E4] bg-[#0B4F4A] px-3 py-2 text-white">
+      <div className="flex items-center gap-3">
+        <button type="button" onClick={status === "speaking" ? onInterrupt : undefined} disabled={status !== "speaking"}
+          className="flex min-h-[44px] min-w-0 flex-1 items-center gap-3 text-left disabled:cursor-default">
+          <span aria-hidden="true" className="flex h-8 items-end gap-0.5">
+            {[0.6, 1, 0.8, 0.5].map((f, i) => (
+              <span key={i} className="w-1.5 rounded-full bg-white/90 transition-[height] duration-75"
+                style={{ height: `${listening ? 6 + Math.round(level * f * 26) : status === "speaking" ? 10 + i * 4 : 6}px` }} />
+            ))}
+          </span>
+          <span className="min-w-0 flex-1 truncate text-sm font-semibold" aria-live="polite">{notice ?? t(key)}</span>
+        </button>
+        <button type="button" onClick={onStop} aria-label={t("vita.liveStop")}
+          className="inline-flex min-h-[44px] shrink-0 items-center gap-1.5 rounded-full bg-white px-3 text-sm font-bold text-[#B3141E]">
+          <Square className="h-4 w-4" aria-hidden="true" /> {t("vita.liveStop")}
+        </button>
+      </div>
+      <p className="text-[11px] leading-tight text-white/70">{t("vita.liveNote")}</p>
     </div>
   );
 }
