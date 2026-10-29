@@ -1,6 +1,7 @@
 ﻿"use client";
 
 import { useMemo, useState } from "react";
+import Eagle from "@/components/patient/vita/Eagle";
 import { useQueries, useQuery } from "@tanstack/react-query";
 import PatientTopBar from "@/components/patient/PatientTopBar";
 import ProfileShell from "@/components/patient/ProfileShell";
@@ -234,9 +235,11 @@ export default function AppointmentsClient() {
           </div>
         ) : (
           <div className="flex flex-col items-center justify-center text-center py-16 bg-white rounded-[2rem] border border-dashed border-slate-200 shadow-sm px-6">
-            <div className="w-16 h-16 rounded-full bg-slate-50 flex items-center justify-center mb-4 border border-slate-100 shadow-inner">
-              <Calendar className="w-7 h-7 text-slate-300" />
-            </div>
+            <span className="vita-peek mb-2">
+              <span className="vita-peek-eagle block">
+                <Eagle mood="wave" size={112} />
+              </span>
+            </span>
             <h3 className="font-display font-bold text-lg text-slate-900 mb-2">No upcoming appointments</h3>
             <p className="text-sm text-slate-500 mb-6 max-w-sm">
               {isLoggedIn

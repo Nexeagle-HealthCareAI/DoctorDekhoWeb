@@ -20,6 +20,15 @@
 .vita-dot { animation: vita-dot 1.2s ease-in-out infinite; }
 .vita-dot:nth-child(2) { animation-delay: 0.15s; }
 .vita-dot:nth-child(3) { animation-delay: 0.3s; }
+/* Eagles outside the chat (VitaPeek, empty states): a hop when you point at her or tab to her, and one hop when a
+   booking request is sent. Still nothing loops. */
+@keyframes vita-hop {
+  0%, 100% { transform: none; }
+  35% { transform: translateY(-10px) rotate(-3deg); }
+  60% { transform: translateY(0) rotate(2deg); }
+}
+.vita-peek:hover .vita-peek-eagle, .vita-peek:focus-visible .vita-peek-eagle, .vita-hop-once { animation: vita-hop 520ms ease-out both; }
+.vita-hop-once { animation-delay: 300ms; }
 @media (prefers-reduced-motion: reduce) {
-  .vita-pop, .vita-fly-in, .vita-dot { animation: none; }
+  .vita-pop, .vita-fly-in, .vita-dot, .vita-peek:hover .vita-peek-eagle, .vita-peek:focus-visible .vita-peek-eagle, .vita-hop-once { animation: none; }
 }

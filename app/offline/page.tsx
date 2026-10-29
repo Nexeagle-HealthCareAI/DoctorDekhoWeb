@@ -11,8 +11,14 @@ export default function OfflinePage() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-slate-50 px-6">
       <div className="w-full max-w-sm rounded-3xl border border-slate-200/80 bg-white shadow-sm p-8 text-center">
-        <div className="mx-auto w-14 h-14 rounded-2xl bg-teal-50 text-brand-teal flex items-center justify-center">
-          <WifiOff className="w-7 h-7" />
+        {/* Vita sleeps while there's no connection. A plain <img>: this page is served with no network, and if the
+            picture isn't cached either, the usual Wi-Fi icon shows instead. */}
+        <div className="relative mx-auto flex h-28 w-28 items-center justify-center">
+          <div className="absolute inset-0 m-auto flex w-14 h-14 rounded-2xl bg-teal-50 text-brand-teal items-center justify-center">
+            <WifiOff className="w-7 h-7" />
+          </div>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/vita/sleeping.png" alt="" aria-hidden="true" className="relative h-28 w-28 object-contain bg-white" onError={(e) => { e.currentTarget.style.display = "none"; }} />
         </div>
         <h1 className="mt-5 text-lg font-bold text-slate-900">You&apos;re offline</h1>
         <p className="mt-2 text-sm text-slate-500 leading-relaxed">

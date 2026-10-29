@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import VitaPeek from "@/components/patient/vita/VitaPeek";
 import { useIsRestoring } from "@tanstack/react-query";
 import { motion, useReducedMotion } from "framer-motion";
-import { Frown, Loader2, ChevronDown, ChevronLeft, ChevronRight, SlidersHorizontal, MapPin, Sparkles } from "lucide-react";
+import { Loader2, ChevronDown, ChevronLeft, ChevronRight, SlidersHorizontal, MapPin, Sparkles } from "lucide-react";
 import DoctorCard from "./DoctorCard";
 import EmergencyBanner from "./EmergencyBanner";
 import SearchFollowUp from "./SearchFollowUp";
@@ -666,15 +667,16 @@ export default function DoctorDirectory({
             initial={{ opacity: 0, scale: 0.97 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ duration: 0.3 }}
-            className="text-center py-32 rounded-[2rem] border border-dashed border-slate-200 bg-white shadow-sm"
+            className="text-center py-20 rounded-[2rem] border border-dashed border-slate-200 bg-white shadow-sm"
           >
-            <div className="w-20 h-20 rounded-full bg-slate-50 border border-slate-100 text-slate-300 flex items-center justify-center mx-auto mb-5 shadow-inner">
-              <Frown className="w-10 h-10" />
-            </div>
             <h3 className="font-display font-bold text-xl text-slate-900 mb-2">{t("directory.noMatch")}</h3>
             <p className="text-base text-slate-500 max-w-md mx-auto">
               {t("directory.noMatchDesc")}
             </p>
+            {/* Vita, thinking: the plain-words way in when the search words found nobody. */}
+            <div className="mt-6 flex justify-center px-4">
+              <VitaPeek mood="thinking" size={88} text={t("vita.peekNoMatch")} cta={t("vita.askCta")} where="no-match" />
+            </div>
           </motion.div>
         )}
       </div>
