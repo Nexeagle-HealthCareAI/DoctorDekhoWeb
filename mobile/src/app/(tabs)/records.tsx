@@ -9,7 +9,7 @@ import { Alert, Linking, Modal, Pressable, RefreshControl, ScrollView, SectionLi
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Avatar, Banner, Button, Chip, EmptyState, IconCircle, Label, Loading, Logo, TopBar, Txt, type IconName } from "../../components/ui";
 import { ApiError } from "../../lib/api/http";
-import { takePendingPhoto } from "../../lib/pendingPick";
+import { clearPicking, markPicking, takePendingPhoto } from "../../lib/pendingPick";
 import { deleteLockerDocument, uploadLockerDocument } from "../../lib/api/patient";
 import type { HealthLockerDocument } from "../../lib/api/types";
 import { relationLabel } from "../../lib/booking";
@@ -54,6 +54,8 @@ export default function RecordsScreen() {
   const [filter, setFilter] = useState<string | "all">("all");
   // Photos stay covered until the patient taps them (shared phones); this is per session, never saved.
   const [shown, setShown] = useState<Record<string, boolean>>({});
+  // Android closed the app while a file was being chosen: say so here instead of leaving the patient on Home.
+  const [pickAgain, setPickAgain] = useState(false);
 
   const members = family.data?.members ?? [];
   const docs = useMemo(() => {
@@ -74,24 +76,39 @@ export default function RecordsScreen() {
 
   // A photo recovered after Android closed the app during the camera: open it ready to save.
   useEffect(() => {
-    if (resume !== "1") return;
+    if (resume !== "1" && resume !== "file") return;
     router.setParams({ resume: undefined });
+    if (resume === "file") {
+      setPickAgain(true);
+      return;
+    }
     const p = takePendingPhoto();
     if (p) open(p);
-  }, [resume]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [resume]);
+
+  /** Before the camera or file picker: free the decoded record photos (the big memory user right after an upload). */
+  async function beforePicking(kind: "camera" | "file") {
+    setPickAgain(false);
+    await Image.clearMemoryCache().catch(() => false);
+    await markPicking(kind);
+  } // eslint-disable-line react-hooks/exhaustive-deps
 
   async function fromCamera() {
     const perm = await ImagePicker.requestCameraPermissionsAsync();
     if (!perm.granted) return;
     // Smaller photos (still sharp enough to read a prescription) use less memory, so Android is less likely to close the app.
+    await beforePicking("camera");
     const r = await ImagePicker.launchCameraAsync({ quality: 0.6, mediaTypes: ["images"], exif: false });
+    void clearPicking();
     if (r.canceled || !r.assets[0]) return;
     const a = r.assets[0];
     open({ uri: a.uri, name: a.fileName ?? `photo-${Date.now()}.jpg`, mimeType: a.mimeType ?? "image/jpeg", size: a.fileSize });
   }
 
   async function fromFiles() {
+    await beforePicking("file");
     const r = await DocumentPicker.getDocumentAsync({ type: ["application/pdf", "image/*"], copyToCacheDirectory: true });
+    void clearPicking();
     if (r.canceled || !r.assets[0]) return;
     const a = r.assets[0];
     open({ uri: a.uri, name: a.name, mimeType: a.mimeType ?? "application/octet-stream", size: a.size });
@@ -174,6 +191,7 @@ export default function RecordsScreen() {
           refreshControl={<RefreshControl refreshing={locker.isRefetching} onRefresh={() => void locker.refetch()} tintColor={colors.primary} />}
           ListHeaderComponent={
             <View style={{ gap: space.lg, marginBottom: space.sm }}>
+              {pickAgain ? <Banner tone="warning" icon="refresh" text={t("pickFileAgain")} /> : null}
               <View style={{ paddingHorizontal: 4 }}>
                 <View style={{ flexDirection: "row", alignItems: "center" }}>
                   <Txt variant="display" style={{ flex: 1 }}>

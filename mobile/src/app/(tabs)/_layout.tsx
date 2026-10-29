@@ -5,7 +5,7 @@ import { View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTextStyle } from "../../lib/appearance";
 import { useI18n } from "../../lib/i18n";
-import { recoverCameraPhoto } from "../../lib/pendingPick";
+import { recoverInterruptedPick } from "../../lib/pendingPick";
 import { colors } from "../../lib/theme";
 
 type IconName = "home" | "map" | "calendar" | "folder-open" | "person";
@@ -24,10 +24,11 @@ export default function TabsLayout() {
   const ts = useTextStyle();
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  // If Android closed the app while the camera was open for Records, go back there with the photo.
+  // If Android closed the app while the camera or file picker was open for Records, go back there (with the photo, if Expo kept it).
   useEffect(() => {
-    void recoverCameraPhoto().then((found) => {
-      if (found) router.navigate({ pathname: "/records", params: { resume: "1" } });
+    void recoverInterruptedPick().then((what) => {
+      if (what === "photo") router.navigate({ pathname: "/records", params: { resume: "1" } });
+      else if (what === "file") router.navigate({ pathname: "/records", params: { resume: "file" } });
     });
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
   return (
