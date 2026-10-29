@@ -4,10 +4,11 @@ import * as Haptics from "expo-haptics";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
 import { Image } from "expo-image";
-import { Pressable, ScrollView, Share, StyleSheet, useWindowDimensions, View } from "react-native";
+import { Pressable, ScrollView, Share, StyleSheet, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { DoctorAvatar } from "../../components/DoctorCard";
-import { Confetti, PopIn, RiseIn } from "../../components/Motion";
+import { PopIn, RiseIn } from "../../components/Motion";
+import { Vita } from "../../components/Vita";
 import { Avatar, Banner, Button, Card, DateBlock, EmptyState, Loading, Logo, StepTitle, TopBar, Txt } from "../../components/ui";
 import { effectiveFee, fetchAvailability, type Doctor } from "../../lib/api/doctors";
 import { ApiError } from "../../lib/api/http";
@@ -323,14 +324,13 @@ function Person({ name, sub, initials, tintIndex, on, onPress }: { name: string;
 }
 
 /**
- * After booking: a short celebration (one burst of confetti and a tick that pops in — none of it with reduce motion),
+ * After booking: a short celebration (joyful Vita hops once, with a tick on her — none of it moves with reduce motion),
  * then the visit as a ticket with a mini map that opens the route, what happens next, and Listen / Send to family.
  * It still says plainly that the hospital will call to confirm the time.
  */
 function Booked({ doctor, date, windowLabel, patientName, reference, mobile, start }: { doctor: Doctor; date: string; windowLabel: string; patientName: string; reference?: string | null; mobile: string; start?: string }) {
   const router = useRouter();
   const { t, locale } = useI18n();
-  const { width } = useWindowDimensions();
   const { speaking, toggle } = useReadAloud(locale);
   const fee = effectiveFee(doctor);
   const when = [formatShortDate(date, locale), windowLabel].filter(Boolean).join(", ");
@@ -359,11 +359,14 @@ function Booked({ doctor, date, windowLabel, patientName, reference, mobile, sta
       </SafeAreaView>
       <ScrollView contentContainerStyle={{ padding: space.lg, paddingTop: 0, gap: space.lg + 2 }}>
         <View style={{ alignItems: "center", gap: space.sm }}>
-          <PopIn delay={120}>
-            <View style={styles.tick}>
-              <Ionicons name="checkmark" size={46} color={colors.primary} />
-            </View>
-          </PopIn>
+          <View>
+            <Vita pose="joyful" size={170} motion="hop" />
+            <PopIn delay={380} style={styles.tickBadge}>
+              <View style={styles.tick}>
+                <Ionicons name="checkmark" size={30} color={colors.primary} />
+              </View>
+            </PopIn>
+          </View>
           <Txt variant="display" color="#fff" center style={{ marginTop: space.sm }}>
             {t("bookedTitle")}
           </Txt>
@@ -453,7 +456,6 @@ function Booked({ doctor, date, windowLabel, patientName, reference, mobile, sta
         />
         <Button label={t("backHome")} variant="onDarkSoft" size="md" onPress={() => router.dismissAll()} />
       </SafeAreaView>
-      <Confetti width={width} />
     </View>
   );
 }
@@ -475,7 +477,8 @@ const styles = StyleSheet.create({
   reasonOn: { backgroundColor: colors.primary, borderColor: colors.primary },
   footer: { backgroundColor: colors.card, borderTopWidth: 1, borderTopColor: colors.line, paddingHorizontal: space.lg, paddingTop: space.md, gap: 10 },
   summary: { flexDirection: "row", alignItems: "center", minHeight: 24 },
-  tick: { width: 84, height: 84, borderRadius: 42, backgroundColor: "#fff", alignItems: "center", justifyContent: "center" },
+  tick: { width: 52, height: 52, borderRadius: 26, backgroundColor: "#fff", alignItems: "center", justifyContent: "center", borderWidth: 3, borderColor: colors.primary },
+  tickBadge: { position: "absolute", right: 4, bottom: 4 },
   ticketTop: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: space.lg, paddingVertical: space.sm },
   ticketClose: { width: 48, height: 48, borderRadius: 24, backgroundColor: "rgba(255,255,255,0.14)", alignItems: "center", justifyContent: "center" },
   ticket: { backgroundColor: "#fff", borderRadius: 24, overflow: "hidden", elevation: 8, shadowColor: "#000", shadowOpacity: 0.22, shadowRadius: 20, shadowOffset: { width: 0, height: 12 } },

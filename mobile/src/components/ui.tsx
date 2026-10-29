@@ -25,6 +25,8 @@ import { useI18n } from "../lib/i18n";
 import type { Locale } from "../lib/i18n/types";
 import { contactSupport } from "../lib/support";
 import { BIG, colors, font, radius, space, TAP, tints, type Tint } from "../lib/theme";
+import { Vita } from "./Vita";
+import type { VitaPose } from "../lib/vitaMood";
 
 export type IconName = ComponentProps<typeof Ionicons>["name"];
 
@@ -338,10 +340,11 @@ export function StepTitle({ n, children }: { n: number; children: ReactNode }) {
   );
 }
 
-export function EmptyState({ icon, title, body, action, onAction }: { icon: IconName; title: string; body?: string; action?: string; onAction?: () => void }) {
+/** An empty list: an icon (or Vita in a pose, when she has something to suggest), a title, a hint and one action. */
+export function EmptyState({ icon, vita, title, body, action, onAction }: { icon: IconName; vita?: VitaPose; title: string; body?: string; action?: string; onAction?: () => void }) {
   return (
     <View style={styles.empty}>
-      <IconCircle icon={icon} tint="teal" size={72} />
+      {vita ? <Vita pose={vita} size={132} motion={vita === "wave" ? "sway" : "breathe"} /> : <IconCircle icon={icon} tint="teal" size={72} />}
       <Txt variant="heading" center style={{ marginTop: space.lg }}>
         {title}
       </Txt>

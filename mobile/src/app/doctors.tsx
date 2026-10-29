@@ -201,7 +201,8 @@ export default function DoctorsScreen() {
           }
           ListEmptyComponent={
             <View>
-              <EmptyState icon="search" title={t("noDoctors")} action={place?.city ? t("searchAllIndia") : undefined} onAction={() => void setPlace({ city: null, state: null })} />
+              <EmptyState icon="search" vita="thinking" title={t("noDoctors")} body={t("vitaTipNoMatch")} action={place?.city ? t("searchAllIndia") : undefined} onAction={() => void setPlace({ city: null, state: null })} />
+              <Button label={t("vitaAsk")} icon="chatbubble-ellipses" variant="primary" onPress={() => router.push("/vita")} style={{ marginHorizontal: space.xl, marginBottom: space.sm }} />
               <Button label={t("callToBook")} icon="call" variant="secondary" onPress={() => contactSupport("whatsapp", t("callToBookMessage", { need: q || symptom?.label[locale] || "" }))} style={{ marginHorizontal: space.xl }} />
             </View>
           }

@@ -1,12 +1,13 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useFocusEffect, useRouter } from "expo-router";
 import { setStatusBarStyle } from "expo-status-bar";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Pressable, RefreshControl, ScrollView, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { AfterVisitCard, BringList, FamilyChips, Journey, OtherVisits } from "../../components/CareCards";
 import { CityPicker } from "../../components/CityPicker";
-import { VitaFace } from "../../components/VitaFace";
+import { Vita } from "../../components/Vita";
 import { DoctorAvatar, DoctorCard } from "../../components/DoctorCard";
 import { LanguageLink } from "../../components/LanguagePicker";
 import { MapPreview } from "../../components/MapPreview";
@@ -27,6 +28,10 @@ import { voiceSearchAvailable } from "../../lib/speech";
 import { plainSpecialty, SYMPTOMS } from "../../lib/specialties";
 import { callNumber } from "../../lib/support";
 import { colors, radius, space } from "../../lib/theme";
+import { HOME_VITA } from "../../lib/vitaMood";
+
+/** Set once Vita has flown in on Home for the first time (cleared with the rest of "dd." on sign-out). */
+const FLEW_IN_KEY = "dd.vitaFlewIn";
 
 const NEAR_KM = 3;
 
@@ -82,6 +87,19 @@ export default function HomeScreen() {
   }, [members, allAppts, myName, t, locale]);
   const whoName = chips.find((c) => c.id === who)?.name;
   const { stage, next, last } = care;
+
+  // Vita on Home follows the care stage. The very first time Home opens, she flies in to say hello instead.
+  const [flyIn, setFlyIn] = useState(false);
+  useEffect(() => {
+    AsyncStorage.getItem(FLEW_IN_KEY)
+      .then((v) => {
+        if (v) return;
+        setFlyIn(true);
+        void AsyncStorage.setItem(FLEW_IN_KEY, "1");
+      })
+      .catch(() => {});
+  }, []);
+  const vitaHere = flyIn && stage === "none" ? { pose: "flying" as const, motion: "bob" as const, tip: "vitaTipHello" as const } : HOME_VITA[stage];
   const nextDoctor = useMemo(() => doctorOf(next, doctors.data), [next, doctors.data]);
   const lastVisitDoctor = useMemo(() => doctorOf(last, doctors.data), [last, doctors.data]);
   const hiddenAfter = useStoredSet("dd.afterHidden");
@@ -199,13 +217,13 @@ export default function HomeScreen() {
             ) : null}
           </Pressable>
 
-          {/* Vita: say what's wrong, get the right doctor. */}
-          <Pressable onPress={() => router.push("/vita")} accessibilityRole="button" accessibilityLabel={`${t("vitaAsk")}. ${t("vitaAskSub")}`} style={({ pressed }) => [styles.vita, { transform: [{ scale: pressed ? 0.98 : 1 }] }]}>
-            <VitaFace size={46} />
+          {/* Vita: say what's wrong, get the right doctor. Her pose and tip follow where you are in your care. */}
+          <Pressable onPress={() => router.push("/vita")} accessibilityRole="button" accessibilityLabel={`${t("vitaAsk")}. ${t(vitaHere.tip)}`} style={({ pressed }) => [styles.vita, { transform: [{ scale: pressed ? 0.98 : 1 }] }]}>
+            <Vita pose={vitaHere.pose} motion={vitaHere.motion} size={68} style={{ marginVertical: -6 }} />
             <View style={{ flex: 1, minWidth: 0 }}>
               <Txt variant="bodyBold">{t("vitaAsk")}</Txt>
               <Txt variant="small" color={colors.muted} numberOfLines={2}>
-                {t("vitaAskSub")}
+                {t(vitaHere.tip)}
               </Txt>
             </View>
             <View style={styles.vitaMic}>

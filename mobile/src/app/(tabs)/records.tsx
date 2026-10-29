@@ -225,7 +225,7 @@ export default function RecordsScreen() {
               {monthTitle(section.month, locale)}
             </Txt>
           )}
-          ListEmptyComponent={<EmptyState icon="folder-open-outline" title={filter === "all" ? t("noRecords") : t("nothingFor", { name: filterName })} body={t("noRecordsHint")} />}
+          ListEmptyComponent={<EmptyState icon="folder-open-outline" vita="wave" title={filter === "all" ? t("noRecords") : t("nothingFor", { name: filterName })} body={t("noRecordsHint")} />}
           renderItem={({ item, index, section }) => {
             const tp = TYPES.find((x) => x.value.toLowerCase() === (item.documentType ?? "").toLowerCase());
             const source = item.doctorName || item.externalDoctorName || item.hospitalName || item.externalClinicName;

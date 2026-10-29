@@ -95,7 +95,7 @@ export default function AppointmentsScreen() {
           keyExtractor={(a) => a.appointmentId}
           contentContainerStyle={{ padding: space.lg, gap: space.md, flexGrow: 1 }}
           refreshControl={<RefreshControl refreshing={q.isRefetching} onRefresh={() => void q.refetch()} tintColor={colors.primary} />}
-          ListEmptyComponent={<EmptyState icon="calendar-outline" title={t("noAppointments")} body={t("noAppointmentsHint")} action={t("findDoctor")} onAction={() => router.push("/doctors")} />}
+          ListEmptyComponent={<EmptyState icon="calendar-outline" vita="wave" title={t("noAppointments")} body={t("noAppointmentsHint")} action={t("findDoctor")} onAction={() => router.push("/doctors")} />}
           renderItem={({ item }) =>
             tab === "upcoming" ? <UpcomingCard a={item} doctor={byName.get(item.doctorName)} /> : <PastRow a={item} doctor={byName.get(item.doctorName)} />
           }
