@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useCallback, useContext, useMemo, useState } from "react";
+import { createContext, useCallback, useContext, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import { NAVIGATION_AVAILABLE, googleMapsUrl, type NavDestination } from "@/lib/navigation";
 
@@ -32,12 +32,34 @@ export function NavigationProvider({ children }: { children: React.ReactNode }) 
   }, []);
 
   const close = useCallback(() => setDestination(null), []);
+
+  // A booking's journey: "on the way" with the time and distance left, at most every 2 minutes, and "arrived" once. Best effort.
+  const sent = useRef<{ id?: string; at: number; arrived: boolean }>({ at: 0, arrived: false });
+  const appointmentId = destination?.appointmentId;
+  const onProgress = useCallback((p: { seconds: number; meters: number; arrived: boolean }) => {
+    if (!appointmentId) return;
+    const s = sent.current.id === appointmentId ? sent.current : (sent.current = { id: appointmentId, at: 0, arrived: false });
+    if (s.arrived) return;
+    const now = Date.now();
+    if (!p.arrived && now - s.at < 120_000) return;
+    s.at = now;
+    s.arrived = p.arrived;
+    const body = p.arrived
+      ? { status: "arrived" }
+      : { status: "on_the_way", etaMinutes: Math.max(1, Math.round(p.seconds / 60)), distanceKm: Math.round(p.meters / 100) / 10 };
+    void fetch(`/api/public/appointments/${appointmentId}/journey`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+      keepalive: true,
+    }).catch(() => {});
+  }, [appointmentId]);
   const value = useMemo(() => ({ openNavigation }), [openNavigation]);
 
   return (
     <NavigationContext.Provider value={value}>
       {children}
-      {destination && <NavigationModal destination={destination} onClose={close} />}
+      {destination && <NavigationModal destination={destination} onClose={close} onProgress={appointmentId ? onProgress : undefined} />}
     </NavigationContext.Provider>
   );
 }
