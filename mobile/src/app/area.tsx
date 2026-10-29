@@ -33,27 +33,42 @@ export default function AreaScreen() {
   const reduce = useReduceMotion();
   const camera = useRef<CameraHandle | null>(null);
   const [center, setCenter] = useState<LatLng | null>(null);
+  // True while the map is moving or the spot is being named: the sheet shows "…" rather than a guess.
+  const [naming, setNaming] = useState(false);
   const [names, setNames] = useState<PlaceNames | null>(place?.area || place?.town ? { area: place?.area ?? null, town: place?.town ?? null, match: place?.town ? [place.town] : [] } : null);
   // The city chip just tapped: lit at once, before the map finishes moving there.
   const [picked, setPicked] = useState<string | null>(null);
   const drop = useRef(new Animated.Value(0)).current;
 
   const pinned = useMemo(() => (doctors.data ?? []).filter((d) => d.latitude != null && d.longitude != null), [doctors.data]);
-  // Each city's centre, from its doctors' pins, so a city chip can move the map there.
+  // Each city's centre, so a city chip can move the map there: the spot with the most of that city's doctors within
+  // 25 km — not the average of all its pins, which a few mislabelled pins far away would drag into the middle of nowhere.
   const cityCentres = useMemo(() => {
-    const m = new Map<string, { city: string; state: string; lat: number; lng: number; n: number }>();
+    const m = new Map<string, { city: string; state: string; pins: LatLng[] }>();
     for (const d of pinned) {
       const k = `${d.city}|${d.state}`;
-      const e = m.get(k) ?? { city: d.city, state: d.state, lat: 0, lng: 0, n: 0 };
-      e.lat += d.latitude!;
-      e.lng += d.longitude!;
-      e.n++;
+      const e = m.get(k) ?? { city: d.city, state: d.state, pins: [] };
+      e.pins.push({ lat: d.latitude!, lng: d.longitude! });
       m.set(k, e);
     }
-    return [...m.values()].map((e) => ({ city: e.city, state: e.state, lat: e.lat / e.n, lng: e.lng / e.n, n: e.n }));
+    return [...m.values()].map((e) => {
+      const spots = new Map<string, LatLng>();
+      for (const p of e.pins) spots.set(`${p.lat.toFixed(3)},${p.lng.toFixed(3)}`, p);
+      let best = e.pins[0];
+      let bestN = -1;
+      for (const s of spots.values()) {
+        const n = e.pins.filter((p) => distanceKm(s, p) <= 25).length;
+        if (n > bestN) {
+          bestN = n;
+          best = s;
+        }
+      }
+      return { city: e.city, state: e.state, lat: best.lat, lng: best.lng, n: e.pins.length };
+    });
   }, [pinned]);
   // The doctor city here: only a directory city the map agrees is this town (see lib/doctorCity.ts).
-  const nearestDoctor = (p: LatLng): Doctor | undefined => doctorCityNear(p, names?.match, pinned);
+  // While naming, there is no answer yet (never the nearest doctor's city, which can be a mislabelled test pin).
+  const nearestDoctor = (p: LatLng): Doctor | undefined => (naming ? undefined : doctorCityNear(p, names ? names.match : null, pinned));
 
   const startAt: LatLng | null =
     place?.lat != null && place?.lng != null ? { lat: place.lat, lng: place.lng } : (cityCentres.find((c) => c.city.toLowerCase() === place?.city?.toLowerCase()) ?? cityCentres[0] ?? null);
@@ -62,9 +77,16 @@ export default function AreaScreen() {
   useEffect(() => {
     if (!center) return;
     let live = true;
+    setNaming(true);
     const id = setTimeout(() => {
-      placeNames(center, locale).then((n) => live && setNames(n));
-    }, 350);
+      placeNames(center, locale)
+        .then((n) => {
+          if (!live) return;
+          setNames(n);
+          setNaming(false);
+        })
+        .catch(() => live && setNaming(false));
+    }, 250);
     return () => {
       live = false;
       clearTimeout(id);
@@ -77,10 +99,12 @@ export default function AreaScreen() {
     drop.setValue(-26);
     Animated.spring(drop, { toValue: 0, friction: 4, tension: 160, useNativeDriver: true }).start();
   };
-  const moveTo = (p: LatLng, zoom = 14) => camera.current?.setCamera({ centerCoordinate: [p.lng, p.lat], zoomLevel: zoom, animationDuration: 600 });
+  // Short hops glide; a jump to another city is instant (gliding hundreds of km loads every tile on the way and feels stuck).
+  const moveTo = (p: LatLng, zoom = 14) =>
+    camera.current?.setCamera({ centerCoordinate: [p.lng, p.lat], zoomLevel: zoom, animationDuration: center && distanceKm(center, p) > 30 ? 0 : 450 });
 
   const M = getMapbox();
-  const city = useMemo(() => (center ? nearestDoctor(center) : undefined), [center, pinned, names]); // eslint-disable-line react-hooks/exhaustive-deps
+  const city = useMemo(() => (center ? nearestDoctor(center) : undefined), [center, pinned, names, naming]); // eslint-disable-line react-hooks/exhaustive-deps
   // Chips stay in one order (nearest to where the screen opened), so they don't jump about under the finger.
   const chips = useMemo(
     () =>
@@ -103,6 +127,11 @@ export default function AreaScreen() {
   return (
     <View style={{ flex: 1, backgroundColor: "#ECEFE7" }}>
       {M && startAt ? (
+        // A finger on the map un-picks the city chip; moving the map starts naming the new spot.
+        <View
+          style={StyleSheet.absoluteFill}
+          onTouchStart={() => setPicked(null)}
+        >
         <M.MapView
           style={StyleSheet.absoluteFill}
           styleURL={`mapbox://styles/${MAP_STYLE}`}
@@ -112,15 +141,12 @@ export default function AreaScreen() {
           rotateEnabled={false}
           logoPosition={{ bottom: 330, left: 12 }}
           attributionPosition={{ bottom: 330, right: 12 }}
+          onCameraChanged={(s) => {
+            if (s.gestures.isGestureActive) setNaming(true);
+          }}
           onMapIdle={(s) => {
             const [lng, lat] = s.properties.center;
             setCenter({ lat, lng });
-          }}
-          onCameraChanged={(s) => {
-            if (s.gestures.isGestureActive) {
-              setNames(null);
-              setPicked(null);
-            }
           }}
         >
           <M.Camera
@@ -130,6 +156,7 @@ export default function AreaScreen() {
             defaultSettings={{ centerCoordinate: [startAt.lng, startAt.lat], zoomLevel: 14 }}
           />
         </M.MapView>
+        </View>
       ) : null}
 
       {/* The pin's tip sits exactly on the map's centre (the middle of the screen); the map moves under it. */}
@@ -162,7 +189,7 @@ export default function AreaScreen() {
             {t("yourArea")}
           </Txt>
           <Txt variant="heading" numberOfLines={1}>
-            {[names?.area, names ? names.town : city?.city].filter(Boolean).join(", ") || "…"}
+            {naming ? "…" : [names?.area, names ? names.town : city?.city].filter(Boolean).join(", ") || "…"}
           </Txt>
         </View>
         <Button
@@ -190,7 +217,7 @@ export default function AreaScreen() {
                   selected={selectedKey === `${c.city}|${c.state}`}
                   onPress={() => {
                     setPicked(`${c.city}|${c.state}`);
-                    setNames(null);
+                    setNaming(true);
                     bounce();
                     moveTo(c, 13);
                   }}
@@ -199,7 +226,7 @@ export default function AreaScreen() {
             </View>
           </View>
         ) : null}
-        <Button label={t("setThisArea")} onPress={save} disabled={!center} />
+        <Button label={t("setThisArea")} onPress={save} disabled={!center || naming} />
       </View>
     </View>
   );
