@@ -4,11 +4,12 @@ import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ImagePlus } from "lucide-react";
+import { ImagePlus, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { contributorApi } from "@/lib/contributor/client";
 import { CONDITION_OPTIONS, SLUG_LABEL } from "@/lib/contributor/conditions";
 import { messageOf } from "@/lib/contributor/hooks";
+import { IMAGE_ACCEPT, ImageProblem, prepareImage } from "@/lib/contributor/prepareImage";
 import { ARTICLE_TYPE_LABEL } from "@/lib/health-wiki/types";
 import { canSelfPublish, isDoctorRole, type ArticleDraftInput, type ArticleType, type ContributorMe, type MyArticle } from "@/lib/contributor/types";
 import { Banner, Field, card, input, primaryBtn, secondaryBtn } from "./ui";
@@ -20,7 +21,6 @@ const RichTextEditor = dynamic(() => import("./RichTextEditor"), {
   loading: () => <div className="h-72 rounded-xl border border-slate-200 bg-slate-50 animate-pulse" aria-label="Loading editor" />,
 });
 
-const MAX_COVER = 2 * 1024 * 1024;
 type Errors = Partial<Record<"title" | "content" | "cover" | "form", string>>;
 
 interface Props {
@@ -34,6 +34,8 @@ export default function ArticleForm({ me, existing }: Props) {
   const doctor = isDoctorRole(me.role);
   const writer = me.role === "WRITER";
   const coverInput = useRef<HTMLInputElement>(null);
+  const [coverBusy, setCoverBusy] = useState(false);
+  const [coverOver, setCoverOver] = useState(false);
   const selfPublish = canSelfPublish(me, existing);
   // A verified doctor can keep editing their live article: the changes go live when they publish them.
   const locked = !!existing && existing.status !== "DRAFT" && !(selfPublish && existing.status === "PUBLISHED");
@@ -84,15 +86,27 @@ export default function ArticleForm({ me, existing }: Props) {
   };
 
   const pickCover = async (file: File | undefined) => {
-    if (!file) return;
-    if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) return setErrors((e) => ({ ...e, cover: "Use a JPG, PNG or WebP file." }));
-    if (file.size > MAX_COVER) return setErrors((e) => ({ ...e, cover: `That file is ${(file.size / 1048576).toFixed(1)} MB. The limit is 2 MB.` }));
+    if (!file || coverBusy || locked) return;
+    setCoverBusy(true);
     try {
-      setCoverUrl(await contributorApi.uploadImage(file));
+      // A big photo is made small first, so a phone picture just works.
+      setCoverUrl(await contributorApi.uploadImage(await prepareImage(file)));
       setErrors((e) => ({ ...e, cover: undefined }));
     } catch (err) {
-      setErrors((e) => ({ ...e, cover: messageOf(err) }));
+      setErrors((e) => ({ ...e, cover: err instanceof ImageProblem ? err.message : messageOf(err) }));
+    } finally {
+      setCoverBusy(false);
     }
+  };
+  // Paste a picture (a screenshot, or one copied from another page) while the cover area is in focus.
+  const pasteCover = (e: React.ClipboardEvent) => {
+    const file = Array.from(e.clipboardData.files).find((f) => f.type.startsWith("image/"));
+    if (file) { e.preventDefault(); void pickCover(file); }
+  };
+  const dropCover = (e: React.DragEvent) => {
+    e.preventDefault();
+    setCoverOver(false);
+    void pickCover(e.dataTransfer.files[0]);
   };
 
   const save = async (submit: boolean) => {
@@ -143,9 +157,9 @@ export default function ArticleForm({ me, existing }: Props) {
         <input id="af-desc" className={input} maxLength={1000} value={description} disabled={locked} onChange={(e) => setDescription(e.target.value)} />
       </Field>
 
-      <div className="space-y-1.5">
+      <div className="space-y-1.5" onPaste={pasteCover}>
         <span className="block text-sm font-bold text-slate-800">Cover image <span className="font-normal text-slate-400">(optional)</span></span>
-        <input ref={coverInput} type="file" accept="image/jpeg,image/png,image/webp" hidden onChange={(e) => { void pickCover(e.target.files?.[0]); e.target.value = ""; }} />
+        <input ref={coverInput} type="file" accept={IMAGE_ACCEPT} hidden onChange={(e) => { void pickCover(e.target.files?.[0]); e.target.value = ""; }} />
         {coverUrl ? (
           <div className="grid sm:grid-cols-[14rem_1fr] gap-4 items-start">
             {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -155,15 +169,21 @@ export default function ArticleForm({ me, existing }: Props) {
                 <input id="af-alt" className={input} maxLength={200} value={coverAlt} disabled={locked} onChange={(e) => setCoverAlt(e.target.value)} placeholder="Describe the image for screen readers" />
               </Field>
               <div className="flex gap-2">
-                <button type="button" className={secondaryBtn} disabled={locked} onClick={() => coverInput.current?.click()}>Replace</button>
+                <button type="button" className={secondaryBtn} disabled={locked || coverBusy} onClick={() => coverInput.current?.click()}>{coverBusy ? "Uploading…" : "Replace"}</button>
                 <button type="button" className={secondaryBtn} disabled={locked} onClick={() => { setCoverUrl(null); setCoverAlt(""); }}>Remove</button>
               </div>
             </div>
           </div>
         ) : (
           <>
-            <button type="button" disabled={locked} onClick={() => coverInput.current?.click()} className="w-full border-2 border-dashed border-slate-300 rounded-xl py-6 text-sm text-slate-500 hover:border-brand-teal hover:text-brand-teal disabled:opacity-50 flex flex-col items-center gap-1">
-              <ImagePlus className="w-5 h-5" aria-hidden="true" /><b className="text-slate-700">Add a cover image</b>JPG, PNG or WebP, up to 2 MB. 16:9 works best.
+            <button
+              type="button" disabled={locked || coverBusy} onClick={() => coverInput.current?.click()}
+              onDragOver={(e) => { e.preventDefault(); setCoverOver(true); }} onDragLeave={() => setCoverOver(false)} onDrop={dropCover}
+              className={`w-full border-2 border-dashed rounded-xl py-6 text-sm text-slate-500 hover:border-brand-teal hover:text-brand-teal disabled:opacity-60 flex flex-col items-center gap-1 ${coverOver ? "border-brand-teal bg-teal-50" : "border-slate-300"}`}
+            >
+              {coverBusy ? <Loader2 className="w-5 h-5 animate-spin" aria-hidden="true" /> : <ImagePlus className="w-5 h-5" aria-hidden="true" />}
+              <b className="text-slate-700">{coverBusy ? "Getting your picture ready…" : "Add a cover image"}</b>
+              {!coverBusy && <span>Choose, drop or paste a picture. Big photos are made smaller for you. 16:9 works best.</span>}
             </button>
             {errors.cover && <p role="alert" className="text-xs font-medium text-red-600">{errors.cover}</p>}
           </>

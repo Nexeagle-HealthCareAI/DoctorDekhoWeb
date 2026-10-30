@@ -1,15 +1,16 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { EditorContent, useEditor, useEditorState } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Image from "@tiptap/extension-image";
 import { Markdown } from "@tiptap/markdown";
-import { Bold, ImagePlus, Italic, Link2, List, ListOrdered, Quote, Redo2, Undo2 } from "lucide-react";
+import { Bold, ImagePlus, Italic, Link2, List, ListOrdered, Loader2, Quote, Redo2, Undo2 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { contributorApi } from "@/lib/contributor/client";
 import { messageOf } from "@/lib/contributor/hooks";
+import { IMAGE_ACCEPT, ImageProblem, prepareImage } from "@/lib/contributor/prepareImage";
 import { input, primaryBtn, secondaryBtn } from "./ui";
 
 interface Props {
@@ -21,16 +22,17 @@ interface Props {
   labelledBy: string;
 }
 
-const IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp"];
-const MAX_BYTES = 2 * 1024 * 1024;
-
 /** Rich-text editor that saves markdown. Loaded without server rendering (it needs the browser). */
 export default function RichTextEditor({ initialMarkdown, disabled, onChange, labelledBy }: Props) {
   const [linkOpen, setLinkOpen] = useState(false);
   const [linkUrl, setLinkUrl] = useState("");
   const [linkError, setLinkError] = useState("");
-  const [pending, setPending] = useState<string | null>(null);
+  // The picture just added: where it sits in the text, and the description being typed for it (optional).
+  const [added, setAdded] = useState<{ pos: number; src: string } | null>(null);
   const [alt, setAlt] = useState("");
+  const [uploading, setUploading] = useState(false);
+  // The picture handler is needed by the editor's own paste and drop handling, which is set up before the editor exists.
+  const addPicture = useRef<(file: File) => void>(() => undefined);
 
   const editor = useEditor({
     immediatelyRender: false,
@@ -40,6 +42,19 @@ export default function RichTextEditor({ initialMarkdown, disabled, onChange, la
     editable: !disabled,
     onUpdate: ({ editor: e }) => onChange(e.getMarkdown()),
     editorProps: {
+      // A picture pasted or dropped into the text is added there, like a picture chosen with the button.
+      handlePaste: (_view, event) => {
+        const file = Array.from(event.clipboardData?.files ?? []).find((f) => f.type.startsWith("image/"));
+        if (!file) return false;
+        addPicture.current(file);
+        return true;
+      },
+      handleDrop: (_view, event) => {
+        const file = Array.from((event as DragEvent).dataTransfer?.files ?? []).find((f) => f.type.startsWith("image/"));
+        if (!file) return false;
+        addPicture.current(file);
+        return true;
+      },
       attributes: {
         role: "textbox", "aria-multiline": "true", "aria-labelledby": labelledBy,
         class: "prose prose-slate max-w-none min-h-[18rem] px-4 py-3 focus:outline-none prose-headings:font-display prose-h2:text-xl prose-h3:text-lg prose-p:text-slate-700 prose-li:text-slate-700 prose-a:text-brand-teal",
@@ -72,21 +87,30 @@ export default function RichTextEditor({ initialMarkdown, disabled, onChange, la
     else editor.chain().focus().setLink({ href: url }).run();
     setLinkOpen(false);
   };
+  // Make the picture small enough, upload it, and put it in the text at once. Describing it for screen readers can follow, or be skipped.
   const pickImage = async (file: File | undefined) => {
-    if (!file) return;
-    if (!IMAGE_TYPES.includes(file.type)) return void toast.error("Use a JPG, PNG or WebP file.");
-    if (file.size > MAX_BYTES) return void toast.error("That file is over 2 MB.");
+    if (!file || uploading) return;
+    setUploading(true);
     try {
-      setPending(await contributorApi.uploadImage(file));
-      setAlt("");
+      const src = await contributorApi.uploadImage(await prepareImage(file));
+      editor.chain().focus().setImage({ src, alt: "" }).run();
+      // Where it landed (an image can take the place of an empty paragraph, so the cursor position is not it).
+      let pos = -1;
+      editor.state.doc.descendants((node, at) => { if (pos < 0 && node.type.name === "image" && node.attrs.src === src) pos = at; });
+      if (pos >= 0) { setAdded({ pos, src }); setAlt(""); }
     } catch (e) {
-      toast.error(messageOf(e));
+      toast.error(e instanceof ImageProblem ? e.message : messageOf(e));
+    } finally {
+      setUploading(false);
     }
   };
-  const insertImage = () => {
-    if (!pending) return;
-    editor.chain().focus().setImage({ src: pending, alt: alt.trim() }).run();
-    setPending(null);
+  addPicture.current = (file) => void pickImage(file);
+  const saveAlt = () => {
+    if (added) {
+      const node = editor.state.doc.nodeAt(added.pos);
+      if (node?.type.name === "image" && node.attrs.src === added.src) editor.view.dispatch(editor.state.tr.setNodeMarkup(added.pos, undefined, { ...node.attrs, alt: alt.trim() }));
+    }
+    setAdded(null);
   };
 
   const tb = (active: boolean) => cn("p-2 rounded-lg text-slate-700 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand-teal", active && "bg-teal-50 text-brand-teal");
@@ -105,9 +129,9 @@ export default function RichTextEditor({ initialMarkdown, disabled, onChange, la
         <button type="button" className={tb(s.ordered)} title="Numbered list" aria-label="Numbered list" aria-pressed={s.ordered} disabled={off} onClick={() => editor.chain().focus().toggleOrderedList().run()}><ListOrdered className="w-4 h-4" /></button>
         <button type="button" className={tb(s.quote)} title="Quote" aria-label="Quote" aria-pressed={s.quote} disabled={off} onClick={() => editor.chain().focus().toggleBlockquote().run()}><Quote className="w-4 h-4" /></button>
         <button type="button" className={tb(s.link)} title="Link" aria-label="Link" aria-pressed={s.link} disabled={off} onClick={() => { setLinkUrl((editor.getAttributes("link").href as string) || ""); setLinkError(""); setLinkOpen(true); }}><Link2 className="w-4 h-4" /></button>
-        <label className={cn(tb(false), "cursor-pointer", off && "opacity-40 cursor-not-allowed")} title="Insert image" aria-label="Insert image">
-          <ImagePlus className="w-4 h-4" />
-          <input type="file" accept="image/jpeg,image/png,image/webp" hidden disabled={off} onChange={(e) => { void pickImage(e.target.files?.[0]); e.target.value = ""; }} />
+        <label className={cn(tb(false), "cursor-pointer", (off || uploading) && "opacity-40 cursor-not-allowed")} title="Insert image" aria-label="Insert image">
+          {uploading ? <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" /> : <ImagePlus className="w-4 h-4" aria-hidden="true" />}
+          <input type="file" accept={IMAGE_ACCEPT} hidden disabled={off || uploading} onChange={(e) => { void pickImage(e.target.files?.[0]); e.target.value = ""; }} />
         </label>
         <span className="w-px h-6 bg-slate-200 mx-1" aria-hidden="true" />
         <button type="button" className={tb(false)} title="Undo" aria-label="Undo" disabled={off || !s.canUndo} onClick={() => editor.chain().focus().undo().run()}><Undo2 className="w-4 h-4" /></button>
@@ -126,16 +150,16 @@ export default function RichTextEditor({ initialMarkdown, disabled, onChange, la
         </div>
       )}
 
-      {pending && (
+      {uploading && <p className="px-3 py-2 text-xs text-slate-600 border-b border-slate-200 bg-slate-50" role="status">Getting your picture ready…</p>}
+      {added && (
         <div className="flex flex-wrap items-end gap-3 p-3 border-b border-slate-200 bg-slate-50">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={pending} alt="" className="w-16 h-16 object-cover rounded-lg border border-slate-200" />
+          <img src={added.src} alt="" className="w-16 h-16 object-cover rounded-lg border border-slate-200" />
           <div className="flex-1 min-w-[12rem] space-y-1">
-            <label htmlFor="rte-alt" className="block text-xs font-bold text-slate-700">Alt text <span className="font-normal text-slate-400">(optional)</span></label>
-            <input id="rte-alt" className={input} placeholder="What the image shows, for screen readers" maxLength={200} value={alt} autoFocus onChange={(e) => setAlt(e.target.value)} onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), insertImage())} />
+            <label htmlFor="rte-alt" className="block text-xs font-bold text-slate-700">Picture added. Describe it for screen readers <span className="font-normal text-slate-400">(optional)</span></label>
+            <input id="rte-alt" className={input} placeholder="What the picture shows" maxLength={200} value={alt} onChange={(e) => setAlt(e.target.value)} onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), saveAlt())} />
           </div>
-          <button type="button" className={`${primaryBtn} !py-2`} onClick={insertImage}>Insert</button>
-          <button type="button" className={`${secondaryBtn} !py-2`} onClick={() => setPending(null)}>Cancel</button>
+          <button type="button" className={`${primaryBtn} !py-2`} onClick={saveAlt}>{alt.trim() ? "Save" : "Done"}</button>
         </div>
       )}
 
