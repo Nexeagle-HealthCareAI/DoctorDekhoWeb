@@ -32,13 +32,15 @@ export async function POST(req: NextRequest) {
   const type = audio.type || "audio/webm";
   if (!AUDIO.test(type)) return fail("format", 415);
   const locale = typeof form.get("locale") === "string" ? (form.get("locale") as string) : null;
+  // "wake": the 2-second check after the device heard "Hey Vita". No spelling hints: they would nudge Whisper toward "Vita".
+  const wakeCheck = form.get("purpose") === "wake";
 
   const ext = /mp4|m4a|aac/i.test(type) ? "m4a" : /ogg/i.test(type) ? "ogg" : /wav/i.test(type) ? "wav" : /mpeg|mp3/i.test(type) ? "mp3" : /flac/i.test(type) ? "flac" : "webm";
   const out = new FormData();
   out.append("file", new File([audio], `turn.${ext}`, { type }));
   out.append("model", STT_MODEL);
   out.append("language", whisperLanguage(locale));
-  out.append("prompt", WHISPER_PROMPT);
+  if (!wakeCheck) out.append("prompt", WHISPER_PROMPT);
   out.append("response_format", "json");
   out.append("temperature", "0");
 

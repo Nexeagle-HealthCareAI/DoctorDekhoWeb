@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import { AnimatePresence, motion } from "framer-motion";
-import { MessageCircle, X } from "lucide-react";
+import { Ear, MessageCircle, X } from "lucide-react";
 import { usePatientAuth } from "@/hooks/usePatientAuth";
 import { useVitaChat } from "@/hooks/useVitaChat";
 import { trackEvent } from "@/lib/analytics";
@@ -12,6 +12,9 @@ import Eagle from "@/components/patient/vita/Eagle";
 import { useTranslation } from "@/lib/i18n/I18nContext";
 import { launcherMood, POSE } from "@/lib/vita/mood";
 import VitaChat from "@/components/patient/vita/VitaChat";
+import { useVitaPrefs } from "@/lib/vita/prefs";
+import { useWakeWord } from "@/hooks/useWakeWord";
+import { chime } from "@/lib/voice/chime";
 
 // The "Ask Vita" button on every patient page, and the chat panel it opens. The button is always the
 // eagle -- resting in the corner, flying in once on a first visit with one line of welcome, asleep after
@@ -127,6 +130,29 @@ export default function ChatWidget() {
     };
   }, [isOpen]);
 
+  // "Hey Vita" (on the device, only when the patient turned it on): opens the chat and starts talking. Paused while Vita is
+  // already listening (the conversation or the mic button has the microphone).
+  const { prefs } = useVitaPrefs();
+  const openState = useRef({ isOpen, open });
+  openState.current = { isOpen, open };
+  const [vitaListening, setVitaListening] = useState(false);
+  const [pendingWake, setPendingWake] = useState(false);
+  const [wakeDebug, setWakeDebug] = useState(false);
+  useEffect(() => {
+    try {
+      setWakeDebug(new URLSearchParams(window.location.search).get("wakedebug") === "1");
+    } catch {
+      /* ignore */
+    }
+  }, []);
+  const onWake = useCallback(() => {
+    chime();
+    trackEvent("vita_wake_word");
+    setPendingWake(true);
+    if (!openState.current.isOpen) openState.current.open(true);
+  }, []);
+  const wake = useWakeWord({ active: prefs.wakeWord && vitaOn !== false && !vitaListening, onWake, locale, debug: wakeDebug });
+
   const lastReply = [...chat.entries].reverse().find((e) => e.role === "vita")?.reply;
   const launcher = launcherMood(lastReply);
   const greeting = getChatGreeting(isLoggedIn);
@@ -165,7 +191,7 @@ export default function ChatWidget() {
         onClick={() => open(!isOpen)}
         data-open={isOpen}
         whileTap={{ scale: 0.94 }}
-        aria-label={isOpen ? t("vita.close") : t("vita.ask")}
+        aria-label={isOpen ? t("vita.close") : wake.status === "listening" ? `${t("vita.ask")}. ${t("vita.wakeListening")}` : t("vita.ask")}
         aria-expanded={isOpen}
         className={`fixed z-50 bottom-[calc(4rem+1rem)] right-4 md:bottom-6 md:right-6 h-16 w-16 items-center justify-center overflow-hidden rounded-full border-[3px] border-white bg-[#0B4F4A] shadow-[0_6px_18px_rgba(11,79,74,0.35)] active:scale-95 transition-transform ${isOpen ? "hidden md:flex" : "flex"}`}
       >
@@ -181,6 +207,19 @@ export default function ChatWidget() {
           )}
         </AnimatePresence>
       </motion.button>
+
+      {!isOpen && wake.status === "listening" && (
+        <span aria-hidden="true" title={t("vita.wakeListening")}
+          className="pointer-events-none fixed z-[51] bottom-[calc(4rem+4.25rem)] right-3 md:bottom-[4.75rem] md:right-5 flex h-6 w-6 items-center justify-center rounded-full border-2 border-white bg-[#16A34A] text-white shadow">
+          <Ear className="h-3.5 w-3.5" />
+        </span>
+      )}
+
+      {wakeDebug && (
+        <div className="fixed left-2 top-2 z-[80] rounded bg-black/80 px-2 py-1 font-mono text-xs text-white">
+          wake {wake.status} {wake.score.toFixed(3)} {wake.lastCheck}
+        </div>
+      )}
 
       <AnimatePresence>
         {isOpen && (
@@ -201,7 +240,9 @@ export default function ChatWidget() {
             {vitaOn === false ? (
               <VitaGettingReady whatsappUrl={greeting.whatsappUrl} onClose={() => open(false)} />
             ) : (
-              <VitaChat chat={chat} onClose={() => open(false)} expanded={expanded} onToggleExpand={() => setExpanded((v) => !v)} />
+              <VitaChat chat={chat} onClose={() => open(false)} expanded={expanded} onToggleExpand={() => setExpanded((v) => !v)}
+                wake={{ supported: wake.supported, status: wake.status, pending: pendingWake, handled: () => setPendingWake(false) }}
+                onListeningChange={setVitaListening} />
             )}
           </motion.div>
         )}
