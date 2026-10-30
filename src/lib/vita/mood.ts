@@ -12,7 +12,7 @@ export type LauncherMood = "resting" | "flying" | "sleeping";
  * purpose. welcome: coffee in hand; resting: the same, head and shoulders, for the round launcher;
  * thinking: wing to beak; working: glasses and screen; joyful: wings open; relaxed: on a cushion;
  * sleeping: on a cloud; flying: the first-visit nudge; eating: the "getting ready" note. */
-export const POSE: Record<Exclude<VitaMood, "emergency"> | LauncherMood | "eating", string> = {
+export const POSE: Record<Exclude<VitaMood, "emergency"> | LauncherMood | "eating" | "wave", string> = {
   welcome: "/vita/welcome.png",
   thinking: "/vita/thinking.png",
   working: "/vita/working.png",
@@ -22,6 +22,7 @@ export const POSE: Record<Exclude<VitaMood, "emergency"> | LauncherMood | "eatin
   flying: "/vita/flying.png",
   sleeping: "/vita/sleeping.png",
   eating: "/vita/eating.png",
+  wave: "/vita/wave.png", // empty states that point somewhere: "nothing here yet, let's find a doctor"
 };
 
 /** While waiting: a short "thinking" beat, then "working" once the wait feels like a search. */

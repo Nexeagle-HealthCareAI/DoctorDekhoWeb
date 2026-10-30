@@ -9,6 +9,7 @@ import type { GeoStatus } from "@/lib/geo";
 import { useTranslation } from "@/lib/i18n/I18nContext";
 import { translateSpecialty } from "@/lib/i18n/specialties";
 import { useDoctors } from "@/lib/api/hooks";
+import VitaPeek from "@/components/patient/vita/VitaPeek";
 
 // en-IN handles Indian English + Hinglish; hi-IN/bn-IN give the speech engine a much
 // better shot at actual Hindi/Bengali sentences once the UI locale says that's what
@@ -452,6 +453,11 @@ export default function PatientHero({
             {t("hero.others")}
             <ChevronDown className={cn("w-3.5 h-3.5 transition-transform", showSpecialtyPanel && "rotate-180")} />
           </button>
+        </div>
+
+        {/* Vita, for people who don't know which kind of doctor they need: point at her and she hops, tap to chat. */}
+        <div className="mt-5 flex justify-center">
+          <VitaPeek mood="welcome" size={64} text={t("vita.peekHome")} cta={t("vita.askCta")} where="home" />
         </div>
       </div>
     </section>

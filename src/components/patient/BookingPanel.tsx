@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Eagle from "@/components/patient/vita/Eagle";
 import {
   ChevronLeft,
   CheckCircle2,
@@ -510,8 +511,14 @@ export default function BookingPanel({ doctor }: BookingPanelProps) {
         <div className="p-5 space-y-4">
           {/* Success icon */}
           <div className="text-center">
-            <div className="w-16 h-16 rounded-full bg-teal-50 border-2 border-brand-teal/30 flex items-center justify-center mx-auto mb-3">
-              <CheckCircle2 className="w-8 h-8 text-brand-teal" />
+            {/* Vita is happy for you: she hops once, with a tick on her (still with reduced motion, just no hop). */}
+            <div className="relative mx-auto mb-2 w-fit">
+              <span className="vita-hop-once block">
+                <Eagle mood="joyful" size={120} />
+              </span>
+              <span className="absolute -bottom-1 -right-1 flex h-9 w-9 items-center justify-center rounded-full border-2 border-brand-teal/40 bg-white">
+                <CheckCircle2 className="h-6 w-6 text-brand-teal" />
+              </span>
             </div>
             <h3 className="text-lg font-extrabold text-slate-900">{t("booking.appointmentRequestedTitle")}</h3>
             <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wide mt-1">

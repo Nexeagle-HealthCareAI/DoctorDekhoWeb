@@ -11,6 +11,7 @@ import { getChatGreeting } from "@/lib/chatEngine";
 import Eagle from "@/components/patient/vita/Eagle";
 import { useTranslation } from "@/lib/i18n/I18nContext";
 import { launcherMood, POSE } from "@/lib/vita/mood";
+import { VITA_OPEN_EVENT } from "@/lib/vita/open";
 import VitaChat from "@/components/patient/vita/VitaChat";
 import { useVitaPrefs } from "@/lib/vita/prefs";
 import { useWakeWord } from "@/hooks/useWakeWord";
@@ -115,6 +116,14 @@ export default function ChatWidget() {
       }
     }
   };
+
+  // An eagle anywhere else on the page (home, empty search, empty appointments…) opens the chat.
+  useEffect(() => {
+    const onOpen = () => open(true);
+    window.addEventListener(VITA_OPEN_EVENT, onOpen);
+    return () => window.removeEventListener(VITA_OPEN_EVENT, onOpen);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [vitaOn]);
 
   useEffect(() => {
     if (!isOpen) return;

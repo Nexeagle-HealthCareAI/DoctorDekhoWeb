@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
+import Eagle from "@/components/patient/vita/Eagle";
 import { toast } from "sonner";
 import PatientTopBar from "@/components/patient/PatientTopBar";
 import ProfileShell from "@/components/patient/ProfileShell";
@@ -264,7 +265,11 @@ export default function HealthLockerClient() {
           </div>
         ) : documents.length === 0 ? (
           <div className="flex flex-col items-center justify-center text-center py-12 bg-white rounded-[2rem] border border-dashed border-slate-200 shadow-sm px-6">
-            <FileText className="w-7 h-7 text-slate-300 mb-3" />
+            <span className="vita-peek mb-2">
+              <span className="vita-peek-eagle block">
+                <Eagle mood="wave" size={96} />
+              </span>
+            </span>
             <p className="text-sm text-slate-500">No documents saved yet.</p>
           </div>
         ) : (

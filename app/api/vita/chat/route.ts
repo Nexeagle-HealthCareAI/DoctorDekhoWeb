@@ -109,7 +109,11 @@ export async function POST(req: NextRequest) {
     out.visit_appointment_id = body.visit_appointment_id;
   }
   if (ip !== "unknown" && ip.length <= 64) out.client_ip = ip;
-  const patientToken = req.cookies.get(PATIENT_SESSION_COOKIE)?.value;
+  // The site's own login (httpOnly cookie), or the Doctor Dekho Android app's, which holds the same 1HMS patient
+  // token itself and sends it as a bearer header. Either way Vita books as that patient without asking for a code.
+  const bearer = /^Bearer\s+(\S+)$/i.exec(req.headers.get("authorization") ?? "")?.[1];
+  const fromApp = !req.cookies.get(PATIENT_SESSION_COOKIE)?.value && Boolean(bearer);
+  const patientToken = req.cookies.get(PATIENT_SESSION_COOKIE)?.value ?? bearer;
   if (patientToken && patientToken.length <= 4096) out.patient_token = patientToken;
 
   const controller = new AbortController();
@@ -135,7 +139,8 @@ export async function POST(req: NextRequest) {
     const session = reply.patient_session as { token?: unknown } | undefined;
     delete reply.patient_session;
     const response = NextResponse.json(reply);
-    if (session && typeof session.token === "string" && session.token) {
+    // The app keeps its own sign-in, so a session Vita creates is only turned into a cookie for the website.
+    if (!fromApp && session && typeof session.token === "string" && session.token) {
       response.cookies.set(PATIENT_SESSION_COOKIE, session.token, patientSessionCookieOptions);
     }
     return response;
