@@ -6,9 +6,9 @@
 
 export const IMAGE_ACCEPT = "image/jpeg,image/png,image/webp,image/heic,image/heif";
 
-const MAX_EDGE = 1600;
+export const MAX_EDGE = 1600;
 // Under the server's 2 MB limit, with room for the multipart wrapper.
-const TARGET_BYTES = 1_800_000;
+export const TARGET_BYTES = 1_800_000;
 // Bigger than this is refused before the browser tries to open it (a 25 MB photo already needs ~200 MB of memory to decode).
 const MAX_INPUT_BYTES = 25 * 1024 * 1024;
 const PLAIN_TYPES = ["image/jpeg", "image/png", "image/webp"];
@@ -61,11 +61,50 @@ function toBlob(canvas: HTMLCanvasElement, type: string, quality: number): Promi
   return new Promise((resolve) => canvas.toBlob(resolve, type, quality));
 }
 
-/** Prepares a chosen file for upload, or throws an ImageProblem that says what to do. */
-export async function prepareImage(file: File): Promise<File> {
+/** Throws an ImageProblem when a chosen file cannot be used at all (wrong kind, or far too big). */
+export function checkImageFile(file: File): void {
   const type = typeOf(file);
   if (!PLAIN_TYPES.includes(type) && !HEIC_TYPES.includes(type)) throw new ImageProblem("Use a JPG, PNG or WebP picture, or an iPhone (HEIC) photo.");
   if (file.size > MAX_INPUT_BYTES) throw new ImageProblem(`That file is ${megabytes(file.size)}. The limit is 25 MB.`);
+}
+
+/** Opens a chosen file as a picture (the way the photo was taken is applied), or throws an ImageProblem. Close it when done. */
+export const openImage = decode;
+
+/**
+ * Writes a canvas as a WebP (or a JPEG where the browser cannot write WebP) that is small enough for the server, or returns null when
+ * even the lowest quality is too large. The caller then tries a smaller canvas.
+ */
+export async function encodeCanvas(canvas: HTMLCanvasElement, baseName: string): Promise<File | null> {
+  let outType = "image/webp";
+  let blob = await toBlob(canvas, outType, 0.85);
+  if (!blob || blob.type !== "image/webp") {
+    // The browser handed back a PNG: write a JPEG instead, on a white ground (a JPEG has no transparency).
+    outType = "image/jpeg";
+    const flat = document.createElement("canvas");
+    flat.width = canvas.width;
+    flat.height = canvas.height;
+    const ctx = flat.getContext("2d");
+    if (!ctx) return null;
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, flat.width, flat.height);
+    ctx.drawImage(canvas, 0, 0);
+    canvas = flat;
+    blob = await toBlob(canvas, outType, 0.85);
+  }
+  for (const quality of [0.75, 0.65, 0.55]) {
+    if (blob && blob.size <= TARGET_BYTES) break;
+    blob = await toBlob(canvas, outType, quality);
+  }
+  if (!blob || blob.size > TARGET_BYTES) return null;
+  const base = baseName.replace(/\.[^.]+$/, "") || "photo";
+  return new File([blob], `${base}.${outType === "image/webp" ? "webp" : "jpg"}`, { type: outType });
+}
+
+/** Prepares a chosen file for upload, or throws an ImageProblem that says what to do. */
+export async function prepareImage(file: File): Promise<File> {
+  checkImageFile(file);
+  const type = typeOf(file);
 
   const picture = await decode(file);
   try {
@@ -84,27 +123,10 @@ export async function prepareImage(file: File): Promise<File> {
       canvas.height = height;
       const ctx = canvas.getContext("2d");
       if (!ctx) throw new ImageProblem("This browser cannot get the picture ready. Try another browser.");
-
-      // WebP keeps transparency and is small. Where the browser cannot write WebP it hands back a PNG, and then JPEG is used on a white ground.
       ctx.clearRect(0, 0, width, height);
       ctx.drawImage(picture.source, 0, 0, width, height);
-      let outType = "image/webp";
-      let blob = await toBlob(canvas, outType, 0.85);
-      if (!blob || blob.type !== "image/webp") {
-        outType = "image/jpeg";
-        ctx.fillStyle = "#ffffff";
-        ctx.fillRect(0, 0, width, height);
-        ctx.drawImage(picture.source, 0, 0, width, height);
-        blob = await toBlob(canvas, outType, 0.85);
-      }
-      for (const quality of [0.75, 0.65, 0.55]) {
-        if (blob && blob.size <= TARGET_BYTES) break;
-        blob = await toBlob(canvas, outType, quality);
-      }
-      if (blob && blob.size <= TARGET_BYTES) {
-        const base = file.name.replace(/\.[^.]+$/, "") || "photo";
-        return new File([blob], `${base}.${outType === "image/webp" ? "webp" : "jpg"}`, { type: outType });
-      }
+      const out = await encodeCanvas(canvas, file.name);
+      if (out) return out;
       edge = Math.round(edge * 0.75);
     }
     throw new ImageProblem("That picture is still too large after it was made smaller. Try a simpler picture.");

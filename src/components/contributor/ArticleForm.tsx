@@ -9,11 +9,12 @@ import { toast } from "sonner";
 import { contributorApi } from "@/lib/contributor/client";
 import { CONDITION_OPTIONS, SLUG_LABEL } from "@/lib/contributor/conditions";
 import { messageOf } from "@/lib/contributor/hooks";
-import { IMAGE_ACCEPT, ImageProblem, prepareImage } from "@/lib/contributor/prepareImage";
+import { IMAGE_ACCEPT, ImageProblem, checkImageFile, prepareImage } from "@/lib/contributor/prepareImage";
 import { ARTICLE_TYPE_LABEL } from "@/lib/health-wiki/types";
 import { canSelfPublish, isDoctorRole, type ArticleDraftInput, type ArticleType, type ContributorMe, type MyArticle } from "@/lib/contributor/types";
 import { Banner, Field, card, input, primaryBtn, secondaryBtn } from "./ui";
 import SubmitConsentDialog from "./SubmitConsentDialog";
+import CoverCropDialog from "./CoverCropDialog";
 
 // The editor needs the browser, so it is not rendered on the server.
 const RichTextEditor = dynamic(() => import("./RichTextEditor"), {
@@ -35,6 +36,9 @@ export default function ArticleForm({ me, existing }: Props) {
   const writer = me.role === "WRITER";
   const coverInput = useRef<HTMLInputElement>(null);
   const [coverBusy, setCoverBusy] = useState(false);
+  // The picture being cropped, and the picture the current cover came from (kept so the crop can be adjusted again in this visit).
+  const [cropFile, setCropFile] = useState<File | null>(null);
+  const [coverSource, setCoverSource] = useState<File | null>(null);
   const [coverOver, setCoverOver] = useState(false);
   const selfPublish = canSelfPublish(me, existing);
   // A verified doctor can keep editing their live article: the changes go live when they publish them.
@@ -85,12 +89,22 @@ export default function ArticleForm({ me, existing }: Props) {
     return e;
   };
 
-  const pickCover = async (file: File | undefined) => {
+  // A chosen, dropped or pasted picture opens the crop window first.
+  const pickCover = (file: File | undefined) => {
     if (!file || coverBusy || locked) return;
+    try {
+      checkImageFile(file);
+      setErrors((e) => ({ ...e, cover: undefined }));
+      setCropFile(file);
+    } catch (err) {
+      setErrors((e) => ({ ...e, cover: err instanceof ImageProblem ? err.message : messageOf(err) }));
+    }
+  };
+  const uploadCover = async (make: () => Promise<File>, source: File) => {
     setCoverBusy(true);
     try {
-      // A big photo is made small first, so a phone picture just works.
-      setCoverUrl(await contributorApi.uploadImage(await prepareImage(file)));
+      setCoverUrl(await contributorApi.uploadImage(await make()));
+      setCoverSource(source);
       setErrors((e) => ({ ...e, cover: undefined }));
     } catch (err) {
       setErrors((e) => ({ ...e, cover: err instanceof ImageProblem ? err.message : messageOf(err) }));
@@ -101,12 +115,12 @@ export default function ArticleForm({ me, existing }: Props) {
   // Paste a picture (a screenshot, or one copied from another page) while the cover area is in focus.
   const pasteCover = (e: React.ClipboardEvent) => {
     const file = Array.from(e.clipboardData.files).find((f) => f.type.startsWith("image/"));
-    if (file) { e.preventDefault(); void pickCover(file); }
+    if (file) { e.preventDefault(); pickCover(file); }
   };
   const dropCover = (e: React.DragEvent) => {
     e.preventDefault();
     setCoverOver(false);
-    void pickCover(e.dataTransfer.files[0]);
+    pickCover(e.dataTransfer.files[0]);
   };
 
   const save = async (submit: boolean) => {
@@ -159,7 +173,7 @@ export default function ArticleForm({ me, existing }: Props) {
 
       <div className="space-y-1.5" onPaste={pasteCover}>
         <span className="block text-sm font-bold text-slate-800">Cover image <span className="font-normal text-slate-400">(optional)</span></span>
-        <input ref={coverInput} type="file" accept={IMAGE_ACCEPT} hidden onChange={(e) => { void pickCover(e.target.files?.[0]); e.target.value = ""; }} />
+        <input ref={coverInput} type="file" accept={IMAGE_ACCEPT} hidden onChange={(e) => { pickCover(e.target.files?.[0]); e.target.value = ""; }} />
         {coverUrl ? (
           <div className="grid sm:grid-cols-[14rem_1fr] gap-4 items-start">
             {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -170,7 +184,8 @@ export default function ArticleForm({ me, existing }: Props) {
               </Field>
               <div className="flex gap-2">
                 <button type="button" className={secondaryBtn} disabled={locked || coverBusy} onClick={() => coverInput.current?.click()}>{coverBusy ? "Uploading…" : "Replace"}</button>
-                <button type="button" className={secondaryBtn} disabled={locked} onClick={() => { setCoverUrl(null); setCoverAlt(""); }}>Remove</button>
+                {coverSource && <button type="button" className={secondaryBtn} disabled={locked || coverBusy} onClick={() => setCropFile(coverSource)}>Crop and position</button>}
+                <button type="button" className={secondaryBtn} disabled={locked} onClick={() => { setCoverUrl(null); setCoverAlt(""); setCoverSource(null); }}>Remove</button>
               </div>
             </div>
           </div>
@@ -227,6 +242,15 @@ export default function ArticleForm({ me, existing }: Props) {
         <button type="button" disabled={busy || locked || !canSubmit} onClick={askToSubmit} className={primaryBtn}>{selfPublish ? (existing?.status === "PUBLISHED" ? "Publish changes" : "Publish") : "Submit for review"}</button>
         <Link href="/contribute" className="inline-flex items-center px-3 text-sm font-semibold text-slate-500 hover:text-brand-teal">Cancel</Link>
       </div>
+      {cropFile && (
+        <CoverCropDialog
+          file={cropFile}
+          onCancel={() => setCropFile(null)}
+          onError={(message) => { setCropFile(null); setErrors((e) => ({ ...e, cover: message })); }}
+          onApply={(cover) => { const original = cropFile; setCropFile(null); void uploadCover(async () => cover, original); }}
+          onSkip={() => { const original = cropFile; setCropFile(null); void uploadCover(() => prepareImage(original), original); }}
+        />
+      )}
       <SubmitConsentDialog open={asking} medical={medical} busy={busy} selfPublish={selfPublish} onCancel={() => setAsking(false)} onConfirm={() => void save(true)} />
     </form>
   );
