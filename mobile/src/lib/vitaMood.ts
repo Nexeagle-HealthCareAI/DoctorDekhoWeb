@@ -21,20 +21,29 @@ export const WORKING_AFTER_MS = 700;
 export type ChatMood = VitaPose | "emergency";
 
 /** The pose for one of Vita's replies. */
-export function replyPose(reply: Pick<VitaReply, "kind">): ChatMood {
+export function replyPose(reply: Pick<VitaReply, "kind"> & { clarify?: { kind?: string } | null; doctor?: unknown }): ChatMood {
   switch (reply.kind) {
     case "emergency":
       return "emergency";
+    case "doctor_selected":
+    case "booked":
+      return "joyful";
     case "follow_up":
-      return "thinking"; // asking a question
+      return reply.clarify?.kind?.startsWith("book_") ? "welcome" : "thinking"; // booking: just asking, not puzzled
+    case "handoff":
+      return "relaxed";
+    case "info":
+      return reply.doctor ? "welcome" : "relaxed";
+    case "visit":
+      return "flying"; // on the way, at the clinic
     default:
-      return "welcome"; // recommendation: presenting doctors, coffee in hand
+      return "welcome"; // doctor_list, recommendation: presenting doctors, coffee in hand
   }
 }
 
 export interface ChatMoodInput {
   /** The latest of Vita's turns, if any. */
-  last?: { reply?: Pick<VitaReply, "kind">; failed?: boolean };
+  last?: { reply?: Parameters<typeof replyPose>[0]; failed?: boolean };
   busy: boolean;
   waitedMs: number;
   listening: boolean;

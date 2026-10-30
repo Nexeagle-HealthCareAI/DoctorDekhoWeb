@@ -1,6 +1,7 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Haptics from "expo-haptics";
+import { useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
 import * as Speech from "expo-speech";
 import type React from "react";
@@ -12,32 +13,57 @@ import { Vita, VitaAvatar } from "../components/Vita";
 import { Banner, Button, Txt } from "../components/ui";
 import type { Doctor } from "../lib/api/doctors";
 import { ApiError } from "../lib/api/http";
-import { vitaChat, type VitaReply } from "../lib/api/vita";
+import { vitaChat, vitaForget, type VitaDoctor, type VitaOption, type VitaReply, type VitaRequest } from "../lib/api/vita";
+import { careState } from "../lib/care";
+import { formatShortDate, rupees } from "../lib/format";
 import { useI18n } from "../lib/i18n";
 import { useHomePlace } from "../lib/location";
-import { useQuietPosition } from "../lib/map";
-import { useDoctors } from "../lib/queries";
+import { askForPosition, useQuietPosition } from "../lib/map";
+import { keys, useDoctors, useMyAppointments } from "../lib/queries";
+import { contactSupport } from "../lib/support";
+import { localName } from "../lib/translit";
 import { SPEECH_LANG, useVoiceSearch } from "../lib/speech";
-import { plainSpecialty, SYMPTOMS } from "../lib/specialties";
+import { SYMPTOMS } from "../lib/specialties";
 import { speakable } from "../lib/spokenNumbers";
 import { colors, radius, space } from "../lib/theme";
 import { CHAT_STATUS, chatMood, VITA_MET_KEY, WORKING_AFTER_MS } from "../lib/vitaMood";
 
-type Turn = { id: number; from: "me" } & { text: string } | { id: number; from: "vita"; text: string; reply?: VitaReply; failed?: boolean };
+type Turn = { id: number; from: "me"; text: string } | { id: number; from: "vita"; text: string; reply?: VitaReply; failed?: boolean };
+
+/** How a turn is sent: a chip or button can send one text and show another, or nothing at all. */
+type SendOpts = Pick<VitaRequest, "select_doctor_id" | "page" | "new_search"> & {
+  spoken?: boolean;
+  /** Shown in the patient's bubble instead of the text sent (a tapped chip). */
+  shownAs?: string;
+  /** No patient bubble (e.g. "Show more doctors"). */
+  quiet?: boolean;
+  /** A location for this turn only ("Share my location"). */
+  at?: { lat: number; lng: number };
+};
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const UI_LANGUAGE = { en: "en", hi: "hi", bn: "bn", hinglish: "hinglish" } as const;
 
 /**
- * Vita, the Doctor Dekho helper. The patient speaks or types what's wrong in Hindi, Hinglish, Bengali or English; Vita
- * (the NLP router's conversational agent) asks a follow-up question or two, then names the right kind of doctor and
- * shows doctors nearby who can be booked in one tap. Danger signs go straight to "go to hospital / call 108".
- *
- * Replies are read aloud after a spoken question (and on request). Nothing of the conversation is stored on the phone;
- * the router keeps the conversation for 30 minutes so follow-ups make sense, and "New chat" starts over.
+ * Vita, the Doctor Dekho patient agent — the same agent as the website's chat (router /v2/agent/chat, through the
+ * website's /api/vita/chat). The patient speaks or types in Hindi, Hinglish, Bengali or English; Vita can:
+ * - work out the right kind of doctor from symptoms (asking a follow-up or two),
+ * - find doctors by name, kind, hospital or area ("cheapest skin doctor near me"), page through them, and pick one,
+ * - book a visit as the signed-in patient (it asks day, time and who it's for, then confirms),
+ * - help with the next visit ("I've reached", directions), and hand over to a person on WhatsApp,
+ * - send danger signs straight to "go to hospital / call 108" with the nearest emergency places.
+ * Vita's questions come with tap-to-answer options. Replies are read aloud after a spoken question (and on request).
+ * Nothing of the conversation is stored on the phone; the router keeps it 30 minutes, and "New chat" forgets it.
  */
 export default function VitaScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { t, locale } = useI18n();
   const doctors = useDoctors();
+  const qc = useQueryClient();
+  const appts = useMyAppointments();
+  // The patient's next visit: Vita uses it for "I've reached", directions and check-in.
+  const nextVisitId = useMemo(() => careState(appts.data?.appointments ?? []).next?.appointmentId, [appts.data]);
   const { place } = useHomePlace();
   const here = useQuietPosition();
   const [turns, setTurns] = useState<Turn[]>([]);
@@ -91,44 +117,72 @@ export default function VitaScreen() {
     [voiceOn, locale],
   );
 
+  const lastSend = useRef<{ text: string; opts: SendOpts } | null>(null);
+
   const send = useCallback(
-    async (raw: string, spoken = false) => {
+    async (raw: string, opts: SendOpts = {}) => {
       const msg = raw.trim();
       if (!msg || busy) return;
-      spokenTurn.current = spoken;
+      lastSend.current = { text: msg, opts };
+      spokenTurn.current = !!opts.spoken;
       setText("");
-      setTurns((ts) => [...ts, { id: nextId.current++, from: "me", text: msg }]);
+      if (!opts.quiet) setTurns((ts) => [...ts, { id: nextId.current++, from: "me", text: opts.shownAs ?? msg }]);
       setBusy(true);
+      const at = opts.at ?? here ?? (place?.lat != null && place?.lng != null ? { lat: place.lat, lng: place.lng } : null);
+      const town = place?.town ?? place?.city ?? null;
       try {
         const reply = await vitaChat({
           text: msg,
-          sessionId: session.current,
-          city: place?.city ?? null,
-          ...(here ? { lat: here.lat, lng: here.lng } : place?.lat != null && place?.lng != null ? { lat: place.lat, lng: place.lng } : {}),
+          ...(session.current ? { session_id: session.current } : {}),
+          ...(town ? { city: town } : {}),
+          ...(at ? { lat: at.lat, lng: at.lng } : {}),
+          ui_language: UI_LANGUAGE[locale],
+          ...(nextVisitId ? { visit_appointment_id: nextVisitId } : {}),
+          ...(opts.select_doctor_id ? { select_doctor_id: opts.select_doctor_id } : {}),
+          ...(opts.page && opts.page > 1 ? { page: opts.page } : {}),
+          ...(opts.new_search ? { new_search: true } : {}),
         });
-        session.current = reply.sessionId || session.current;
+        session.current = reply.session_id || session.current;
         setTurns((ts) => [...ts, { id: nextId.current++, from: "vita", text: reply.message, reply }]);
         if (reply.kind === "emergency") Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(() => {});
+        if (reply.kind === "booked") {
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+          void qc.invalidateQueries({ queryKey: keys.appointments });
+        }
         if (spokenTurn.current || reply.kind === "emergency") say(reply.kind === "emergency" ? `${reply.message} ${t("vitaEmergency")}` : reply.message);
       } catch (e) {
         const busyNow = e instanceof ApiError && e.status === 429;
-        setTurns((ts) => [...ts, { id: nextId.current++, from: "vita", text: busyNow ? (e as ApiError).message || t("vitaError") : t("vitaError"), failed: true }]);
+        setTurns((ts) => [...ts, { id: nextId.current++, from: "vita", text: busyNow ? t("vitaTooMany") : t("vitaError"), failed: true }]);
       } finally {
         setBusy(false);
       }
     },
-    [busy, place, here, say, t],
+    [busy, place, here, say, t, locale, nextVisitId, qc],
   );
+
+  const choose = (d: { doctorId: string; name?: string | null }) =>
+    void send("Choose", { select_doctor_id: d.doctorId, shownAs: t("vitaChooseDoctor", { name: localName(d.name ?? "", locale) }) });
+  const onOption = (o: VitaOption) => {
+    if (UUID.test(o.id)) void send("Choose", { select_doctor_id: o.id, shownAs: o.label });
+    else if (o.id === "human") void send("Talk to a person", { shownAs: o.label });
+    else void send(o.label);
+  };
+  const shareLocation = async () => {
+    const at = await askForPosition();
+    if (at) void send("location", { at, shownAs: t("vitaLocationShared") });
+  };
 
   // Speak, and send what was heard as soon as the sentence ends.
   const voice = useVoiceSearch(locale, (heard, final) => {
     setText(heard);
-    if (final) void send(heard, true);
+    if (final) void send(heard, { spoken: true });
   });
 
   const reset = () => {
     void Speech.stop();
+    if (session.current) void vitaForget(session.current);
     session.current = null;
+    lastSend.current = null;
     setTurns([]);
     setText("");
   };
@@ -139,7 +193,6 @@ export default function VitaScreen() {
   }, [turns.length, busy]);
 
   const lastFailed = turns.length > 0 && turns[turns.length - 1].from === "vita" && (turns[turns.length - 1] as { failed?: boolean }).failed;
-  const lastMine = [...turns].reverse().find((x) => x.from === "me");
   const lastVita = [...turns].reverse().find((x) => x.from === "vita") as Extract<Turn, { from: "vita" }> | undefined;
   const mood = chatMood({ last: lastVita, busy, waitedMs: waitedLong ? WORKING_AFTER_MS : 0, listening: voice.listening, firstEver });
   const status = voice.listening ? CHAT_STATUS.listening : speaking && mood !== "emergency" ? CHAT_STATUS.speaking : CHAT_STATUS[mood];
@@ -211,7 +264,7 @@ export default function VitaScreen() {
           ) : (
             <View key={turn.id} style={{ gap: space.sm }}>
               <VitaBubble text={turn.text} failed={turn.failed} urgent={turn.reply?.kind === "emergency"} onListen={turn.text ? () => say(turn.text) : undefined} />
-              {turn.reply ? replyExtras(turn.reply) : null}
+              {turn.reply ? replyExtras(turn.reply, turn.id === lastVita?.id) : null}
             </View>
           ),
         )}
@@ -224,7 +277,9 @@ export default function VitaScreen() {
             </Txt>
           </View>
         ) : null}
-        {lastFailed && lastMine && !busy ? <Button label={t("retry")} icon="refresh" variant="secondary" size="md" onPress={() => void send(lastMine.text, spokenTurn.current)} /> : null}
+        {lastFailed && lastSend.current && !busy ? (
+          <Button label={t("retry")} icon="refresh" variant="secondary" size="md" onPress={() => lastSend.current && void send(lastSend.current.text, { ...lastSend.current.opts, quiet: true })} />
+        ) : null}
 
         <Txt variant="tiny" color={colors.muted} center style={{ marginTop: space.sm }}>
           {t("notDiagnosis")}
@@ -278,72 +333,181 @@ export default function VitaScreen() {
   );
 
   // Called as a function (not a component) so the doctor cards keep their state between messages.
-  function replyExtras(reply: VitaReply) {
-    if (reply.kind === "emergency") {
-      return (
-        <View style={styles.emergency}>
-          <View style={{ flexDirection: "row", gap: space.sm, alignItems: "flex-start" }}>
-            <Ionicons name="warning" size={22} color={colors.danger} />
-            <Txt variant="bodyBold" color={colors.danger} style={{ flex: 1 }}>
-              {t("vitaEmergency")}
-            </Txt>
-          </View>
-          <Button label={t("vitaCall108")} icon="call" variant="danger" onPress={() => void Linking.openURL("tel:108")} />
-          <Button label={t("vitaNearestHospital")} icon="medkit" variant="secondary" size="md" onPress={() => router.push({ pathname: "/doctors", params: { specialty: "emergencymedicine" } })} />
-        </View>
+  // `latest`: only the newest reply's chips and buttons can be used (older ones are history).
+  function replyExtras(reply: VitaReply, latest: boolean) {
+    const off = !latest || busy;
+    const block = reply.doctors;
+    const clarify = reply.clarify && reply.clarify.kind !== "location" && reply.clarify.kind !== "visit_checkin" ? reply.clarify : null;
+    const askLocation = latest && (reply.clarify?.kind === "location" || reply.emergency?.needsLocation);
+    const deadEnd = latest && (reply.clarify?.kind === "no_match" || (reply.clarify?.options ?? []).some((o) => o.id === "human"));
+    const doctorCard = (d: VitaDoctor) => {
+      const known = byId.get(d.doctorId.toLowerCase());
+      return known ? (
+        <DoctorCard key={d.doctorId} doctor={known} onPress={() => router.push(`/doctor/${known.id}`)} onBook={() => !off && choose(d)} />
+      ) : (
+        <VitaDoctorRow key={d.doctorId} doctor={d} disabled={off} onChoose={() => choose(d)} />
       );
-    }
-    if (reply.kind !== "recommendation") return null;
-    const main = reply.specialists.find((s) => s.role === "PRIMARY") ?? reply.specialists[0];
-    const docs = reply.doctorIds.map((id) => byId.get(id.toLowerCase())).filter((d): d is Doctor => !!d);
+    };
     return (
       <View style={{ gap: space.sm }}>
-        {reply.specialists.length ? (
-          <View style={{ gap: 6 }}>
-            <Txt variant="smallBold" color={colors.muted}>
-              {t("vitaUsually")}
-            </Txt>
-            <View style={styles.specRow}>
-              {reply.specialists
-                .filter((s) => s.specialtyId)
-                .slice(0, 3)
-                .map((s, i) => (
-                  <Pressable
-                    key={`${s.specialist}-${i}`}
-                    onPress={() => router.push({ pathname: "/doctors", params: { specialty: s.specialtyId! } })}
-                    accessibilityRole="button"
-                    style={[styles.spec, i === 0 && styles.specMain]}
-                  >
-                    <Txt variant="smallBold" color={i === 0 ? "#fff" : colors.primaryDark}>
-                      {plainSpecialty(s.specialtyId!, locale)}
-                    </Txt>
-                  </Pressable>
-                ))}
+        {reply.kind === "emergency" ? (
+          <View style={styles.emergency}>
+            <View style={{ flexDirection: "row", gap: space.sm, alignItems: "flex-start" }}>
+              <Ionicons name="warning" size={22} color={colors.danger} />
+              <Txt variant="bodyBold" color={colors.danger} style={{ flex: 1 }}>
+                {t("vitaEmergency")}
+              </Txt>
             </View>
+            <Button label={t("vitaCall108")} icon="call" variant="danger" onPress={() => void Linking.openURL("tel:108")} />
+            {(reply.emergency?.places ?? []).slice(0, 3).map((p) => (
+              <View key={p.settingId} style={styles.place}>
+                <View style={{ flex: 1, minWidth: 0 }}>
+                  <Txt variant="bodyBold" numberOfLines={1}>
+                    {p.name}
+                  </Txt>
+                  <Txt variant="small" color={colors.muted} numberOfLines={2}>
+                    {[p.distanceKm != null ? `${p.distanceKm.toFixed(1)} km` : null, p.address].filter(Boolean).join(" · ")}
+                  </Txt>
+                </View>
+                <Button label={t("call")} icon="call" variant="secondary" size="sm" onPress={() => void Linking.openURL(`tel:${p.phone.replace(/[^\d+]/g, "")}`)} />
+                {p.mapUrl ? <Button label={t("directions")} icon="navigate" variant="outline" size="sm" onPress={() => void Linking.openURL(p.mapUrl!)} /> : null}
+              </View>
+            ))}
+            {!reply.emergency?.places?.length ? (
+              <Button label={t("vitaNearestHospital")} icon="medkit" variant="secondary" size="md" onPress={() => router.push({ pathname: "/doctors", params: { specialty: "emergencymedicine" } })} />
+            ) : null}
           </View>
         ) : null}
-        {docs.length ? (
-          <>
+
+        {(reply.degraded ?? []).includes("doctor_lookup") ? (
+          <Banner tone="warning" icon="cloud-offline" text={t("vitaLookupFailed")} />
+        ) : null}
+
+        {block && block.items.length ? (
+          <View style={{ gap: space.sm }}>
             <Txt variant="smallBold" color={colors.muted}>
-              {t("vitaDoctorsNear")}
+              {t("vitaDoctorsFound", { count: block.total || block.items.length })}
             </Txt>
-            {docs.slice(0, 3).map((d) => (
-              <DoctorCard key={d.id} doctor={d} onPress={() => router.push(`/doctor/${d.id}`)} onBook={() => router.push(`/book/${d.id}`)} />
+            {block.items.map(doctorCard)}
+            {block.hasMore && latest ? (
+              <Button
+                label={t("vitaShowMore")}
+                icon="chevron-down"
+                variant="outline"
+                size="md"
+                disabled={off}
+                onPress={() => void send("aur doctor dikhao", { page: (block.page ?? 1) + 1, shownAs: t("vitaShowMore") })}
+              />
+            ) : null}
+          </View>
+        ) : null}
+
+        {(reply.kind === "doctor_selected" || reply.kind === "info") && reply.doctor ? doctorCard(reply.doctor) : null}
+
+        {reply.availability && reply.availability.days.length ? (
+          <View style={styles.box}>
+            <Txt variant="smallBold">{t("vitaWorkingDays")}</Txt>
+            {reply.availability.days.map((d) => (
+              <View key={d.date} style={styles.dayRow}>
+                <Txt variant="small">{formatShortDate(d.date, locale)}</Txt>
+                <Txt variant="small" color={d.isAvailable ? colors.ink : colors.muted}>
+                  {d.isAvailable ? d.shifts.map((x) => `${x.start ?? ""}–${x.end ?? ""}`).join(", ") : t("vitaDayOff")}
+                </Txt>
+              </View>
             ))}
-          </>
+            <Txt variant="tiny" color={colors.muted}>
+              {t("vitaHospitalConfirms")}
+            </Txt>
+          </View>
         ) : null}
-        {main?.specialtyId ? (
-          <Button
-            label={t("vitaSeeAll", { specialty: plainSpecialty(main.specialtyId, locale) })}
-            icon="search"
-            variant={docs.length ? "outline" : "primary"}
-            size="md"
-            onPress={() => router.push({ pathname: "/doctors", params: { specialty: main.specialtyId! } })}
-          />
+
+        {reply.booking && (reply.clarify?.kind === "book_confirm" || reply.kind === "booked") ? (
+          <View style={[styles.box, reply.kind === "booked" && styles.booked]}>
+            {reply.kind === "booked" ? (
+              <View style={{ alignItems: "center" }}>
+                <Vita pose="joyful" size={110} motion="hop" />
+                <Txt variant="heading" center>
+                  {t("vitaBookedTitle")}
+                </Txt>
+              </View>
+            ) : (
+              <Txt variant="smallBold">{t("vitaCheckBooking")}</Txt>
+            )}
+            <BookingRow label={t("vitaDoctor")} value={[localName(reply.booking.doctorName, locale), reply.booking.specialty].filter(Boolean).join(" · ")} />
+            {reply.booking.hospital ? <BookingRow label={t("vitaHospital")} value={localName(reply.booking.hospital, locale)} /> : null}
+            <BookingRow label={t("vitaWhen")} value={reply.booking.when} />
+            {reply.booking.patientName ? <BookingRow label={t("vitaFor")} value={localName(reply.booking.patientName, locale)} /> : null}
+            {reply.booking.fee != null ? <BookingRow label={t("fee")} value={rupees(reply.booking.fee)} /> : null}
+            {reply.kind === "booked" ? (
+              <>
+                <Txt variant="small" color={colors.muted}>
+                  {t("vitaHospitalConfirms")}
+                </Txt>
+                <Button label={t("viewBookings")} icon="calendar" size="md" onPress={() => router.navigate("/appointments")} />
+              </>
+            ) : null}
+          </View>
         ) : null}
+
+        {reply.kind === "visit" && latest ? <Button label={t("viewBookings")} icon="calendar" variant="outline" size="md" onPress={() => router.navigate("/appointments")} /> : null}
+
+        {reply.kind === "handoff" ? (
+          <Button label={t("vitaWhatsapp")} icon="logo-whatsapp" variant="secondary" size="md" onPress={() => contactSupport("whatsapp", t("vitaWhatsappMessage"))} />
+        ) : null}
+
+        {askLocation ? <Button label={t("vitaShareLocation")} icon="locate" size="md" disabled={off} onPress={() => void shareLocation()} /> : null}
+
+        {clarify && clarify.options.length && latest ? (
+          <View style={styles.specRow} accessibilityLabel={clarify.question ?? undefined}>
+            {clarify.options.map((o) => (
+              <Pressable
+                key={o.id + o.label}
+                onPress={() => !off && onOption(o)}
+                disabled={off}
+                accessibilityRole="button"
+                style={({ pressed }) => [styles.option, pressed && { backgroundColor: colors.primarySoft }, off && { opacity: 0.5 }]}
+              >
+                <Txt variant="smallBold" color={colors.primaryDark}>
+                  {o.label}
+                </Txt>
+              </Pressable>
+            ))}
+          </View>
+        ) : null}
+
+        {deadEnd ? <Button label={t("vitaNewChat")} icon="refresh" variant="outline" size="sm" onPress={reset} /> : null}
       </View>
     );
   }
+}
+
+/** A doctor Vita found who isn't in the app's directory yet (new or filtered out): name, kind, place, fee, Choose. */
+function VitaDoctorRow({ doctor, disabled, onChoose }: { doctor: VitaDoctor; disabled: boolean; onChoose: () => void }) {
+  const { t, locale } = useI18n();
+  const fee = doctor.discountedFee ?? doctor.consultFee;
+  return (
+    <View style={styles.box}>
+      <Txt variant="bodyBold">{localName(doctor.name ?? "", locale)}</Txt>
+      <Txt variant="small" color={colors.muted} numberOfLines={2}>
+        {[doctor.specialtyName, doctor.hospital?.name ? localName(doctor.hospital.name, locale) : null, doctor.distanceKm != null ? `${doctor.distanceKm.toFixed(1)} km` : null].filter(Boolean).join(" · ")}
+      </Txt>
+      {fee != null ? <Txt variant="smallBold">{t("fullFee", { fee: rupees(fee) })}</Txt> : null}
+      <Button label={t("book")} size="md" disabled={disabled} onPress={onChoose} />
+    </View>
+  );
+}
+
+function BookingRow({ label, value }: { label: string; value: string }) {
+  return (
+    <View style={styles.dayRow}>
+      <Txt variant="small" color={colors.muted}>
+        {label}
+      </Txt>
+      <Txt variant="smallBold" style={{ flex: 1, textAlign: "right" }}>
+        {value}
+      </Txt>
+    </View>
+  );
 }
 
 function VitaBubble({ text, failed, urgent, onListen }: { text: string; failed?: boolean; urgent?: boolean; onListen?: () => void }) {
@@ -387,6 +551,11 @@ const styles = StyleSheet.create({
   spec: { minHeight: 40, paddingHorizontal: 14, borderRadius: 20, justifyContent: "center", backgroundColor: colors.primarySoft },
   specMain: { backgroundColor: colors.primary },
   emergency: { gap: space.sm, padding: space.md, borderRadius: radius.lg, backgroundColor: colors.dangerSoft, borderWidth: 1.5, borderColor: colors.danger },
+  place: { flexDirection: "row", alignItems: "center", gap: space.sm, padding: space.sm, borderRadius: radius.md, backgroundColor: colors.card },
+  box: { gap: 6, padding: space.md, borderRadius: radius.lg, backgroundColor: colors.card, borderWidth: 1, borderColor: colors.line },
+  booked: { borderColor: colors.primary, borderWidth: 1.5 },
+  dayRow: { flexDirection: "row", justifyContent: "space-between", gap: space.md },
+  option: { minHeight: 44, paddingHorizontal: 14, borderRadius: 22, justifyContent: "center", backgroundColor: colors.card, borderWidth: 1.5, borderColor: colors.primary },
   bar: { flexDirection: "row", alignItems: "flex-end", gap: space.sm, paddingHorizontal: space.md, paddingTop: space.sm, backgroundColor: colors.card, borderTopWidth: 1, borderTopColor: colors.line },
   mic: { width: 56, height: 56, borderRadius: 28, alignItems: "center", justifyContent: "center", backgroundColor: colors.primary },
   micOn: { backgroundColor: colors.danger },
