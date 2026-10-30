@@ -144,4 +144,29 @@ describe("/api/vita/chat", () => {
     fetchMock.mockResolvedValue(json({ kind: "doctor_list", message: "ok" }));
     expect((await post({ text: "skin" })).cookies.get("nexeagle_patient_session")).toBeUndefined();
   });
+
+  it("the app's bearer token reaches Vita as patient_token, and the app never gets a cookie", async () => {
+    await load({ NLP_ROUTER_BASE_URL: "http://router", NLP_ROUTER_API_KEY: "k" });
+    fetchMock.mockResolvedValueOnce(json({ session_id: "sess_abc123", kind: "follow_up", message: "Kab se?", patient_session: { token: "new-token" } }));
+    const res = await route.POST(new NextRequest("http://dd.test/api/vita/chat", {
+      method: "POST", body: JSON.stringify({ text: "bukhar hai" }), headers: { "x-forwarded-for": "5.5.5.1", authorization: "Bearer app-jwt" },
+    }));
+    expect(res.status).toBe(200);
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body).patient_token).toBe("app-jwt");
+    expect(res.headers.get("set-cookie")).toBeNull();
+    const body = await res.json();
+    expect(body.patient_session).toBeUndefined();
+    expect(body.message).toBe("Kab se?");
+  });
+
+  it("the website's own login cookie wins over a bearer token, and a session Vita creates becomes the site cookie", async () => {
+    await load({ NLP_ROUTER_BASE_URL: "http://router", NLP_ROUTER_API_KEY: "k" });
+    fetchMock.mockResolvedValueOnce(json({ session_id: "sess_abc123", kind: "booked", message: "Done", patient_session: { token: "new-token" } }));
+    const res = await route.POST(new NextRequest("http://dd.test/api/vita/chat", {
+      method: "POST", body: JSON.stringify({ text: "haan" }),
+      headers: { "x-forwarded-for": "5.5.5.2", authorization: "Bearer app-jwt", cookie: "nexeagle_patient_session=site-jwt" },
+    }));
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body).patient_token).toBe("site-jwt");
+    expect(res.headers.get("set-cookie") ?? "").toContain("nexeagle_patient_session=new-token");
+  });
 });
