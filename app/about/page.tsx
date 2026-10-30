@@ -49,11 +49,11 @@ export default function AboutPage() {
     <div className="min-h-screen bg-slate-50 flex flex-col font-sans text-slate-800">
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }} />
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbs) }} />
-      <PatientTopBar />
+      <PatientTopBar wide />
 
       <main className="flex-1 pb-24">
         <div className="bg-white border-b border-slate-200">
-          <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+          <div className="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
             <nav className="flex items-center gap-2 text-xs font-medium text-slate-500">
               <Link href="/" className="hover:text-brand-teal">Home</Link>
               <ChevronRight className="w-3.5 h-3.5" />
@@ -62,10 +62,10 @@ export default function AboutPage() {
           </div>
         </div>
 
-        <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-10">
+        <div className="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-10">
           <div>
             <h1 className="font-display text-3xl sm:text-4xl font-extrabold text-slate-900 mb-4">About Doctor Dekho</h1>
-            <p className="text-lg text-slate-600 leading-relaxed">
+            <p className="text-lg text-slate-600 leading-relaxed max-w-3xl">
               Doctor Dekho is built by{" "}
               <Link href={BUSINESS_URL} className="text-brand-teal font-semibold hover:underline">NexEagle</Link>
               {" "}to help patients find and book verified doctors nearby, with no login and no app required.
@@ -83,6 +83,8 @@ export default function AboutPage() {
             </div>
           </div>
 
+          {/* The verification explanation takes the width; the contact card sits beside it on large screens */}
+          <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_24rem] lg:items-start">
           <div className="bg-white rounded-3xl border border-slate-200/80 shadow-sm p-6 sm:p-8">
             <div className="flex items-center gap-2 mb-4">
               <ShieldCheck className="w-5 h-5 text-brand-teal" />
@@ -102,13 +104,13 @@ export default function AboutPage() {
               </li>
             </ul>
             <p className="text-xs text-slate-400 mt-4">
-              Spotted something that looks wrong on a profile? Let us know using the contact details below and we&apos;ll review it.
+              Spotted something that looks wrong on a profile? Let us know using the contact details on this page and we&apos;ll review it.
             </p>
           </div>
 
-          <div className="bg-white rounded-3xl border border-slate-200/80 shadow-sm p-6 sm:p-8">
+          <div className="bg-white rounded-3xl border border-slate-200/80 shadow-sm p-6 sm:p-8 lg:sticky lg:top-28">
             <h2 className="font-display text-xl font-extrabold text-slate-900 mb-4">Questions or a Concern About a Listing?</h2>
-            <div className="flex flex-col sm:flex-row gap-4">
+            <div className="flex flex-col gap-4">
               <a href="tel:+918074906808" className="flex items-center gap-2 text-sm font-semibold text-slate-700 hover:text-brand-teal">
                 <Phone className="w-4 h-4" /> +91 80749 06808
               </a>
@@ -116,6 +118,7 @@ export default function AboutPage() {
                 <Mail className="w-4 h-4" /> info@nexeagle.com
               </a>
             </div>
+          </div>
           </div>
         </div>
       </main>

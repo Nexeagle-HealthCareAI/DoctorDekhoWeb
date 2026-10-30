@@ -1,10 +1,13 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import VitaPeek from "@/components/patient/vita/VitaPeek";
 import { useIsRestoring } from "@tanstack/react-query";
 import { motion, useReducedMotion } from "framer-motion";
-import { Frown, Loader2, ChevronDown, ChevronLeft, ChevronRight, SlidersHorizontal, MapPin, Sparkles } from "lucide-react";
+import { Loader2, ChevronDown, ChevronLeft, ChevronRight, SlidersHorizontal, MapPin, Sparkles } from "lucide-react";
 import DoctorCard from "./DoctorCard";
+import EmergencyBanner from "./EmergencyBanner";
+import SearchFollowUp from "./SearchFollowUp";
 import { specialties, cityLabel } from "@/data/patient";
 import type { CityOption, Doctor } from "@/data/patient";
 import { usePaginatedDoctors, useSmartSearch, type SmartSearchIntent } from "@/lib/api/hooks";
@@ -169,6 +172,58 @@ export default function DoctorDirectory({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [query, keywordFiltered.length]);
 
+  // ── Emergency check for keyword matches ─────────────────────────────────
+  // The AI fallback above only runs when the keyword match is empty, so symptom text that
+  // happens to match a doctor's profile ("chest pain", "saans") used to skip the router and its
+  // emergency check entirely. This asks the router ONLY "is this an emergency?" (safetyOnly:
+  // router only, never Groq, ~20 ms server-side) for every 4+ character search that DID match
+  // doctors. The keyword results stay exactly as they are; only the banner can change.
+  const safetyCheck = useSmartSearch();
+  const [safetyEmergency, setSafetyEmergency] = useState<SmartSearchIntent["emergency"]>(null);
+  const [safetyCheckedQuery, setSafetyCheckedQuery] = useState<string | null>(null);
+
+  useEffect(() => {
+    const q = query.trim();
+    if (q.length < 4 || keywordFiltered.length === 0) {
+      if (safetyEmergency) setSafetyEmergency(null);
+      return;
+    }
+    if (safetyCheckedQuery === q) return;
+    setSafetyCheckedQuery(q);
+    setSafetyEmergency(null);
+    safetyCheck.mutate(
+      { query: q, safetyOnly: true },
+      {
+        onSuccess: (intent) => {
+          // Ignore a late answer for a query the patient has already replaced.
+          if (query.trim() === q) setSafetyEmergency(intent.emergency);
+        },
+      }
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [query, keywordFiltered.length]);
+
+  // Whichever path ran, an emergency answer wins over everything else on the page.
+  const emergency = aiIntent?.emergency ?? safetyEmergency;
+
+  // Answers to the router's follow-up question (SearchFollowUp). An age answer re-runs the same
+  // search with ageGroup, so the router can settle (child + fever -> Paediatrics); a specialty pick
+  // just shows that specialty's doctors, keeping the question on screen so the patient can switch.
+  function answerAge(ageGroup: "child" | "adult") {
+    const q = query.trim();
+    smartSearch.mutate(
+      { query: q, ageGroup },
+      {
+        onSuccess: (intent) => {
+          if (!intent.notConfigured && query.trim() === q) setAiIntent(intent);
+        },
+      }
+    );
+  }
+  function pickSpecialty(id: string) {
+    setAiIntent((prev) => (prev ? { ...prev, specialtyId: id, specialtyIds: [id] } : prev));
+  }
+
   const aiFiltered = useMemo(() => {
     if (!aiIntent) return null;
     let list = baseFiltered;
@@ -315,9 +370,16 @@ export default function DoctorDirectory({
   // an actual search intent (free-text query or a specialty filter), not the default browse-all
   // state. This is the only place that knows the final result count, so it's the natural home for
   // this event rather than the search box itself (PatientHero.tsx).
+  // One event per distinct search: results growing as more pages load, or this effect re-running
+  // for the same query, must not log the search again (it used to, inflating the CMS search counts).
+  const lastLoggedSearchRef = useRef<string | null>(null);
+
   useEffect(() => {
     const q = query.trim();
     if (!q && !specialtyId) return;
+    // Wait for the symptom router: logging before it answers recorded the same search twice
+    // (once without AI results, once with).
+    if (smartSearch.isPending || safetyCheck.isPending) return;
 
     const handle = setTimeout(() => {
       // When the AI path drove the results, log what it ACTUALLY predicted (aiIntent's own
@@ -327,6 +389,9 @@ export default function DoctorDirectory({
       // previous manual selection. This is what feeds the 1HMS-NLP-Router feedback loop, so
       // getting the predicted value right matters.
       const loggedSpecialtyId = usingAiResults ? aiIntent?.specialtyId ?? undefined : specialtyId || undefined;
+      const searchKey = `${q.toLowerCase()}|${loggedSpecialtyId ?? ""}|${usingAiResults}`;
+      if (lastLoggedSearchRef.current === searchKey) return;
+      lastLoggedSearchRef.current = searchKey;
 
       trackEvent("search_performed", {
         specialtyId: loggedSpecialtyId,
@@ -337,6 +402,12 @@ export default function DoctorDirectory({
           method: usingAiResults ? aiIntent?.method ?? undefined : undefined,
           confidence: usingAiResults ? aiIntent?.confidence ?? undefined : undefined,
           modelVersion: usingAiResults ? aiIntent?.modelVersion ?? undefined : undefined,
+          // Router decision (answer / clarify / abstain) and whether an emergency banner was
+          // shown, from either path — lets the CMS count how often patients see the warning.
+          decision: usingAiResults ? aiIntent?.decision ?? undefined : undefined,
+          emergency: emergency ? true : undefined,
+          emergencySource: emergency?.source,
+          emergencyReasons: emergency && emergency.reasons.length > 0 ? emergency.reasons : undefined,
           // Full candidate set the router considered, not just the top pick — lets the
           // feedback-log correlation (CMSAPI SymptomRouterRepository) tell a genuine
           // misprediction apart from a booking that landed on a close-call runner-up we
@@ -368,7 +439,7 @@ export default function DoctorDirectory({
 
     return () => clearTimeout(handle);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [query, specialtyId, filtered.length, usingAiResults, aiIntent]);
+  }, [query, specialtyId, filtered.length, usingAiResults, aiIntent, smartSearch.isPending, safetyCheck.isPending, emergency]);
 
   // ── Paginated page slice ─────────────────────────────────────────────────
   // When browsing unfiltered (no specialty chip, free-text query, GPS radius, or area narrowing
@@ -489,8 +560,11 @@ export default function DoctorDirectory({
           </div>
         </div>
 
+        {/* ── Emergency warning: always above the results, whichever search path found it ── */}
+        {emergency && <EmergencyBanner reasons={emergency.reasons} />}
+
         {/* ── AI-enhanced results hint ── */}
-        {usingAiResults && (
+        {usingAiResults && !emergency && (
           <div className="flex items-center gap-2 mb-6 -mt-4 text-sm text-brand-teal font-semibold">
             <Sparkles className="w-4 h-4 shrink-0" />
             <span>
@@ -499,6 +573,17 @@ export default function DoctorDirectory({
                 : t("directory.aiHintGeneric", { query: query.trim() })}
             </span>
           </div>
+        )}
+
+        {/* ── The router's follow-up: age or specialty question, or a General Physician suggestion ── */}
+        {aiIntent && !emergency && keywordFiltered.length === 0 && (aiIntent.clarify || aiIntent.decision === "abstain") && (
+          <SearchFollowUp
+            intent={aiIntent}
+            pending={smartSearch.isPending}
+            onAnswerAge={answerAge}
+            onPickSpecialty={pickSpecialty}
+            selectedSpecialtyId={aiIntent.specialtyId}
+          />
         )}
 
         {/* ── Grid ── */}
@@ -582,15 +667,16 @@ export default function DoctorDirectory({
             initial={{ opacity: 0, scale: 0.97 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ duration: 0.3 }}
-            className="text-center py-32 rounded-[2rem] border border-dashed border-slate-200 bg-white shadow-sm"
+            className="text-center py-20 rounded-[2rem] border border-dashed border-slate-200 bg-white shadow-sm"
           >
-            <div className="w-20 h-20 rounded-full bg-slate-50 border border-slate-100 text-slate-300 flex items-center justify-center mx-auto mb-5 shadow-inner">
-              <Frown className="w-10 h-10" />
-            </div>
             <h3 className="font-display font-bold text-xl text-slate-900 mb-2">{t("directory.noMatch")}</h3>
             <p className="text-base text-slate-500 max-w-md mx-auto">
               {t("directory.noMatchDesc")}
             </p>
+            {/* Vita, thinking: the plain-words way in when the search words found nobody. */}
+            <div className="mt-6 flex justify-center px-4">
+              <VitaPeek mood="thinking" size={88} text={t("vita.peekNoMatch")} cta={t("vita.askCta")} where="no-match" />
+            </div>
           </motion.div>
         )}
       </div>

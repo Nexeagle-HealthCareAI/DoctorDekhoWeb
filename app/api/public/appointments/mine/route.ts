@@ -21,9 +21,12 @@ export async function GET(_req: NextRequest) {
     return NextResponse.json({ notConfigured: true });
   }
   if (!r.ok) {
-    // Token invalid/expired/revoked — clear the stale cookie so the client doesn't keep retrying.
     const res = NextResponse.json({ loggedIn: false, appointments: [] }, { status: r.status });
-    res.cookies.delete(PATIENT_SESSION_COOKIE);
+    // Only a 401 means the token is invalid/expired/revoked, and only then is the cookie cleared. A 429, 502 or 503 (rate limit, a deploy
+    // in progress) says nothing about the login, so the patient must stay signed in and the client can simply ask again.
+    if (r.status === 401) res.cookies.delete(PATIENT_SESSION_COOKIE);
+    // A rate limit tells the browser when to ask again.
+    if (r.status === 429 && r.retryAfter) res.headers.set("Retry-After", r.retryAfter);
     return res;
   }
 

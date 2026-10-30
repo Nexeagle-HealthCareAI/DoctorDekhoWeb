@@ -9,6 +9,7 @@ import type { GeoStatus } from "@/lib/geo";
 import { useTranslation } from "@/lib/i18n/I18nContext";
 import { translateSpecialty } from "@/lib/i18n/specialties";
 import { useDoctors } from "@/lib/api/hooks";
+import VitaPeek from "@/components/patient/vita/VitaPeek";
 
 // en-IN handles Indian English + Hinglish; hi-IN/bn-IN give the speech engine a much
 // better shot at actual Hindi/Bengali sentences once the UI locale says that's what
@@ -31,6 +32,8 @@ const POPULAR_TAG_COUNT = 4;
 // (slicing into popular/more, the expand toggle, etc.) stays the same.
 
 interface PatientHeroProps {
+  /** The page's own heading for search engines and screen readers, e.g. "General Physicians in Kishanganj, Bihar". The home page leaves it out. */
+  pageHeading?: string;
   query: string;
   onQueryChange: (q: string) => void;
   specialtyId: string;
@@ -56,6 +59,7 @@ export default function PatientHero({
   cities = [],
   onCityChange,
   onRequestLocation,
+  pageHeading,
 }: PatientHeroProps) {
   const { t, locale } = useTranslation();
 
@@ -305,7 +309,7 @@ export default function PatientHero({
             transition={{ duration: 4, repeat: Infinity, ease: "easeInOut", delay: 1 }}
             className="font-display text-6xl sm:text-7xl md:text-8xl lg:text-9xl font-extrabold text-slate-900 tracking-tighter leading-[1.05] flex flex-col items-center"
           >
-            <span className="sr-only">Find & Book Top Specialists Near You on </span>
+            <span className="sr-only">{pageHeading ? `${pageHeading} on ` : "Find & Book Top Specialists Near You on "}</span>
             <span>
               {/* mr- instead of a trailing "Doctor " text space — inline-block trims trailing
                   whitespace at its own edge, so a plain space character here would silently
@@ -449,6 +453,11 @@ export default function PatientHero({
             {t("hero.others")}
             <ChevronDown className={cn("w-3.5 h-3.5 transition-transform", showSpecialtyPanel && "rotate-180")} />
           </button>
+        </div>
+
+        {/* Vita, for people who don't know which kind of doctor they need: point at her and she hops, tap to chat. */}
+        <div className="mt-5 flex justify-center">
+          <VitaPeek mood="welcome" size={64} text={t("vita.peekHome")} cta={t("vita.askCta")} where="home" />
         </div>
       </div>
     </section>

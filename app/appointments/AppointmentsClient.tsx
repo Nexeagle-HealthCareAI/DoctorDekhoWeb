@@ -1,8 +1,10 @@
 ﻿"use client";
 
 import { useMemo, useState } from "react";
+import Eagle from "@/components/patient/vita/Eagle";
 import { useQueries, useQuery } from "@tanstack/react-query";
 import PatientTopBar from "@/components/patient/PatientTopBar";
+import ProfileShell from "@/components/patient/ProfileShell";
 import { Calendar, Clock, MapPin, ChevronRight, ChevronDown, LogIn, Smartphone, FileText, Paperclip } from "lucide-react";
 import Link from "next/link";
 import { useGuestAppointments } from "@/hooks/useGuestAppointments";
@@ -121,7 +123,14 @@ function AppointmentCard({ appt, canViewDocuments }: { appt: PatientAppointment;
 
       <div className="mt-5 pt-4 border-t border-slate-100 flex items-center justify-between">
         <span className="text-[11px] font-semibold text-slate-400">Ref: {appt.appointmentId.slice(0, 8).toUpperCase()}</span>
-        <ChevronRight className="w-4 h-4 text-slate-300" />
+        {!isCancelled ? (
+          <Link href={`/appointments/visit/${appt.appointmentId}`}
+            className="inline-flex items-center gap-1 text-xs font-bold text-brand-teal hover:text-teal-700">
+            Directions &amp; check-in <ChevronRight className="w-4 h-4" />
+          </Link>
+        ) : (
+          <ChevronRight className="w-4 h-4 text-slate-300" />
+        )}
       </div>
     </div>
   );
@@ -156,7 +165,7 @@ export default function AppointmentsClient() {
   if (!isLoaded || authLoading) {
     return (
       <main className="min-h-screen bg-slate-50 flex flex-col pb-24 md:pb-0">
-        <PatientTopBar showBackButton={true} />
+        <PatientTopBar showBackButton={true} wide />
         <div className="flex-1 w-full max-w-3xl mx-auto px-4 py-10 flex items-center justify-center">
           <div className="w-8 h-8 border-4 border-brand-teal/20 border-t-brand-teal rounded-full animate-spin" />
         </div>
@@ -166,31 +175,18 @@ export default function AppointmentsClient() {
 
   const hasAnyAppointments = myAppointments.length > 0 || guestAppointments.length > 0;
 
-  return (
-    <main className="min-h-screen bg-slate-50 flex flex-col pb-24 md:pb-0">
-      <PatientTopBar showBackButton={true} />
-
-      <div className="flex-1 w-full max-w-3xl mx-auto px-4 sm:px-6 py-6 md:py-10">
-          <div className="flex items-center justify-between gap-3 mb-6">
-            <h1 className="text-2xl font-display font-extrabold text-slate-900 tracking-tight">
-              My Appointments
-            </h1>
-            {isLoggedIn ? (
-              <button
-                onClick={() => logout.mutate()}
-                className="text-xs font-bold text-slate-500 hover:text-slate-800 transition-colors"
-              >
-                Sign out
-              </button>
-            ) : (
-              <Link
-                href="/login"
-                className="inline-flex items-center gap-1.5 text-xs font-bold text-brand-teal hover:text-teal-700 transition-colors"
-              >
-                <LogIn className="w-3.5 h-3.5" /> Log in
-              </Link>
-            )}
-          </div>
+  // The content of the page: a signed-in person sees it inside the account layout (their card and the menu of sections beside it, Sign out
+  // in the top bar menu only); a guest sees it on its own.
+  const content = (
+    <>
+        <div className="flex items-center justify-between gap-3 mb-6">
+          <h1 className="text-2xl font-display font-extrabold text-slate-900 tracking-tight">My Appointments</h1>
+          {!isLoggedIn && (
+            <Link href="/login" className="inline-flex items-center gap-1.5 text-xs font-bold text-brand-teal hover:text-teal-700 transition-colors">
+              <LogIn className="w-3.5 h-3.5" /> Log in
+            </Link>
+          )}
+        </div>
 
         {hasAnyAppointments ? (
           <div className="space-y-6">
@@ -239,9 +235,11 @@ export default function AppointmentsClient() {
           </div>
         ) : (
           <div className="flex flex-col items-center justify-center text-center py-16 bg-white rounded-[2rem] border border-dashed border-slate-200 shadow-sm px-6">
-            <div className="w-16 h-16 rounded-full bg-slate-50 flex items-center justify-center mb-4 border border-slate-100 shadow-inner">
-              <Calendar className="w-7 h-7 text-slate-300" />
-            </div>
+            <span className="vita-peek mb-2">
+              <span className="vita-peek-eagle block">
+                <Eagle mood="wave" size={112} />
+              </span>
+            </span>
             <h3 className="font-display font-bold text-lg text-slate-900 mb-2">No upcoming appointments</h3>
             <p className="text-sm text-slate-500 mb-6 max-w-sm">
               {isLoggedIn
@@ -273,8 +271,17 @@ export default function AppointmentsClient() {
             )}
           </div>
         )}
+    </>
+  );
+
+  if (isLoggedIn) return <ProfileShell>{content}</ProfileShell>;
+
+  return (
+    <main className="min-h-screen bg-slate-50 flex flex-col pb-24 md:pb-0">
+      <PatientTopBar showBackButton={true} wide />
+      <div className="flex-1 w-full max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 py-6 md:py-10">
+        <div className="max-w-3xl">{content}</div>
       </div>
     </main>
   );
 }
-

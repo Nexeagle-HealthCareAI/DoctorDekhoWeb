@@ -91,6 +91,7 @@ export default async function SpecialtyPage({ params }: PageProps) {
       />
       <HomeClient
         initialSpecialtyId={specialty.id}
+        pageHeading={`Top ${specialty.name}s near you`}
         initialDoctors={initialDoctors}
         breadcrumb={<PageBreadcrumb items={breadcrumbItems} />}
       />

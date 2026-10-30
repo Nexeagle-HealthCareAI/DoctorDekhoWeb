@@ -34,9 +34,12 @@
 #                         (app/api/search/parse). Unset = literal keyword search only, nothing breaks.
 #                         NLP_ROUTER_BASE_URL (hardcoded in the docker run below) is tried BEFORE
 #                         this; Groq (openai/gpt-oss-20b, overridable via GROQ_MODEL) is the fallback.
-#                         Dev's NLP_ROUTER_BASE_URL is still the raw http://151.185.45.77:5003 —
-#                         NOT yet switched to https://nlp-api-dev.nexeagle.com (as of 2026-08-13
-#                         that subdomain's Caddy/DNS wasn't resolving). Deliberate, not oversight.
+#                         Dev's NLP_ROUTER_BASE_URL is http://host.docker.internal:5003 (the router is on the
+#                         same VM; its public IP is not reachable from this bridge container).
+#   NLP_ROUTER_API_KEY    The router's "doctordekho" key (scope route), sent as X-Api-Key. Make it in
+#                         1HMS-NLP-Router: python3 scripts/make_api_key.py doctordekho route, and add
+#                         its HMS_API_KEYS line to that repo's HMS_API_KEYS secret. Unset = the router
+#                         answers 401 and every search goes to Groq.
 #   INTERNAL_PROXY_SECRET OPTIONAL — lets easyHMSAPI's public rate limiters see each real visitor's
 #                         IP instead of this container's own (every API call is server-to-server —
 #                         see src/lib/api/server.ts). Must match Internal:ProxyForwardingSecret in
@@ -133,6 +136,8 @@ jobs:
             NEXT_PUBLIC_BUSINESS_URL=https://nexeagle-dev.nexeagle.com
             EASYHMS_API_BASE_URL=https://1hms-dev-api.nexeagle.com
             NEXT_PUBLIC_MAPBOX_TOKEN=${{ secrets.MAPBOX_TOKEN }}
+            NEXT_PUBLIC_CONTRIBUTOR_ENABLED=true
+            HEALTH_WIKI_IMAGE_ORIGINS=${{ vars.DEV_HEALTHWIKI_IMAGE_ORIGIN || 'https://nexeagle-healthwiki-dev.in-south1-objectstore.e2enetworks.net' }}
 
       - name: Deploy to Dev VM
         uses: appleboy/ssh-action@v1.0.3
@@ -142,6 +147,7 @@ jobs:
           ACTOR: ${{ github.actor }}
           EASYHMS_API_KEY: ${{ secrets.EASYHMS_DEV_API_KEY }}
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          NLP_ROUTER_API_KEY: ${{ secrets.NLP_ROUTER_API_KEY }}
           PROXY_SECRET: ${{ secrets.INTERNAL_PROXY_SECRET }}
         with:
           host: ${{ secrets.SSH_HOST }}
@@ -149,13 +155,20 @@ jobs:
           password: ${{ secrets.SSH_PASSWORD }}
           port: 22
           command_timeout: 10m
-          envs: IMAGE,PULL_TOKEN,ACTOR,EASYHMS_API_KEY,GROQ_API_KEY,PROXY_SECRET
+          envs: IMAGE,PULL_TOKEN,ACTOR,EASYHMS_API_KEY,GROQ_API_KEY,PROXY_SECRET,NLP_ROUTER_API_KEY
           script: |
             set -e
             NAME=doctordekho-web-dev
             PORT=84
             IMAGE_LC=$(printf '%s' "$IMAGE" | tr '[:upper:]' '[:lower:]')
             echo "$PULL_TOKEN" | docker login ghcr.io -u "$ACTOR" --password-stdin
+            # Free disk first: this VM filled up once ("failed to extract layer ... no space left").
+            # Only OUR OWN old image tags are removed (docker rmi refuses any image a container still uses),
+            # plus dangling layers. Other services' images on this shared VM are never touched.
+            REPO_LC=$(printf '%s' "$IMAGE" | tr '[:upper:]' '[:lower:]' | sed 's/:.*$//')
+            docker images "$REPO_LC" --format '{{.Repository}}:{{.Tag}}' | grep -vx "$(printf '%s' "$IMAGE" | tr '[:upper:]' '[:lower:]')" | xargs -r docker rmi 2>/dev/null || true
+            docker image prune -f || true
+            df -h / | tail -1
             docker pull "$IMAGE_LC"
             docker rm -f "$NAME" 2>/dev/null || true
 
@@ -174,6 +187,8 @@ jobs:
             # fetch to the API silently failed once and served mock doctor data with zero visible
             # error (see the NexEagleWebsite repo history). host.docker.internal (host-gateway)
             # reaches the host directly. Port 5001 is the API's real bound port on BOTH VMs.
+            # Same for NLP_ROUTER_BASE_URL: the dev router (nlp-router-dev, --network host :5003) is on
+            # this VM, so http://151.185.45.77:5003 timed out and every search silently went to Groq.
             for i in 1 2 3 4 5; do
               if docker run -d --name "$NAME" --restart unless-stopped \
                   -p $PORT:80 \
@@ -183,7 +198,8 @@ jobs:
                   -e EASYHMS_API_KEY_HEADER='X-Api-Key' \
                   -e GROQ_API_KEY="$GROQ_API_KEY" \
                   -e EASYHMS_TRUSTED_PROXY_SECRET="$PROXY_SECRET" \
-                  -e NLP_ROUTER_BASE_URL='http://151.185.45.77:5003' \
+                  -e NLP_ROUTER_BASE_URL='http://host.docker.internal:5003' \
+                  -e NLP_ROUTER_API_KEY="$NLP_ROUTER_API_KEY" \
                   "$IMAGE_LC"; then
                 break
               fi
@@ -281,6 +297,7 @@ jobs:
           ACTOR: ${{ github.actor }}
           EASYHMS_API_KEY: ${{ secrets.EASYHMS_PROD_API_KEY }}
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          NLP_ROUTER_API_KEY: ${{ secrets.NLP_ROUTER_API_KEY }}
           PROXY_SECRET: ${{ secrets.INTERNAL_PROXY_SECRET }}
         with:
           host: ${{ secrets.PROD_SSH_HOST }}
@@ -290,13 +307,20 @@ jobs:
           key_path: deploy_key
           port: 22
           command_timeout: 10m
-          envs: IMAGE,PULL_TOKEN,ACTOR,EASYHMS_API_KEY,GROQ_API_KEY,PROXY_SECRET
+          envs: IMAGE,PULL_TOKEN,ACTOR,EASYHMS_API_KEY,GROQ_API_KEY,PROXY_SECRET,NLP_ROUTER_API_KEY
           script: |
             set -e
             NAME=doctordekho-web
             PORT=8081
             IMAGE_LC=$(printf '%s' "$IMAGE" | tr '[:upper:]' '[:lower:]')
             echo "$PULL_TOKEN" | docker login ghcr.io -u "$ACTOR" --password-stdin
+            # Free disk first: this VM filled up once ("failed to extract layer ... no space left").
+            # Only OUR OWN old image tags are removed (docker rmi refuses any image a container still uses),
+            # plus dangling layers. Other services' images on this shared VM are never touched.
+            REPO_LC=$(printf '%s' "$IMAGE" | tr '[:upper:]' '[:lower:]' | sed 's/:.*$//')
+            docker images "$REPO_LC" --format '{{.Repository}}:{{.Tag}}' | grep -vx "$(printf '%s' "$IMAGE" | tr '[:upper:]' '[:lower:]')" | xargs -r docker rmi 2>/dev/null || true
+            docker image prune -f || true
+            df -h / | tail -1
             docker pull "$IMAGE_LC"
             docker rm -f "$NAME" 2>/dev/null || true
 
@@ -319,6 +343,7 @@ jobs:
                   -e GROQ_API_KEY="$GROQ_API_KEY" \
                   -e EASYHMS_TRUSTED_PROXY_SECRET="$PROXY_SECRET" \
                   -e NLP_ROUTER_BASE_URL='https://nlp-api.nexeagle.com' \
+                  -e NLP_ROUTER_API_KEY="$NLP_ROUTER_API_KEY" \
                   "$IMAGE_LC"; then
                 break
               fi

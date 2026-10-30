@@ -1,0 +1,633 @@
+{
+ "guest": {
+  "session_id": "sess_0b2506622c9b",
+  "turn": 1,
+  "kind": "emergency",
+  "message": "This sounds like an emergency. Call 108 (ambulance) now, or 112. If you can, go to the nearest emergency room.\nSigns: chest pain.\nNearest emergency help:\n1. Salt Lake Care (1.2 km) - 03340001111\n2. District Hospital (4.8 km) - 108\nI've told them a patient may be coming.",
+  "question": null,
+  "card": {
+   "kind": "emergency",
+   "summary": "chest pain",
+   "severity_level": "EMERGENCY",
+   "severity_score": 90,
+   "disposition": "ER / Ambulance NOW",
+   "outputs": [
+    {
+     "role": "EMERGENCY",
+     "specialist": "Emergency Medicine",
+     "confidence": 1.0,
+     "reason": "Emergency red flag detected",
+     "matched_symptoms": [
+      "chest pain"
+     ],
+     "cluster_id": null
+    }
+   ],
+   "watch_for": [],
+   "alert": "EMERGENCY: Turant 108 (ambulance) ya 112 par call karein, ya nearest ER jaayein. / Call 108 (ambulance) or 112, or go to the nearest ER now.",
+   "emergency_reasons": [
+    "Chest pain",
+    "Breathlessness"
+   ],
+   "after_stabilisation": [
+    "Cardiologist",
+    "General Physician"
+   ],
+   "red_flags": [],
+   "low_confidence": false,
+   "disclaimer": "Triage support only - not a diagnosis."
+  },
+  "state": {
+   "session_id": "sess_0b2506622c9b",
+   "turn": 1,
+   "symptoms": [
+    "chest pain"
+   ],
+   "negated_symptoms": [],
+   "body_parts": [
+    "chest"
+   ],
+   "intensity": "severe",
+   "duration": null,
+   "durations": [],
+   "language": "english",
+   "first_seen_turn": {
+    "chest pain": 1
+   },
+   "ready": true,
+   "ready_reason": "emergency_safety_net",
+   "next_question": null
+  },
+  "severity": {
+   "score": 90,
+   "level": "EMERGENCY",
+   "disposition": "ER / Ambulance NOW",
+   "emergency": true,
+   "alert": "EMERGENCY: Turant 108 (ambulance) ya 112 par call karein, ya nearest ER jaayein. / Call 108 (ambulance) or 112, or go to the nearest ER now.",
+   "triggered_by": "safety_net",
+   "emergency_hits": [
+    {
+     "canonical": "chest pain",
+     "english": "Chest pain",
+     "flag": "EMERGENCY",
+     "via": "symptom"
+    },
+    {
+     "canonical": "breathlessness",
+     "english": "Breathlessness",
+     "flag": "EMERGENCY",
+     "via": "text",
+     "phrase": "can t breathe"
+    }
+   ],
+   "red_flags": [],
+   "rule_score": 0,
+   "ml_score": null,
+   "factors": [
+    "no scorable symptoms",
+    "hardcoded emergency phrase/symptom: Chest pain, Breathlessness"
+   ],
+   "note": "Triage support only - not a diagnosis."
+  },
+  "keywords": [
+   {
+    "token": "i",
+    "canonical": null,
+    "level": "UNKNOWN",
+    "discriminative": false,
+    "idf": 0.0
+   },
+   {
+    "token": "have",
+    "canonical": null,
+    "level": "UNKNOWN",
+    "discriminative": false,
+    "idf": 0.0
+   },
+   {
+    "token": "severe",
+    "canonical": "severe",
+    "level": "MODIFIER",
+    "discriminative": false,
+    "idf": 0.0
+   },
+   {
+    "token": "chest pain",
+    "canonical": "chest pain",
+    "level": "CRITICAL",
+    "discriminative": true,
+    "idf": 4.610917912644224
+   },
+   {
+    "token": "and",
+    "canonical": null,
+    "level": "UNKNOWN",
+    "discriminative": false,
+    "idf": 0.0
+   },
+   {
+    "token": "can",
+    "canonical": null,
+    "level": "UNKNOWN",
+    "discriminative": false,
+    "idf": 0.0
+   },
+   {
+    "token": "t",
+    "canonical": null,
+    "level": "UNKNOWN",
+    "discriminative": false,
+    "idf": 0.0
+   },
+   {
+    "token": "breathe",
+    "canonical": null,
+    "level": "UNKNOWN",
+    "discriminative": false,
+    "idf": 0.0
+   }
+  ],
+  "language": "english",
+  "degraded": [],
+  "emergency": {
+   "places": [
+    {
+     "settingId": "5e771000-0000-0000-0000-000000000001",
+     "name": "Salt Lake Care",
+     "kind": "HOSPITAL",
+     "phone": "03340001111",
+     "alternatePhone": null,
+     "distanceKm": 1.2,
+     "address": "Sector V",
+     "landmark": "Near City Centre",
+     "city": "Kolkata",
+     "lat": 22.58,
+     "lng": 88.42,
+     "is24x7": true,
+     "capabilities": [
+      "cardiac",
+      "icu"
+     ],
+     "mapUrl": "https://www.google.com/maps/dir/?api=1&destination=22.58,88.42"
+    },
+    {
+     "settingId": "5e771000-0000-0000-0000-000000000002",
+     "name": "District Hospital",
+     "kind": "HOSPITAL",
+     "phone": "108",
+     "alternatePhone": null,
+     "distanceKm": 4.8,
+     "address": null,
+     "landmark": null,
+     "city": null,
+     "lat": 22.6,
+     "lng": 88.45,
+     "is24x7": true,
+     "capabilities": [],
+     "mapUrl": "https://www.google.com/maps/dir/?api=1&destination=22.6,88.45"
+    }
+   ],
+   "eventId": "e0000000-0000-0000-0000-000000000001",
+   "alerted": 2,
+   "repeated": false,
+   "needsLocation": false,
+   "numberShared": false,
+   "canShareNumber": false
+  }
+ },
+ "nolocation": {
+  "session_id": "sess_c33ea8bc097d",
+  "turn": 1,
+  "kind": "emergency",
+  "message": "This sounds like an emergency. Call 108 (ambulance) now, or 112. If you can, go to the nearest emergency room.\nSigns: chest pain.\nShare your location and I'll show the nearest emergency hospitals and tell them you may be coming.",
+  "question": null,
+  "card": {
+   "kind": "emergency",
+   "summary": "chest pain",
+   "severity_level": "EMERGENCY",
+   "severity_score": 90,
+   "disposition": "ER / Ambulance NOW",
+   "outputs": [
+    {
+     "role": "EMERGENCY",
+     "specialist": "Emergency Medicine",
+     "confidence": 1.0,
+     "reason": "Emergency red flag detected",
+     "matched_symptoms": [
+      "chest pain"
+     ],
+     "cluster_id": null
+    }
+   ],
+   "watch_for": [],
+   "alert": "EMERGENCY: Turant 108 (ambulance) ya 112 par call karein, ya nearest ER jaayein. / Call 108 (ambulance) or 112, or go to the nearest ER now.",
+   "emergency_reasons": [
+    "Chest pain",
+    "Breathlessness"
+   ],
+   "after_stabilisation": [
+    "Cardiologist",
+    "General Physician"
+   ],
+   "red_flags": [],
+   "low_confidence": false,
+   "disclaimer": "Triage support only - not a diagnosis."
+  },
+  "state": {
+   "session_id": "sess_c33ea8bc097d",
+   "turn": 1,
+   "symptoms": [
+    "chest pain"
+   ],
+   "negated_symptoms": [],
+   "body_parts": [
+    "chest"
+   ],
+   "intensity": "severe",
+   "duration": null,
+   "durations": [],
+   "language": "english",
+   "first_seen_turn": {
+    "chest pain": 1
+   },
+   "ready": true,
+   "ready_reason": "emergency_safety_net",
+   "next_question": null
+  },
+  "severity": {
+   "score": 90,
+   "level": "EMERGENCY",
+   "disposition": "ER / Ambulance NOW",
+   "emergency": true,
+   "alert": "EMERGENCY: Turant 108 (ambulance) ya 112 par call karein, ya nearest ER jaayein. / Call 108 (ambulance) or 112, or go to the nearest ER now.",
+   "triggered_by": "safety_net",
+   "emergency_hits": [
+    {
+     "canonical": "chest pain",
+     "english": "Chest pain",
+     "flag": "EMERGENCY",
+     "via": "symptom"
+    },
+    {
+     "canonical": "breathlessness",
+     "english": "Breathlessness",
+     "flag": "EMERGENCY",
+     "via": "text",
+     "phrase": "can t breathe"
+    }
+   ],
+   "red_flags": [],
+   "rule_score": 0,
+   "ml_score": null,
+   "factors": [
+    "no scorable symptoms",
+    "hardcoded emergency phrase/symptom: Chest pain, Breathlessness"
+   ],
+   "note": "Triage support only - not a diagnosis."
+  },
+  "keywords": [
+   {
+    "token": "i",
+    "canonical": null,
+    "level": "UNKNOWN",
+    "discriminative": false,
+    "idf": 0.0
+   },
+   {
+    "token": "have",
+    "canonical": null,
+    "level": "UNKNOWN",
+    "discriminative": false,
+    "idf": 0.0
+   },
+   {
+    "token": "severe",
+    "canonical": "severe",
+    "level": "MODIFIER",
+    "discriminative": false,
+    "idf": 0.0
+   },
+   {
+    "token": "chest pain",
+    "canonical": "chest pain",
+    "level": "CRITICAL",
+    "discriminative": true,
+    "idf": 4.610917912644224
+   },
+   {
+    "token": "and",
+    "canonical": null,
+    "level": "UNKNOWN",
+    "discriminative": false,
+    "idf": 0.0
+   },
+   {
+    "token": "can",
+    "canonical": null,
+    "level": "UNKNOWN",
+    "discriminative": false,
+    "idf": 0.0
+   },
+   {
+    "token": "t",
+    "canonical": null,
+    "level": "UNKNOWN",
+    "discriminative": false,
+    "idf": 0.0
+   },
+   {
+    "token": "breathe",
+    "canonical": null,
+    "level": "UNKNOWN",
+    "discriminative": false,
+    "idf": 0.0
+   }
+  ],
+  "language": "english",
+  "degraded": [],
+  "emergency": {
+   "places": [],
+   "needsLocation": true,
+   "canShareNumber": false
+  }
+ },
+ "located": {
+  "session_id": "sess_c33ea8bc097d",
+  "turn": 2,
+  "kind": "emergency",
+  "message": "This sounds like an emergency. Call 108 (ambulance) now, or 112. If you can, go to the nearest emergency room.\nNearest emergency help:\n1. Salt Lake Care (1.2 km) - 03340001111\n2. District Hospital (4.8 km) - 108\nI've told them a patient may be coming.",
+  "question": null,
+  "card": null,
+  "state": null,
+  "severity": null,
+  "keywords": [],
+  "language": "english",
+  "degraded": [],
+  "clarify": null,
+  "emergency": {
+   "places": [
+    {
+     "settingId": "5e771000-0000-0000-0000-000000000001",
+     "name": "Salt Lake Care",
+     "kind": "HOSPITAL",
+     "phone": "03340001111",
+     "alternatePhone": null,
+     "distanceKm": 1.2,
+     "address": "Sector V",
+     "landmark": "Near City Centre",
+     "city": "Kolkata",
+     "lat": 22.58,
+     "lng": 88.42,
+     "is24x7": true,
+     "capabilities": [
+      "cardiac",
+      "icu"
+     ],
+     "mapUrl": "https://www.google.com/maps/dir/?api=1&destination=22.58,88.42"
+    },
+    {
+     "settingId": "5e771000-0000-0000-0000-000000000002",
+     "name": "District Hospital",
+     "kind": "HOSPITAL",
+     "phone": "108",
+     "alternatePhone": null,
+     "distanceKm": 4.8,
+     "address": null,
+     "landmark": null,
+     "city": null,
+     "lat": 22.6,
+     "lng": 88.45,
+     "is24x7": true,
+     "capabilities": [],
+     "mapUrl": "https://www.google.com/maps/dir/?api=1&destination=22.6,88.45"
+    }
+   ],
+   "eventId": "e0000000-0000-0000-0000-000000000001",
+   "alerted": 2,
+   "repeated": false,
+   "needsLocation": false,
+   "numberShared": false,
+   "canShareNumber": false
+  }
+ },
+ "signed": {
+  "session_id": "sess_6aed57c9e31e",
+  "turn": 1,
+  "kind": "emergency",
+  "message": "This sounds like an emergency. Call 108 (ambulance) now, or 112. If you can, go to the nearest emergency room.\nSigns: chest pain.\nNearest emergency help:\n1. Salt Lake Care (1.2 km) - 03340001111\n2. District Hospital (4.8 km) - 108\nWant them to call you? Tap 'Share my number'.",
+  "question": null,
+  "card": {
+   "kind": "emergency",
+   "summary": "chest pain",
+   "severity_level": "EMERGENCY",
+   "severity_score": 90,
+   "disposition": "ER / Ambulance NOW",
+   "outputs": [
+    {
+     "role": "EMERGENCY",
+     "specialist": "Emergency Medicine",
+     "confidence": 1.0,
+     "reason": "Emergency red flag detected",
+     "matched_symptoms": [
+      "chest pain"
+     ],
+     "cluster_id": null
+    }
+   ],
+   "watch_for": [],
+   "alert": "EMERGENCY: Turant 108 (ambulance) ya 112 par call karein, ya nearest ER jaayein. / Call 108 (ambulance) or 112, or go to the nearest ER now.",
+   "emergency_reasons": [
+    "Chest pain",
+    "Breathlessness"
+   ],
+   "after_stabilisation": [
+    "Cardiologist",
+    "General Physician"
+   ],
+   "red_flags": [],
+   "low_confidence": false,
+   "disclaimer": "Triage support only - not a diagnosis."
+  },
+  "state": {
+   "session_id": "sess_6aed57c9e31e",
+   "turn": 1,
+   "symptoms": [
+    "chest pain"
+   ],
+   "negated_symptoms": [],
+   "body_parts": [
+    "chest"
+   ],
+   "intensity": "severe",
+   "duration": null,
+   "durations": [],
+   "language": "english",
+   "first_seen_turn": {
+    "chest pain": 1
+   },
+   "ready": true,
+   "ready_reason": "emergency_safety_net",
+   "next_question": null
+  },
+  "severity": {
+   "score": 90,
+   "level": "EMERGENCY",
+   "disposition": "ER / Ambulance NOW",
+   "emergency": true,
+   "alert": "EMERGENCY: Turant 108 (ambulance) ya 112 par call karein, ya nearest ER jaayein. / Call 108 (ambulance) or 112, or go to the nearest ER now.",
+   "triggered_by": "safety_net",
+   "emergency_hits": [
+    {
+     "canonical": "chest pain",
+     "english": "Chest pain",
+     "flag": "EMERGENCY",
+     "via": "symptom"
+    },
+    {
+     "canonical": "breathlessness",
+     "english": "Breathlessness",
+     "flag": "EMERGENCY",
+     "via": "text",
+     "phrase": "can t breathe"
+    }
+   ],
+   "red_flags": [],
+   "rule_score": 0,
+   "ml_score": null,
+   "factors": [
+    "no scorable symptoms",
+    "hardcoded emergency phrase/symptom: Chest pain, Breathlessness"
+   ],
+   "note": "Triage support only - not a diagnosis."
+  },
+  "keywords": [
+   {
+    "token": "i",
+    "canonical": null,
+    "level": "UNKNOWN",
+    "discriminative": false,
+    "idf": 0.0
+   },
+   {
+    "token": "have",
+    "canonical": null,
+    "level": "UNKNOWN",
+    "discriminative": false,
+    "idf": 0.0
+   },
+   {
+    "token": "severe",
+    "canonical": "severe",
+    "level": "MODIFIER",
+    "discriminative": false,
+    "idf": 0.0
+   },
+   {
+    "token": "chest pain",
+    "canonical": "chest pain",
+    "level": "CRITICAL",
+    "discriminative": true,
+    "idf": 4.610917912644224
+   },
+   {
+    "token": "and",
+    "canonical": null,
+    "level": "UNKNOWN",
+    "discriminative": false,
+    "idf": 0.0
+   },
+   {
+    "token": "can",
+    "canonical": null,
+    "level": "UNKNOWN",
+    "discriminative": false,
+    "idf": 0.0
+   },
+   {
+    "token": "t",
+    "canonical": null,
+    "level": "UNKNOWN",
+    "discriminative": false,
+    "idf": 0.0
+   },
+   {
+    "token": "breathe",
+    "canonical": null,
+    "level": "UNKNOWN",
+    "discriminative": false,
+    "idf": 0.0
+   }
+  ],
+  "language": "english",
+  "degraded": [],
+  "emergency": {
+   "places": [
+    {
+     "settingId": "5e771000-0000-0000-0000-000000000001",
+     "name": "Salt Lake Care",
+     "kind": "HOSPITAL",
+     "phone": "03340001111",
+     "alternatePhone": null,
+     "distanceKm": 1.2,
+     "address": "Sector V",
+     "landmark": "Near City Centre",
+     "city": "Kolkata",
+     "lat": 22.58,
+     "lng": 88.42,
+     "is24x7": true,
+     "capabilities": [
+      "cardiac",
+      "icu"
+     ],
+     "mapUrl": "https://www.google.com/maps/dir/?api=1&destination=22.58,88.42"
+    },
+    {
+     "settingId": "5e771000-0000-0000-0000-000000000002",
+     "name": "District Hospital",
+     "kind": "HOSPITAL",
+     "phone": "108",
+     "alternatePhone": null,
+     "distanceKm": 4.8,
+     "address": null,
+     "landmark": null,
+     "city": null,
+     "lat": 22.6,
+     "lng": 88.45,
+     "is24x7": true,
+     "capabilities": [],
+     "mapUrl": "https://www.google.com/maps/dir/?api=1&destination=22.6,88.45"
+    }
+   ],
+   "eventId": "e0000000-0000-0000-0000-000000000001",
+   "alerted": 0,
+   "repeated": true,
+   "needsLocation": false,
+   "numberShared": false,
+   "canShareNumber": true
+  },
+  "clarify": {
+   "kind": "emergency_share",
+   "question": null,
+   "options": [
+    {
+     "id": "emergency:share",
+     "label": "Share my number"
+    }
+   ]
+  }
+ },
+ "shared": {
+  "session_id": "sess_6aed57c9e31e",
+  "turn": 2,
+  "kind": "info",
+  "message": "Done. The hospitals have your number and may call you. Keep your phone free, and call 112 if it gets worse.",
+  "question": null,
+  "card": null,
+  "state": null,
+  "severity": null,
+  "keywords": [],
+  "language": "english",
+  "degraded": [],
+  "clarify": null
+ }
+}

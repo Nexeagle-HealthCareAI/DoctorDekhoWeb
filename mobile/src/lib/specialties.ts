@@ -1,0 +1,199 @@
+// Specialty taxonomy shared with DoctorDekhoWeb (src/data/patient.ts) and the NLP router: same ids everywhere.
+import type { Locale } from "./i18n/types";
+
+export interface Specialty { id: string; name: string; icon: string; blurb: string }
+
+export const SPECIALTIES: Specialty[] = [
+  { id: "general", name: "General Physician", icon: "medkit", blurb: "Fever, cold, infections & checkups" },
+  { id: "pediatrics", name: "Pediatrics", icon: "happy", blurb: "Child health, vaccination & growth" },
+  { id: "cardiology", name: "Cardiology", icon: "heart", blurb: "Heart, BP & chest concerns" },
+  { id: "dermatology", name: "Dermatology", icon: "sparkles", blurb: "Skin, hair & nail conditions" },
+  { id: "orthopedics", name: "Orthopedics", icon: "body", blurb: "Joints, bones & sports injuries" },
+  { id: "gynecology", name: "Gynecology", icon: "flower", blurb: "Women's health & pregnancy care" },
+  { id: "dentistry", name: "Dentistry", icon: "happy-outline", blurb: "Teeth, gums & oral care" },
+  { id: "ent", name: "ENT", icon: "ear", blurb: "Ear, nose & throat issues" },
+  { id: "ophthalmology", name: "Ophthalmology", icon: "eye", blurb: "Eye care, vision & spectacles" },
+  { id: "neurology", name: "Neurology", icon: "bulb", blurb: "Headache, seizures & nerve disorders" },
+  { id: "psychiatry", name: "Psychiatry", icon: "bulb", blurb: "Mental health, anxiety & depression" },
+  { id: "urology", name: "Urology", icon: "water", blurb: "Kidney, bladder & urinary tract" },
+  { id: "gastroenterology", name: "Gastroenterology", icon: "pulse", blurb: "Stomach, liver & digestive issues" },
+  { id: "endocrinology", name: "Endocrinology", icon: "flash", blurb: "Diabetes, thyroid & hormones" },
+  { id: "pulmonology", name: "Pulmonology", icon: "cloudy", blurb: "Lungs, asthma & breathing" },
+  { id: "nephrology", name: "Nephrology", icon: "water", blurb: "Kidney disease & dialysis care" },
+  { id: "oncology", name: "Oncology", icon: "shield-checkmark", blurb: "Cancer diagnosis & treatment" },
+  { id: "rheumatology", name: "Rheumatology", icon: "pulse", blurb: "Arthritis, lupus & autoimmune disease" },
+  { id: "physiotherapy", name: "Physiotherapy", icon: "barbell", blurb: "Rehabilitation, pain & mobility" },
+  { id: "dietetics", name: "Dietetics & Nutrition", icon: "nutrition", blurb: "Diet, weight & lifestyle diseases" },
+  { id: "generalsurgery", name: "General Surgery", icon: "cut", blurb: "Hernia, gallbladder & general operations" },
+  { id: "neurosurgery", name: "Neurosurgery", icon: "git-network", blurb: "Brain, spine & nerve surgery" },
+  { id: "plasticsurgery", name: "Plastic Surgery", icon: "color-wand", blurb: "Reconstructive & cosmetic surgery" },
+  { id: "vascularsurgery", name: "Vascular Surgery", icon: "git-branch", blurb: "Varicose veins & blood vessel surgery" },
+  { id: "cardiothoracicsurgery", name: "Cardiothoracic Surgery", icon: "heart", blurb: "Heart & chest surgery" },
+  { id: "anesthesiology", name: "Anesthesiology", icon: "bandage", blurb: "Pain management & surgical anesthesia" },
+  { id: "radiology", name: "Radiology", icon: "scan", blurb: "X-ray, CT, MRI & imaging diagnostics" },
+  { id: "pathology", name: "Pathology", icon: "flask", blurb: "Lab diagnostics & disease testing" },
+  { id: "emergencymedicine", name: "Emergency Medicine", icon: "warning", blurb: "Trauma, urgent & critical care" },
+  { id: "geriatrics", name: "Geriatrics", icon: "accessibility", blurb: "Elderly care & age-related conditions" },
+  { id: "sportsmedicine", name: "Sports Medicine", icon: "trophy", blurb: "Sports injuries & athletic performance" },
+];
+
+/** The eight shown first on the home screen; everything else is one tap away under "All". */
+export const POPULAR_SPECIALTY_IDS = ["general", "pediatrics", "gynecology", "dermatology", "orthopedics", "ent", "cardiology", "dentistry"];
+
+const SPECIALTY_NAMES: Record<Exclude<Locale, "en">, Record<string, string>> = {
+  hi: {
+    general: "सामान्य चिकित्सक",
+    pediatrics: "बाल रोग विशेषज्ञ",
+    cardiology: "हृदय रोग विशेषज्ञ",
+    dermatology: "त्वचा रोग विशेषज्ञ",
+    orthopedics: "हड्डी रोग विशेषज्ञ",
+    gynecology: "स्त्री रोग विशेषज्ञ",
+    dentistry: "दंत चिकित्सक",
+    ent: "कान-नाक-गला विशेषज्ञ",
+    ophthalmology: "नेत्र रोग विशेषज्ञ",
+    neurology: "तंत्रिका रोग विशेषज्ञ",
+    psychiatry: "मानसिक रोग विशेषज्ञ",
+    urology: "मूत्र रोग विशेषज्ञ",
+    gastroenterology: "पेट रोग विशेषज्ञ",
+    endocrinology: "हार्मोन रोग विशेषज्ञ",
+    pulmonology: "फेफड़ा रोग विशेषज्ञ",
+    nephrology: "किडनी रोग विशेषज्ञ",
+    oncology: "कैंसर रोग विशेषज्ञ",
+    rheumatology: "गठिया रोग विशेषज्ञ",
+    physiotherapy: "फिजियोथेरेपिस्ट",
+    dietetics: "आहार विशेषज्ञ",
+    generalsurgery: "सामान्य सर्जन",
+    neurosurgery: "न्यूरोसर्जन",
+    plasticsurgery: "प्लास्टिक सर्जन",
+    vascularsurgery: "रक्तवाहिका सर्जन",
+    cardiothoracicsurgery: "हृदय सर्जन",
+    anesthesiology: "एनेस्थीसिया विशेषज्ञ",
+    radiology: "रेडियोलॉजिस्ट",
+    pathology: "पैथोलॉजिस्ट",
+    emergencymedicine: "आपातकालीन चिकित्सा विशेषज्ञ",
+    geriatrics: "वृद्धावस्था रोग विशेषज्ञ",
+    sportsmedicine: "स्पोर्ट्स मेडिसिन विशेषज्ञ",
+  },
+  bn: {
+    general: "সাধারণ চিকিৎসক",
+    pediatrics: "শিশু রোগ বিশেষজ্ঞ",
+    cardiology: "হৃদরোগ বিশেষজ্ঞ",
+    dermatology: "চর্মরোগ বিশেষজ্ঞ",
+    orthopedics: "হাড় রোগ বিশেষজ্ঞ",
+    gynecology: "স্ত্রীরোগ বিশেষজ্ঞ",
+    dentistry: "দন্ত চিকিৎসক",
+    ent: "নাক-কান-গলা বিশেষজ্ঞ",
+    ophthalmology: "চক্ষু বিশেষজ্ঞ",
+    neurology: "স্নায়ুরোগ বিশেষজ্ঞ",
+    psychiatry: "মানসিক রোগ বিশেষজ্ঞ",
+    urology: "মূত্ররোগ বিশেষজ্ঞ",
+    gastroenterology: "পেটের রোগ বিশেষজ্ঞ",
+    endocrinology: "হরমোন রোগ বিশেষজ্ঞ",
+    pulmonology: "ফুসফুস রোগ বিশেষজ্ঞ",
+    nephrology: "কিডনি রোগ বিশেষজ্ঞ",
+    oncology: "ক্যান্সার বিশেষজ্ঞ",
+    rheumatology: "বাত রোগ বিশেষজ্ঞ",
+    physiotherapy: "ফিজিওথেরাপিস্ট",
+    dietetics: "পুষ্টিবিদ",
+    generalsurgery: "সাধারণ সার্জন",
+    neurosurgery: "নিউরোসার্জন",
+    plasticsurgery: "প্লাস্টিক সার্জন",
+    vascularsurgery: "রক্তনালী সার্জন",
+    cardiothoracicsurgery: "হার্ট সার্জন",
+    anesthesiology: "অ্যানেস্থেসিয়া বিশেষজ্ঞ",
+    radiology: "রেডিওলজিস্ট",
+    pathology: "প্যাথোলজিস্ট",
+    emergencymedicine: "জরুরি চিকিৎসা বিশেষজ্ঞ",
+    geriatrics: "বার্ধক্য রোগ বিশেষজ্ঞ",
+    sportsmedicine: "স্পোর্টস মেডিসিন বিশেষজ্ঞ",
+  },
+  hinglish: {
+    general: "General Physician",
+    pediatrics: "Bacchon Ke Doctor",
+    cardiology: "Dil Ke Doctor",
+    dermatology: "Skin Ke Doctor",
+    orthopedics: "Haddi Ke Doctor",
+    gynecology: "Mahila Rog Specialist",
+    dentistry: "Daant Ke Doctor",
+    ent: "Kaan-Naak-Gala Specialist",
+    ophthalmology: "Aankhon Ke Doctor",
+    neurology: "Nerve Specialist",
+    psychiatry: "Mansik Swasthya Specialist",
+    urology: "Mootra Rog Specialist",
+    gastroenterology: "Pet Ke Doctor",
+    endocrinology: "Hormone Specialist",
+    pulmonology: "Phephdon Ke Doctor",
+    nephrology: "Kidney Specialist",
+    oncology: "Cancer Specialist",
+    rheumatology: "Jodon Ke Dard Specialist",
+    physiotherapy: "Physiotherapist",
+    dietetics: "Diet Specialist",
+    generalsurgery: "General Surgeon",
+    neurosurgery: "Neurosurgeon",
+    plasticsurgery: "Plastic Surgeon",
+    vascularsurgery: "Vascular Surgeon",
+    cardiothoracicsurgery: "Heart Surgeon",
+    anesthesiology: "Anesthesia Specialist",
+    radiology: "Radiologist",
+    pathology: "Pathologist",
+    emergencymedicine: "Emergency Doctor",
+    geriatrics: "Budhape Ke Doctor",
+    sportsmedicine: "Sports Injury Doctor",
+  },
+};
+
+export function specialtyName(id: string, locale: Locale): string {
+  const en = SPECIALTIES.find((s) => s.id === id)?.name ?? id;
+  if (locale === "en") return en;
+  return SPECIALTY_NAMES[locale]?.[id] ?? en;
+}
+
+// ── Plain words ──────────────────────────────────────────────────────────────────────────────────
+// Patients think "child doctor", not "Paediatrician". These names are shown on cards and search results;
+// the formal specialty stays on the doctor's own page in brackets. Unlisted ids fall back to specialtyName().
+
+const PLAIN: Record<string, Record<Locale, string>> = {
+  general: { en: "General doctor", hi: "सामान्य डॉक्टर", bn: "সাধারণ ডাক্তার", hinglish: "General doctor" },
+  pediatrics: { en: "Child doctor", hi: "बच्चों के डॉक्टर", bn: "শিশু ডাক্তার", hinglish: "Bachchon ke doctor" },
+  gynecology: { en: "Women's doctor", hi: "महिला रोग डॉक्टर", bn: "স্ত্রীরোগ ডাক্তার", hinglish: "Mahila doctor" },
+  dermatology: { en: "Skin doctor", hi: "त्वचा के डॉक्टर", bn: "চর্মরোগ ডাক্তার", hinglish: "Skin doctor" },
+  orthopedics: { en: "Bone and joint doctor", hi: "हड्डी के डॉक्टर", bn: "হাড়ের ডাক্তার", hinglish: "Haddi ke doctor" },
+  dentistry: { en: "Dentist", hi: "दाँतों के डॉक्टर", bn: "দাঁতের ডাক্তার", hinglish: "Daant ke doctor" },
+  ent: { en: "Ear, nose, throat doctor", hi: "नाक-कान-गला डॉक्टर", bn: "নাক-কান-গলা ডাক্তার", hinglish: "Naak-kaan-gala doctor" },
+  cardiology: { en: "Heart doctor", hi: "दिल के डॉक्टर", bn: "হৃদরোগ ডাক্তার", hinglish: "Dil ke doctor" },
+  ophthalmology: { en: "Eye doctor", hi: "आँखों के डॉक्टर", bn: "চোখের ডাক্তার", hinglish: "Aankh ke doctor" },
+  gastroenterology: { en: "Stomach specialist", hi: "पेट के डॉक्टर", bn: "পেটের ডাক্তার", hinglish: "Pet ke doctor" },
+  neurology: { en: "Brain and nerve doctor", hi: "दिमाग-नस के डॉक्टर", bn: "স্নায়ু ডাক্তার", hinglish: "Nas ke doctor" },
+  psychiatry: { en: "Mental health doctor", hi: "मानसिक स्वास्थ्य डॉक्टर", bn: "মানসিক স্বাস্থ্য ডাক্তার", hinglish: "Mental health doctor" },
+  urology: { en: "Urine and kidney doctor", hi: "मूत्र रोग डॉक्टर", bn: "মূত্ররোগ ডাক্তার", hinglish: "Peshab rog doctor" },
+  pulmonology: { en: "Lung doctor", hi: "फेफड़ों के डॉक्टर", bn: "ফুসফুসের ডাক্তার", hinglish: "Phephde ke doctor" },
+  physiotherapy: { en: "Physiotherapist", hi: "फिज़ियोथेरेपिस्ट", bn: "ফিজিওথেরাপিস্ট", hinglish: "Physiotherapist" },
+};
+
+/** "General doctor" rather than "General Physician", in the patient's language. */
+export function plainSpecialty(id: string, locale: Locale): string {
+  return PLAIN[id]?.[locale] ?? specialtyName(id, locale);
+}
+
+/** True when the plain name differs from the formal one, so the doctor page can show "(General Physician)". */
+export const hasPlainName = (id: string) => id in PLAIN;
+
+// ── Symptom tiles on Home ────────────────────────────────────────────────────────────────────────
+
+export interface Symptom {
+  id: string;
+  icon: "thermometer-outline" | "nutrition-outline" | "happy-outline" | "female-outline" | "sparkles-outline" | "body-outline";
+  tint: "red" | "amber" | "teal" | "purple" | "blue" | "gray";
+  label: Record<Locale, string>;
+  /** Specialties to show, best first. */
+  specialtyIds: string[];
+}
+
+export const SYMPTOMS: Symptom[] = [
+  { id: "fever", icon: "thermometer-outline", tint: "red", specialtyIds: ["general"], label: { en: "Fever, cold", hi: "बुखार, सर्दी", bn: "জ্বর, সর্দি", hinglish: "Bukhar, sardi" } },
+  { id: "stomach", icon: "nutrition-outline", tint: "amber", specialtyIds: ["general", "gastroenterology"], label: { en: "Stomach", hi: "पेट दर्द", bn: "পেটের সমস্যা", hinglish: "Pet dard" } },
+  { id: "child", icon: "happy-outline", tint: "teal", specialtyIds: ["pediatrics"], label: { en: "Child health", hi: "बच्चों की सेहत", bn: "শিশুর স্বাস্থ্য", hinglish: "Bachchon ki sehat" } },
+  { id: "women", icon: "female-outline", tint: "purple", specialtyIds: ["gynecology"], label: { en: "Women's health", hi: "महिलाओं की सेहत", bn: "মহিলাদের স্বাস্থ্য", hinglish: "Mahilaon ki sehat" } },
+  { id: "skin", icon: "sparkles-outline", tint: "blue", specialtyIds: ["dermatology"], label: { en: "Skin, hair", hi: "त्वचा, बाल", bn: "ত্বক, চুল", hinglish: "Skin, baal" } },
+  { id: "bones", icon: "body-outline", tint: "gray", specialtyIds: ["orthopedics", "physiotherapy"], label: { en: "Bones, joints", hi: "हड्डी, जोड़", bn: "হাড়, গাঁট", hinglish: "Haddi, jod" } },
+];

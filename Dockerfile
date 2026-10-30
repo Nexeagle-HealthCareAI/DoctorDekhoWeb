@@ -36,6 +36,13 @@ ENV EASYHMS_API_BASE_URL=$EASYHMS_API_BASE_URL
 ARG NEXT_PUBLIC_MAPBOX_TOKEN
 ENV NEXT_PUBLIC_MAPBOX_TOKEN=$NEXT_PUBLIC_MAPBOX_TOKEN
 
+# Health Wiki contributor pages. Both are build-time: the first is inlined into the client bundle, the second
+# is read by next.config.mjs for the Content-Security-Policy (the bucket the article images are served from).
+ARG NEXT_PUBLIC_CONTRIBUTOR_ENABLED
+ENV NEXT_PUBLIC_CONTRIBUTOR_ENABLED=$NEXT_PUBLIC_CONTRIBUTOR_ENABLED
+ARG HEALTH_WIKI_IMAGE_ORIGINS
+ENV HEALTH_WIKI_IMAGE_ORIGINS=$HEALTH_WIKI_IMAGE_ORIGINS
+
 RUN npm run build
 
 # ── Stage 2: Serve ────────────────────────────────────────────────────────────
@@ -51,6 +58,9 @@ COPY --from=builder /app/package-lock.json ./package-lock.json
 COPY --from=builder /app/.next ./.next
 COPY --from=builder /app/public ./public
 COPY --from=builder /app/node_modules ./node_modules
+# The Health Wiki's interim article file (src/lib/wikiStore.ts) is read from disk at request time,
+# not only at build time. Without this the running container has no such file.
+COPY --from=builder /app/src/data ./src/data
 
 # Bind container port to 80 (deploy.yml maps a host port -> container 80)
 EXPOSE 80

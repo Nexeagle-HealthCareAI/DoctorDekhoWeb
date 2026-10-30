@@ -1,3 +1,4 @@
+import { revalidateTag } from "next/cache";
 import { NextRequest, NextResponse } from "next/server";
 import { isValidAdminSession } from "@/lib/adminAuth";
 import { reviewArticle } from "@/lib/wikiStore";
@@ -22,5 +23,8 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     comments: body.comments,
   });
   if (!article) return NextResponse.json({ message: "Not found" }, { status: 404 });
+  // The public Health Wiki pages cache the article list (see src/lib/health-wiki/server.ts); an
+  // approval changes what is published, so drop that cache instead of waiting for it to expire.
+  revalidateTag("health-articles");
   return NextResponse.json({ article });
 }

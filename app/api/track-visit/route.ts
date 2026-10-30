@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { easyhmsFetch } from "@/lib/api/server";
+import { isBotUserAgent } from "@/lib/botUserAgent";
 
 export const dynamic = "force-dynamic";
 
@@ -9,8 +10,10 @@ export const dynamic = "force-dynamic";
 // Always returns 200 regardless of upstream outcome: a visitor must never see an error, or have a
 // page's rendering depend on this, just because analytics recording had a bad moment.
 export async function POST(req: NextRequest) {
+  // Crawlers run the page script too; they are not visitors (see src/lib/botUserAgent.ts).
+  if (isBotUserAgent(req.headers.get("user-agent"))) return NextResponse.json({ ok: true });
   try {
-    const body = await req.json();
+    const body = { ...(await req.json()), site: "doctordekho", userAgent: req.headers.get("user-agent") };
     await easyhmsFetch("/public/track-visit", {
       method: "POST",
       body: JSON.stringify(body),

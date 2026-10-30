@@ -26,6 +26,11 @@ Backed live by EasyHMS's public API: `/` (search), `/doctors/[doctorSlug]`,
 `app/api/**` are same-origin server-side proxies to the EasyHMS API — the browser never calls the
 API directly, so **no backend CORS entry is needed for this app's origin**.
 
+## Mobile app
+
+The Android/iOS app (Expo / React Native) is in [`mobile/`](mobile/README.md) — a separate npm project with its own
+install and build. It is excluded from this app's TypeScript, lint and Docker build.
+
 ## Tech stack
 
 Next.js 14 (App Router) · React 18 · TypeScript · Tailwind + shadcn/ui · react-query (+ persisted

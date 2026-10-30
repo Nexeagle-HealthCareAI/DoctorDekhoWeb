@@ -337,19 +337,37 @@ export interface SmartSearchIntent {
   method: string | null;
   confidence: number | null;
   modelVersion: string | null;
+  /** The router's decision (answer / clarify / abstain); null when Groq or the legacy router answered. */
+  decision: "answer" | "clarify" | "abstain" | null;
+  /** Non-null = medical emergency. The page must show the emergency banner (reasons, call 108),
+   * not just a doctor list. */
+  emergency: { reasons: string[]; source: "router" | "groq" } | null;
+  /** Non-null = a question to show as chips. kind "age": re-run the search with the chosen id as
+   * ageGroup. kind "specialty": the chosen id is the specialty to show. */
+  clarify: { kind: "age" | "specialty"; question: string; options: { id: string; label: string }[] } | null;
+  /** Short explanation from the router, in the patient's language (e.g. why a GP is suggested). */
+  reason: string | null;
 }
 
+/** The search text, plus the patient's answer to an age question when re-asking. safetyOnly asks
+ * only "is this an emergency?" (router only, never Groq): used when keyword search already found
+ * doctors, so symptom text that happens to match a doctor's profile is still safety-checked. */
+export type SmartSearchInput = string | { query: string; ageGroup?: "child" | "adult"; safetyOnly?: boolean };
+
+const EMPTY_INTENT_EXTRAS = { decision: null, emergency: null, clarify: null, reason: null } as const;
+
 export function useSmartSearch() {
-  return useMutation<SmartSearchIntent, Error, string>({
-    mutationFn: async (query) => {
+  return useMutation<SmartSearchIntent, Error, SmartSearchInput>({
+    mutationFn: async (input) => {
+      const payload = typeof input === "string" ? { query: input } : input;
       const res = await fetch("/api/search/parse", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ query }),
+        body: JSON.stringify(payload),
       });
       const json = await res.json();
       if (json?.notConfigured) {
-        return { specialtyId: null, specialtyIds: [], city: null, keywords: [], notConfigured: true, method: null, confidence: null, modelVersion: null };
+        return { specialtyId: null, specialtyIds: [], city: null, keywords: [], notConfigured: true, method: null, confidence: null, modelVersion: null, ...EMPTY_INTENT_EXTRAS };
       }
       if (!res.ok) throw new Error(json?.error || `Search interpretation failed: ${res.status}`);
       return {
@@ -361,6 +379,14 @@ export function useSmartSearch() {
         method: typeof json?.method === "string" ? json.method : null,
         confidence: typeof json?.confidence === "number" ? json.confidence : null,
         modelVersion: typeof json?.modelVersion === "string" ? json.modelVersion : null,
+        decision: json?.decision === "answer" || json?.decision === "clarify" || json?.decision === "abstain" ? json.decision : null,
+        emergency: json?.emergency && Array.isArray(json.emergency.reasons)
+          ? { reasons: json.emergency.reasons, source: json.emergency.source === "groq" ? "groq" : "router" }
+          : null,
+        clarify: json?.clarify && (json.clarify.kind === "age" || json.clarify.kind === "specialty") && Array.isArray(json.clarify.options)
+          ? json.clarify
+          : null,
+        reason: typeof json?.reason === "string" ? json.reason : null,
       };
     },
   });

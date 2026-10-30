@@ -3,7 +3,8 @@ import type { MetadataRoute } from "next";
 import { getAllDoctors, getAllLabs } from "@/lib/api/server";
 import { doctorSlug, specialties, CITIES, AREAS_BY_CITY } from "@/data/patient";
 import { labSlug } from "@/data/labs";
-import { getPublishedArticles } from "@/lib/wikiStore";
+import { getPublishedArticles } from "@/lib/health-wiki/server";
+import { articlePath } from "@/lib/health-wiki/seo";
 
 // Must be dynamic. As a statically prerendered route (the old `revalidate = 3600`) the sitemap runs
 // at BUILD time, where the doctors fetch fails and the try/catch below swallows it, freezing a
@@ -119,17 +120,6 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       });
     }
 
-    // Generate Health Wiki paths -- published articles only (drafts/in_review aren't public URLs).
-    const medicalArticles = await getPublishedArticles();
-    for (const article of medicalArticles) {
-      pseoEntries.push({
-        url: `${BASE_URL}/health/conditions/${article.id}`,
-        lastModified: article.updatedAt ? new Date(article.updatedAt) : now,
-        changeFrequency: "monthly",
-        priority: 0.8, // High priority for YMYL informational content
-      });
-    }
-
   } catch (err) {
     // Sitemap generation must never fail the build over a flaky upstream call — but silently
     // swallowing this is exactly what produced the 23-URL/0-doctor-page incident this file's
@@ -153,5 +143,22 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     console.error("[sitemap] lab entry generation failed; sitemap will be missing lab pages:", err);
   }
 
-  return [...staticEntries, ...doctorEntries, ...pseoEntries, ...labEntries];
+  // Health Wiki: its own block, so a Health Wiki API failure cannot drop the doctor or lab URLs.
+  let wikiEntries: MetadataRoute.Sitemap = [];
+  try {
+    const articles = await getPublishedArticles();
+    wikiEntries = [
+      { url: `${BASE_URL}/health`, lastModified: articles[0] ? new Date(articles[0].updatedAt) : now, changeFrequency: "weekly", priority: 0.7 },
+      ...articles.map((a) => ({
+        url: `${BASE_URL}${articlePath(a.slug)}`,
+        lastModified: new Date(a.updatedAt),
+        changeFrequency: "monthly" as const,
+        priority: 0.8, // High priority for YMYL informational content
+      })),
+    ];
+  } catch (err) {
+    console.error("[sitemap] Health Wiki entry generation failed; sitemap will be missing these URLs:", err);
+  }
+
+  return [...staticEntries, ...doctorEntries, ...pseoEntries, ...labEntries, ...wikiEntries];
 }

@@ -1,0 +1,102 @@
+# Builds an installable test APK of the Doctor Dekho mobile app (mobile/) on GitHub's servers.
+# Runs on every push to feature/mobile-* branches that touches mobile/, or by hand from the Actions tab.
+# The APK is published as a pre-release (open it on the phone and tap the .apk) and as a workflow artifact.
+# It is signed with the standard debug key — fine for testers, not for the Play Store (use EAS / a release key for that).
+name: Mobile test APK
+
+on:
+  push:
+    branches: ["feature/mobile-*"]
+    paths: ["mobile/**", ".github/workflows/mobile-apk.yml"]
+  workflow_dispatch:
+    inputs:
+      api:
+        description: "Which API the APK talks to"
+        type: choice
+        options: [dev, production]
+        default: dev
+
+permissions:
+  contents: write
+
+concurrency:
+  group: mobile-apk-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    defaults:
+      run:
+        working-directory: mobile
+    env:
+      API_TARGET: ${{ inputs.api || 'dev' }}
+      # Public Mapbox token (pk.…) for maps, routes and area names. Add it once under
+      # Settings → Secrets and variables → Actions → New repository secret, named MAPBOX_PUBLIC_TOKEN.
+      # Without it the app still builds; map screens fall back to the list and Google Maps directions.
+      EXPO_PUBLIC_MAPBOX_TOKEN: ${{ secrets.MAPBOX_PUBLIC_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Pick API
+        run: |
+          if [ "$API_TARGET" = "production" ]; then
+            echo "EXPO_PUBLIC_API_BASE_URL=https://1hms-api.nexeagle.com" >> "$GITHUB_ENV"
+            echo "EXPO_PUBLIC_SEARCH_PARSE_URL=https://doctordekho.nexeagle.com/api/search/parse" >> "$GITHUB_ENV"
+          else
+            echo "EXPO_PUBLIC_API_BASE_URL=https://1hms-dev-api.nexeagle.com" >> "$GITHUB_ENV"
+            echo "EXPO_PUBLIC_SEARCH_PARSE_URL=https://doctordekho-dev.nexeagle.com/api/search/parse" >> "$GITHUB_ENV"
+          fi
+
+      # The lockfile was made with --legacy-peer-deps (expo-router's web tabs pull a react-dom peer that clashes with React 19.3).
+      - name: Install packages
+        run: npm ci --legacy-peer-deps
+
+      - name: Type-check
+        run: npx tsc --noEmit
+
+      - name: Generate the Android project
+        run: npx expo prebuild --platform android --clean --no-install
+
+      - name: Build APK
+        working-directory: mobile/android
+        run: ./gradlew assembleRelease --no-daemon -PreactNativeArchitectures=arm64-v8a,armeabi-v7a
+
+      - name: Name the file
+        id: out
+        run: |
+          VERSION=$(node -p "require('./app.json').expo.version")
+          NAME="DoctorDekho-${VERSION}-test${{ github.run_number }}-${API_TARGET}.apk"
+          cp android/app/build/outputs/apk/release/app-release.apk "$NAME"
+          echo "name=$NAME" >> "$GITHUB_OUTPUT"
+          ls -la "$NAME"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.out.outputs.name }}
+          path: mobile/${{ steps.out.outputs.name }}
+          retention-days: 30
+
+      - name: Publish as a pre-release (download link for phones)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "mobile-test-${{ github.run_number }}" "${{ steps.out.outputs.name }}" \
+            --prerelease \
+            --target "${{ github.sha }}" \
+            --title "Doctor Dekho app — test build ${{ github.run_number }} (${API_TARGET} API)" \
+            --notes "Test APK from \`${GITHUB_REF_NAME}\` at ${GITHUB_SHA::7}. On the Android phone: open this page, tap the .apk, allow installing from this source, install. Talks to the ${API_TARGET} API. Signed with the debug key — for testing only."

@@ -111,6 +111,7 @@ export default async function SpecialtyCityPage({ params }: PageProps) {
       <HomeClient
         initialSpecialtyId={specialty.id}
         initialCityId={city.id}
+        pageHeading={`${specialty.name}s in ${city.name}, ${city.state}`}
         initialDoctors={initialDoctors}
         breadcrumb={<PageBreadcrumb items={breadcrumbItems} />}
       />
