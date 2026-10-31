@@ -184,6 +184,69 @@ describe("search parse: current router", () => {
   });
 });
 
+// Vita's reading (POST /v2/agent/search-intent, 2026-10-31): the same reader as the chat and WhatsApp.
+const VITA = {
+  name: {
+    kind: "name", specialtyId: null, specialtyIds: [], city: null, near: false, doctorName: "neha sharma", degree: null,
+    hospital: null, gender: null, availableToday: false, keywords: ["neha", "sharma"], corrected: "dr neha sarma",
+    emergency: { flag: false, reasons: [], recommendedSpecialtyIds: [] }, method: "vita", confidence: null,
+    modelVersion: null, decision: null, decisive: false, clarify: null, reason: null, usedDefault: false,
+  },
+  specialtyCity: {
+    kind: "specialty", specialtyId: "cardiology", specialtyIds: ["cardiology"], city: "Kolkata", near: false,
+    doctorName: null, degree: null, hospital: null, gender: null, availableToday: false, keywords: ["cardiologist", "kolkata"],
+    corrected: "cardiologist kolkata", emergency: { flag: false, reasons: [], recommendedSpecialtyIds: [] },
+    method: "vita", confidence: 1, modelVersion: null, decision: null, decisive: false, clarify: null, reason: null,
+    usedDefault: false,
+  },
+  nothing: {
+    kind: "none", specialtyId: null, specialtyIds: [], city: null, near: false, doctorName: null, degree: null,
+    hospital: null, gender: null, availableToday: false, keywords: ["cricket", "score"], corrected: "cricket score",
+    emergency: { flag: false, reasons: [], recommendedSpecialtyIds: [] }, method: "vita", confidence: null,
+    modelVersion: null, decision: "abstain", decisive: false, clarify: null, reason: null, usedDefault: true,
+  },
+};
+
+describe("search parse: Vita reads the query", () => {
+  it("asks Vita's search-intent first", async () => {
+    fetchMock.mockResolvedValueOnce(json(VITA.specialtyCity));
+    await ask({ query: "cardiolgist kolkatta" });
+    expect(String(routerCalls()[0][0])).toBe("http://router.test/v2/agent/search-intent");
+  });
+
+  it("a misspelled specialty and city: Vita's answer, the city as listed, never Groq", async () => {
+    fetchMock.mockResolvedValueOnce(json(VITA.specialtyCity));
+    const { body } = await ask({ query: "cardiolgist kolkatta" });
+    expect(body.specialtyIds).toEqual(["cardiology"]);
+    expect(body.city).toBe("Kolkata");
+    expect(body.filters.kind).toBe("specialty");
+    expect(groqCalls()).toHaveLength(0);
+  });
+
+  it("a doctor's name: no specialty, the name in filters and keywords, never Groq", async () => {
+    fetchMock.mockResolvedValueOnce(json(VITA.name));
+    const { body } = await ask({ query: "dr neha sarma" });
+    expect(body.specialtyId).toBeNull();
+    expect(body.filters.doctorName).toBe("neha sharma");
+    expect(body.keywords).toContain("sharma");
+    expect(groqCalls()).toHaveLength(0);
+  });
+
+  it("nothing medical: no specialty, never Groq", async () => {
+    fetchMock.mockResolvedValueOnce(json(VITA.nothing));
+    const { body } = await ask({ query: "cricket score" });
+    expect(body.specialtyId).toBeNull();
+    expect(groqCalls()).toHaveLength(0);
+  });
+
+  it("an older router without search-intent (404): /route-symptom as before", async () => {
+    fetchMock.mockResolvedValueOnce(json({ detail: "Not Found" }, 404)).mockResolvedValueOnce(json(ROUTER.answer));
+    const { body } = await ask({ query: "pet mein dard" });
+    expect(String(routerCalls()[1][0])).toBe("http://router.test/route-symptom");
+    expect(body.specialtyIds).toEqual(["gastroenterology"]);
+  });
+});
+
 describe("search parse: safetyOnly (keyword search already found doctors)", () => {
   it("returns the emergency when the router flags one", async () => {
     fetchMock.mockResolvedValueOnce(json(ROUTER.emergency));

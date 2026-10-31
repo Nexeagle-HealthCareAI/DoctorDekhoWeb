@@ -57,9 +57,27 @@ export interface ClarifyInfo {
   options: { id: string; label: string }[];
 }
 
+/** What Vita read beyond a specialty (POST /v2/agent/search-intent on the router; null fields when not said). */
+export interface VitaFilters {
+  /** symptom | specialty | name | degree | hospital | place | near | emergency | none */
+  kind: string;
+  doctorName: string | null;
+  degree: string | null;
+  hospital: string | null;
+  gender: "female" | "male" | null;
+  availableToday: boolean;
+  /** The query with typing mistakes in search words repaired ("cardiolgist kolkatta" -> "cardiologist kolkata"). */
+  corrected: string | null;
+}
+
 interface RouterResult {
   /** True for the current router (it returned `decision`); false for the legacy one. */
   modern: boolean;
+  /** Vita's reading (search-intent); null when only /route-symptom answered. */
+  vita: VitaFilters | null;
+  /** The city Vita read, spelled as Doctor Dekho lists it, or NEAR_ME; null = not said / not Vita. */
+  city: string | null;
+  keywords: string[];
   decision: RouterDecision | null;
   decisive: boolean;
   emergency: { flag: boolean; reasons: string[]; recommendedSpecialtyIds: string[] };
@@ -101,8 +119,24 @@ function readRouter(data: unknown): RouterResult {
     if (options.length > 0) clarify = { kind: cl.kind, question: cl.question, options };
   }
 
+  const str = (v: unknown) => (typeof v === "string" && v.trim() ? v.trim().slice(0, 80) : null);
+  const vita: VitaFilters | null =
+    typeof d.kind === "string"
+      ? {
+          kind: d.kind,
+          doctorName: str(d.doctorName),
+          degree: str(d.degree),
+          hospital: str(d.hospital),
+          gender: d.gender === "female" || d.gender === "male" ? d.gender : null,
+          availableToday: d.availableToday === true,
+          corrected: str(d.corrected),
+        }
+      : null;
   return {
-    modern: decision !== null,
+    modern: decision !== null || vita !== null,
+    vita,
+    city: typeof d.city === "string" ? knownCity(d.city) : null,
+    keywords: strings(d.keywords).map((k) => k.slice(0, 40)).slice(0, 10),
     decision,
     decisive: d.decisive === true,
     emergency,
@@ -116,20 +150,24 @@ function readRouter(data: unknown): RouterResult {
   };
 }
 
+// Vita's reading first (POST /v2/agent/search-intent: the same reader as the chat and WhatsApp, spelling-tolerant,
+// with doctor names, degrees, cities and near me, and route-symptom's own decision fields for symptoms); a router
+// without that endpoint (404) is asked /route-symptom as before.
 async function callNlpRouter(query: string, ageGroup: AgeGroup | null): Promise<RouterResult | null> {
   if (!NLP_ROUTER_BASE_URL) return null;
+  const headers = {
+    "content-type": "application/json",
+    ...(NLP_ROUTER_API_KEY ? { "X-Api-Key": NLP_ROUTER_API_KEY } : {}),
+  };
+  // context.ageGroup answers the router's "child or adult?" question; the legacy router ignores unknown fields.
+  const body = JSON.stringify(ageGroup ? { query, context: { ageGroup } } : { query });
   try {
-    const res = await fetch(`${NLP_ROUTER_BASE_URL}/route-symptom`, {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-        ...(NLP_ROUTER_API_KEY ? { "X-Api-Key": NLP_ROUTER_API_KEY } : {}),
-      },
-      // context.ageGroup answers the router's "child or adult?" question; the legacy router
-      // ignores unknown fields.
-      body: JSON.stringify(ageGroup ? { query, context: { ageGroup } } : { query }),
-      signal: AbortSignal.timeout(3000),
+    let res = await fetch(`${NLP_ROUTER_BASE_URL}/v2/agent/search-intent`, {
+      method: "POST", headers, body, signal: AbortSignal.timeout(3000),
     });
+    if (res.status === 404) {
+      res = await fetch(`${NLP_ROUTER_BASE_URL}/route-symptom`, { method: "POST", headers, body, signal: AbortSignal.timeout(3000) });
+    }
     if (!res.ok) {
       console.warn(`NLP router answered ${res.status}, falling back to Groq`);
       return null;
@@ -221,6 +259,8 @@ export interface SearchIntent {
   method: string | null;
   confidence: number | null;
   modelVersion: string | null;
+  /** Vita's other filters (doctor name, degree, ...): present only when Vita read the query. */
+  filters?: VitaFilters;
 }
 
 // JSON mode guarantees syntactically valid JSON, NOT that it matches our shape or taxonomy — and
@@ -263,11 +303,16 @@ function sanitizeIntent(raw: unknown, allowEmergency: boolean): SearchIntent {
 }
 
 function routerIntent(r: RouterResult, query: string, specialtyIds: string[], extra: Partial<SearchIntent> = {}): SearchIntent {
+  // Vita's doctor name rides in keywords too, so the page's keyword fallback finds "neha sarma" as Dr Neha Sharma
+  const nameWords = r.vita?.doctorName ? r.vita.doctorName.split(/\s+/).filter((w) => w.length >= 3) : [];
+  const keywords = r.vita ? Array.from(new Set([...nameWords, ...r.keywords])).slice(0, 10)
+    : query.split(/\s+/).filter((w) => w.length >= 3);
   return {
     specialtyId: specialtyIds[0] ?? null,
     specialtyIds,
-    city: extractCityFromQuery(query),
-    keywords: query.split(/\s+/).filter((w) => w.length >= 3),
+    city: r.vita ? r.city : extractCityFromQuery(query),
+    keywords,
+    ...(r.vita ? { filters: r.vita } : {}),
     decision: r.decision,
     emergency: null,
     clarify: null,
@@ -348,6 +393,13 @@ export async function POST(req: NextRequest) {
       modelVersion: null,
     };
     return NextResponse.json(intent);
+  }
+
+  // Vita read a doctor search, not symptoms ("cardiolgist kolkatta", "dr neha sarma", "MD near me", "lady skin
+  // doctor"): its answer, never Groq. "none" (nothing medical, e.g. "cricket score") is honoured as "no specialty".
+  if (r?.vita && r.vita.kind !== "symptom") {
+    log(`vita-${r.vita.kind}`, r);
+    return NextResponse.json(routerIntent(r, query, r.specialtyIds));
   }
 
   let clarifyForGroq: ClarifyInfo | null = null;

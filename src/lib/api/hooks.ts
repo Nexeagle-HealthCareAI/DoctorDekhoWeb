@@ -347,6 +347,9 @@ export interface SmartSearchIntent {
   clarify: { kind: "age" | "specialty"; question: string; options: { id: string; label: string }[] } | null;
   /** Short explanation from the router, in the patient's language (e.g. why a GP is suggested). */
   reason: string | null;
+  /** What Vita read besides a specialty ("dr neha sarma", "MD doctor"): narrows the list on the page.
+   *  Null when Vita did not read the query (older router, or Groq). */
+  filters: { kind: string; doctorName: string | null; degree: string | null } | null;
 }
 
 /** The search text, plus the patient's answer to an age question when re-asking. safetyOnly asks
@@ -354,7 +357,7 @@ export interface SmartSearchIntent {
  * doctors, so symptom text that happens to match a doctor's profile is still safety-checked. */
 export type SmartSearchInput = string | { query: string; ageGroup?: "child" | "adult"; safetyOnly?: boolean };
 
-const EMPTY_INTENT_EXTRAS = { decision: null, emergency: null, clarify: null, reason: null } as const;
+const EMPTY_INTENT_EXTRAS = { decision: null, emergency: null, clarify: null, reason: null, filters: null } as const;
 
 export function useSmartSearch() {
   return useMutation<SmartSearchIntent, Error, SmartSearchInput>({
@@ -387,6 +390,13 @@ export function useSmartSearch() {
           ? json.clarify
           : null,
         reason: typeof json?.reason === "string" ? json.reason : null,
+        filters: json?.filters && typeof json.filters.kind === "string"
+          ? {
+              kind: json.filters.kind,
+              doctorName: typeof json.filters.doctorName === "string" ? json.filters.doctorName : null,
+              degree: typeof json.filters.degree === "string" ? json.filters.degree : null,
+            }
+          : null,
       };
     },
   });

@@ -5,7 +5,7 @@ export const dynamic = "force-dynamic";
 
 // POST /api/vita/app-chat — { text, sessionId?, city?, lat?, lng? } -> VitaReply (src/lib/vitaChat.ts)
 //
-// The Doctor Dekho app's "Vita" assistant talks to the NLP router's conversational /chat agent through here, so the router
+// The Doctor Dekho app's "Vita" assistant talks to Vita (the router's POST /v2/agent/chat) through here, so the router
 // key stays on the server (same reason search/parse exists). The router needs a key with the "chat" scope
 // (scripts/make_api_key.py <name> chat); NLP_ROUTER_CHAT_API_KEY is used when set, else NLP_ROUTER_API_KEY.
 const NLP_ROUTER_BASE_URL = (process.env.NLP_ROUTER_BASE_URL ?? "").trim().replace(/\/+$/, "");
@@ -26,7 +26,7 @@ export async function POST(req: NextRequest) {
   const lng = num(body?.lng, -180, 180);
 
   try {
-    const res = await fetch(`${NLP_ROUTER_BASE_URL}/chat`, {
+    const res = await fetch(`${NLP_ROUTER_BASE_URL}/v2/agent/chat`, {
       method: "POST",
       headers: { "content-type": "application/json", ...(NLP_ROUTER_CHAT_API_KEY ? { "X-Api-Key": NLP_ROUTER_CHAT_API_KEY } : {}) },
       body: JSON.stringify({ text, session_id: sessionId ?? null, city, ...(lat != null && lng != null ? { lat, lng } : {}) }),
