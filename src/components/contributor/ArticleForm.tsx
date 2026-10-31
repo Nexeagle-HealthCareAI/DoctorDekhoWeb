@@ -7,7 +7,7 @@ import { useRouter } from "next/navigation";
 import { ImagePlus, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { contributorApi } from "@/lib/contributor/client";
-import { CONDITION_OPTIONS, SLUG_LABEL } from "@/lib/contributor/conditions";
+import { CONDITION_OPTIONS } from "@/lib/contributor/conditions";
 import { messageOf } from "@/lib/contributor/hooks";
 import { IMAGE_ACCEPT, ImageProblem, checkImageFile, prepareImage } from "@/lib/contributor/prepareImage";
 import { ARTICLE_TYPE_LABEL } from "@/lib/health-wiki/types";
@@ -15,6 +15,7 @@ import { canSelfPublish, isDoctorRole, type ArticleDraftInput, type ArticleType,
 import { Banner, Field, card, input, primaryBtn, secondaryBtn } from "./ui";
 import SubmitConsentDialog from "./SubmitConsentDialog";
 import CoverCropDialog from "./CoverCropDialog";
+import ConditionField from "./ConditionField";
 
 // The editor needs the browser, so it is not rendered on the server.
 const RichTextEditor = dynamic(() => import("./RichTextEditor"), {
@@ -212,11 +213,7 @@ export default function ArticleForm({ me, existing }: Props) {
       </div>
 
       {medical && (
-        <Field label="Related condition" htmlFor="af-cond" optional>
-          <select id="af-cond" className={input} value={condition ?? ""} disabled={locked} onChange={(e) => setCondition(e.target.value || null)}>
-            <option value="">None</option>{CONDITION_OPTIONS.map((c) => <option key={c} value={c}>{SLUG_LABEL(c)}</option>)}
-          </select>
-        </Field>
+        <ConditionField value={condition} options={CONDITION_OPTIONS} disabled={locked} onChange={setCondition} />
       )}
       <Field label="References" htmlFor="af-refs" optional hint="One source per line. Shown at the end of the article.">
         <textarea id="af-refs" rows={3} className={input} value={references} disabled={locked} onChange={(e) => setReferences(e.target.value)} />
