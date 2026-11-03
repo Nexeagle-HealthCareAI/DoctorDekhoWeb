@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hey Vita recorder</title>
+<style>
+  :root { --bg: #f4f8f7; --fg: #10302d; --brand: #0b5e57; --muted: #4b6663; --warn: #b3141e; }
+  body { margin: 0; font: 16px/1.45 system-ui, sans-serif; background: var(--bg); color: var(--fg); }
+  main { max-width: 560px; margin: 0 auto; padding: 24px 16px 48px; }
+  h1 { font-size: 22px; margin: 0 0 4px; }
+  p { margin: 8px 0; color: var(--muted); }
+  label { display: block; margin: 12px 0 4px; font-weight: 600; }
+  input, select { width: 100%; box-sizing: border-box; min-height: 44px; padding: 8px 10px; border: 1px solid #c9dad6; border-radius: 10px; font-size: 16px; }
+  button { min-height: 48px; padding: 0 18px; border: 0; border-radius: 12px; background: var(--brand); color: #fff; font-weight: 700; font-size: 16px; cursor: pointer; }
+  button[disabled] { opacity: .5; }
+  #prompt { margin: 24px 0 8px; padding: 20px; border-radius: 16px; background: #fff; font-size: 26px; font-weight: 800; text-align: center; min-height: 72px; }
+  #status { text-align: center; color: var(--muted); min-height: 24px; }
+  .rec #prompt { outline: 4px solid var(--warn); }
+  .row { display: flex; gap: 8px; margin-top: 16px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>“Hey Vita” recorder</h1>
+  <p>Records short clips of real voices to train Vita's wake word. Nothing leaves this computer: the clips are saved as one
+    .tar file that you give to whoever trains the model (tools/wakeword/README.md).</p>
+  <label for="who">Speaker code (no names), e.g. "staff07-f"</label>
+  <input id="who" autocomplete="off" placeholder="staff07-f">
+  <label for="where">Where are you recording?</label>
+  <select id="where"><option>quiet room</option><option>office</option><option>clinic / reception</option><option>street / traffic</option><option>home with TV</option></select>
+  <div id="prompt">Press Start</div>
+  <div id="status"></div>
+  <div class="row"><button id="start">Start</button><button id="save" disabled>Save .tar</button></div>
+  <p>About 4 minutes: 30 times “Hey Vita” (vary how you say it: normal, fast, slow, far from the phone, softly), then 15
+    other phrases. Each clip is 2.5 seconds; speak when the box turns red.</p>
+</main>
+<script>
+const POS = ["Hey Vita", "Hey Vita (fast)", "Hey Vita (slowly)", "Hey Vita (softly)", "Hey Vita (from across the room)", "Hi Vita", "Hey Vita (as a question)"];
+const NEG = ["Hey Rita", "Hey Kavita", "Savita", "Vitamin tablets", "Hey beta, come here", "Hey Neeta", "Hey Siri",
+  "Mujhe bukhar hai", "Kal subah doctor se milna hai", "Hello, can you hear me?", "Hey there", "Vital signs", "Meeta aa gayi",
+  "Hey Vikas", "Peeta hoon chai"];
+const plan = [];
+for (let i = 0; i < 30; i++) plan.push({ kind: "pos", text: POS[i % POS.length] });
+for (const t of NEG) plan.push({ kind: "neg", text: t });
+const clips = [];
+const $ = (id) => document.getElementById(id);
+
+function wav16(samples) {
+  const buf = new ArrayBuffer(44 + samples.length * 2), v = new DataView(buf);
+  const w = (o, s) => [...s].forEach((c, i) => v.setUint8(o + i, c.charCodeAt(0)));
+  w(0, "RIFF"); v.setUint32(4, 36 + samples.length * 2, true); w(8, "WAVEfmt "); v.setUint32(16, 16, true); v.setUint16(20, 1, true);
+  v.setUint16(22, 1, true); v.setUint32(24, 16000, true); v.setUint32(28, 32000, true); v.setUint16(32, 2, true); v.setUint16(34, 16, true);
+  w(36, "data"); v.setUint32(40, samples.length * 2, true);
+  samples.forEach((s, i) => v.setInt16(44 + i * 2, Math.max(-1, Math.min(1, s)) * 32767, true));
+  return new Uint8Array(buf);
+}
+function tar(files) {
+  const blocks = [];
+  const enc = new TextEncoder();
+  for (const { name, data } of files) {
+    const h = new Uint8Array(512);
+    h.set(enc.encode(name).slice(0, 99), 0);
+    const oct = (n, len) => enc.encode(n.toString(8).padStart(len - 1, "0") + "\0");
+    h.set(oct(0o644, 8), 100); h.set(oct(0, 8), 108); h.set(oct(0, 8), 116); h.set(oct(data.length, 12), 124);
+    h.set(oct(Math.floor(Date.now() / 1000), 12), 136); h.set(enc.encode("        "), 148); h[156] = 48; h.set(enc.encode("ustar\0"), 257); h.set(enc.encode("00"), 263);
+    let sum = 0; for (const b of h) sum += b; h.set(enc.encode(sum.toString(8).padStart(6, "0") + "\0 "), 148);
+    blocks.push(h, data, new Uint8Array((512 - (data.length % 512)) % 512));
+  }
+  blocks.push(new Uint8Array(1024));
+  return new Blob(blocks, { type: "application/x-tar" });
+}
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+$("start").onclick = async () => {
+  const who = ($("who").value.trim() || "anon").replace(/[^a-z0-9_-]/gi, "").slice(0, 24);
+  const where = $("where").value.replace(/[^a-z]+/gi, "-");
+  $("start").disabled = true;
+  const stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } });
+  const ctx = new AudioContext();
+  const src = ctx.createMediaStreamSource(stream);
+  const proc = ctx.createScriptProcessor(4096, 1, 1);
+  let rec = null;
+  proc.onaudioprocess = (e) => { if (rec) rec.push(new Float32Array(e.inputBuffer.getChannelData(0))); };
+  src.connect(proc); proc.connect(ctx.destination);
+  for (let i = 0; i < plan.length; i++) {
+    const p = plan[i];
+    $("prompt").textContent = p.text;
+    $("status").textContent = `${i + 1} / ${plan.length}: get ready…`;
+    await sleep(1100);
+    document.body.classList.add("rec");
+    $("status").textContent = "Speak now";
+    rec = [];
+    await sleep(2500);
+    const parts = rec; rec = null;
+    document.body.classList.remove("rec");
+    const all = new Float32Array(parts.reduce((n, a) => n + a.length, 0));
+    let o = 0; for (const a of parts) { all.set(a, o); o += a.length; }
+    const off = new OfflineAudioContext(1, Math.ceil(all.length * 16000 / ctx.sampleRate), 16000);
+    const b = off.createBuffer(1, all.length, ctx.sampleRate); b.copyToChannel(all, 0);
+    const s = off.createBufferSource(); s.buffer = b; s.connect(off.destination); s.start();
+    const out = (await off.startRendering()).getChannelData(0);
+    clips.push({ name: `${p.kind}/${who}_${where}_${String(i).padStart(2, "0")}.wav`, data: wav16(out) });
+  }
+  stream.getTracks().forEach((t) => t.stop());
+  await ctx.close();
+  $("prompt").textContent = "Done — thank you!";
+  $("status").textContent = `${clips.length} clips`;
+  $("save").disabled = false;
+  $("start").disabled = false;
+};
+$("save").onclick = () => {
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(tar(clips));
+  a.download = `hey-vita-${($("who").value.trim() || "anon").replace(/[^a-z0-9_-]/gi, "")}.tar`;
+  a.click();
+};
+</script>
+</body>
+</html>

@@ -22,6 +22,10 @@ export interface NavDestination {
   longitude?: number | null;
   /** Free-text address, geocoded when there's no GPS pin. */
   address?: string;
+  /** Start in this mode (Vita knows the patient is walking). */
+  profile?: TravelProfile;
+  /** A booking: while navigating, the time and distance left go to 1HMS so reception sees "On the way" (if the patient agreed). */
+  appointmentId?: string;
 }
 
 export interface NavStep {

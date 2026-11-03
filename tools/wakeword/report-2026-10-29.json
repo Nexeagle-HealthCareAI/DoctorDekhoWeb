@@ -1,0 +1,77 @@
+{
+ "val_hours": 0.5197746875,
+ "rows": [
+  {
+   "threshold": 0.3,
+   "recall": 0.741,
+   "near_misses_accepted": 0.055,
+   "false_wakes_near_miss": 13,
+   "false_wakes_speech": 9,
+   "false_wakes_noise": 0,
+   "false_wakes_per_hour_speech": 42.33
+  },
+  {
+   "threshold": 0.4,
+   "recall": 0.714,
+   "near_misses_accepted": 0.03,
+   "false_wakes_near_miss": 11,
+   "false_wakes_speech": 6,
+   "false_wakes_noise": 0,
+   "false_wakes_per_hour_speech": 32.71
+  },
+  {
+   "threshold": 0.5,
+   "recall": 0.688,
+   "near_misses_accepted": 0.03,
+   "false_wakes_near_miss": 8,
+   "false_wakes_speech": 4,
+   "false_wakes_noise": 0,
+   "false_wakes_per_hour_speech": 23.09
+  },
+  {
+   "threshold": 0.6,
+   "recall": 0.677,
+   "near_misses_accepted": 0.027,
+   "false_wakes_near_miss": 7,
+   "false_wakes_speech": 3,
+   "false_wakes_noise": 0,
+   "false_wakes_per_hour_speech": 19.24
+  },
+  {
+   "threshold": 0.7,
+   "recall": 0.654,
+   "near_misses_accepted": 0.018,
+   "false_wakes_near_miss": 6,
+   "false_wakes_speech": 3,
+   "false_wakes_noise": 0,
+   "false_wakes_per_hour_speech": 17.32
+  },
+  {
+   "threshold": 0.8,
+   "recall": 0.639,
+   "near_misses_accepted": 0.015,
+   "false_wakes_near_miss": 4,
+   "false_wakes_speech": 3,
+   "false_wakes_noise": 0,
+   "false_wakes_per_hour_speech": 13.47
+  },
+  {
+   "threshold": 0.9,
+   "recall": 0.583,
+   "near_misses_accepted": 0.012,
+   "false_wakes_near_miss": 3,
+   "false_wakes_speech": 2,
+   "false_wakes_noise": 0,
+   "false_wakes_per_hour_speech": 9.62
+  },
+  {
+   "threshold": 0.95,
+   "recall": 0.53,
+   "near_misses_accepted": 0.0,
+   "false_wakes_near_miss": 2,
+   "false_wakes_speech": 1,
+   "false_wakes_noise": 0,
+   "false_wakes_per_hour_speech": 5.77
+  }
+ ]
+}

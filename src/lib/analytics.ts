@@ -182,7 +182,8 @@ export type AnalyticsEventType =
   | "booking_step_reached"
   | "chat_widget_opened"
   | "chat_whatsapp_handoff"
-  | "vita_feedback";
+  | "vita_feedback"
+  | "vita_wake_word";
 
 interface TrackEventPayload {
   mobile?: string;

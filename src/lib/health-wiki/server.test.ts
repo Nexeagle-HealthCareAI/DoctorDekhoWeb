@@ -1,8 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("next/cache", () => ({ unstable_cache: (fn: () => unknown) => fn }));
-vi.mock("react", async (orig) => ({ ...(await orig<typeof import("react")>()), cache: (fn: unknown) => fn }));
-const api = vi.hoisted(() => ({ easyhmsFetch: vi.fn(), isConfigured: vi.fn(() => true) }));
+const api = vi.hoisted(() => ({ easyhmsFetch: vi.fn(), easyhmsFetchRevalidating: vi.fn(), isConfigured: vi.fn(() => true) }));
 vi.mock("@/lib/api/server", () => api);
 vi.mock("./interim", () => ({ getInterimArticles: async () => [] }));
 
@@ -23,23 +22,29 @@ describe("getPublishedArticle", () => {
   });
 
   it("asks the backend for an article published after the list was cached, instead of answering 404", async () => {
-    api.easyhmsFetch
-      .mockResolvedValueOnce({ ok: true, status: 200, data: { articles: [dto("old-one")] } })
-      .mockResolvedValueOnce({ ok: true, status: 200, data: dto("just-published") });
+    api.easyhmsFetch.mockResolvedValueOnce({ ok: true, status: 200, data: { articles: [dto("old-one")] } });
+    api.easyhmsFetchRevalidating.mockResolvedValueOnce({ ok: true, status: 200, data: dto("just-published") });
     expect((await getPublishedArticle("just-published"))?.title).toBe("Fresh article");
-    expect(api.easyhmsFetch).toHaveBeenLastCalledWith("/public/health-articles/just-published", expect.anything());
+    expect(api.easyhmsFetchRevalidating).toHaveBeenCalledWith("/public/health-articles/just-published", expect.objectContaining({ revalidate: 60 }));
   });
 
   it("is still not found when the backend does not have it either", async () => {
-    api.easyhmsFetch
-      .mockResolvedValueOnce({ ok: true, status: 200, data: { articles: [] } })
-      .mockResolvedValueOnce({ ok: false, status: 404, data: null });
+    api.easyhmsFetch.mockResolvedValueOnce({ ok: true, status: 200, data: { articles: [] } });
+    api.easyhmsFetchRevalidating.mockResolvedValueOnce({ ok: false, status: 404, data: null });
     expect(await getPublishedArticle("nothing-here")).toBeNull();
+  });
+
+  it("treats a backend failure as not found, and does not throw", async () => {
+    const log = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    api.easyhmsFetch.mockResolvedValueOnce({ ok: true, status: 200, data: { articles: [] } });
+    api.easyhmsFetchRevalidating.mockResolvedValueOnce({ ok: false, status: 502, data: null });
+    expect(await getPublishedArticle("some-article")).toBeNull();
+    log.mockRestore();
   });
 
   it("does not ask the backend about something that is not a slug", async () => {
     api.easyhmsFetch.mockResolvedValueOnce({ ok: true, status: 200, data: { articles: [] } });
     expect(await getPublishedArticle("../../admin")).toBeNull();
-    expect(api.easyhmsFetch).toHaveBeenCalledTimes(1);
+    expect(api.easyhmsFetchRevalidating).not.toHaveBeenCalled();
   });
 });

@@ -1,10 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { CalendarCheck, CheckCircle2, LocateFixed, MapPin, MessageCircle, Ticket, RotateCcw, RotateCw, Square, ThumbsDown, ThumbsUp, Volume2, X } from "lucide-react";
+import { Bus, CalendarCheck, Car, CheckCircle2, LocateFixed, MapPin, Navigation, MessageCircle, Ticket, RotateCcw, RotateCw, Square, ThumbsDown, ThumbsUp, Volume2, X } from "lucide-react";
 import EmergencyBanner from "@/components/patient/EmergencyBanner";
 import VitaDoctorCard, { doctorHref, feeOf } from "@/components/patient/vita/VitaDoctorCard";
 import { useTranslation } from "@/lib/i18n/I18nContext";
+import { useNavigation } from "@/components/navigation/NavigationProvider";
+import { joinAddress } from "@/lib/navigation";
 import { filterChips, type FilterKey } from "@/lib/vita/filters";
 import type { VitaBooking, VitaDoctor, VitaDoctorsBlock, VitaOption, VitaReply } from "@/lib/vita/types";
 import { WHATSAPP_BUSINESS_NUMBER } from "@/lib/site";
@@ -428,8 +430,9 @@ function VisitCard({ reply, active, off, onCheckIn }: { reply: VitaReply; active
           <LocateFixed className="h-5 w-5" aria-hidden="true" /> {reply.clarify?.options?.[0]?.label ?? t("visit.checkIn")}
         </button>
       )}
+      {reply.journey && !visit.cancelled && <JourneyButtons reply={reply} off={off} />}
       <div className="flex flex-wrap gap-2">
-        {!visit.cancelled && (
+        {!visit.cancelled && !reply.journey && (
           <a href={visit.mapUrl} target="_blank" rel="noopener noreferrer"
             className="inline-flex min-h-[44px] items-center gap-1.5 rounded-xl border border-slate-300 bg-white px-3 font-semibold text-slate-800 hover:bg-slate-50">
             <MapPin className="h-4 w-4" aria-hidden="true" /> {t("vita.directions")}
@@ -441,5 +444,53 @@ function VisitCard({ reply, active, off, onCheckIn }: { reply: VitaReply; active
         </Link>
       </div>
     </section>
+  );
+}
+
+/** On the way: the in-app turn-by-turn navigation (it tells reception the time left, if the patient agreed), and a cab or transit app
+ * with the clinic already filled in. */
+function JourneyButtons({ reply, off }: { reply: VitaReply; off: boolean }) {
+  const { t } = useTranslation();
+  const { openNavigation } = useNavigation();
+  const visit = reply.visit!;
+  const journey = reply.journey!;
+  const link = (id: string) => journey.links.find((l) => l.id === id)?.url;
+  const ext = "inline-flex min-h-[44px] items-center gap-1.5 rounded-xl border border-slate-300 bg-white px-3 font-semibold text-slate-800 hover:bg-slate-50";
+  return (
+    <div className="flex flex-col gap-2">
+      {journey.etaMinutes ? (
+        <p className="text-xs font-semibold text-[#0B5E57]" aria-live="polite">{t("journey.eta", { m: String(journey.etaMinutes) })}</p>
+      ) : null}
+      <button type="button" disabled={off}
+        onClick={() => openNavigation({
+          name: visit.hospitalName,
+          latitude: visit.latitude,
+          longitude: visit.longitude,
+          address: joinAddress(visit.hospitalName, visit.address, visit.city),
+          profile: journey.mode === "walk" ? "walking" : "driving",
+          appointmentId: journey.share ? visit.appointmentId : undefined,
+        })}
+        className="inline-flex min-h-[48px] items-center justify-center gap-2 rounded-xl bg-[#0B5E57] px-4 font-bold text-white disabled:opacity-50">
+        <Navigation className="h-5 w-5" aria-hidden="true" /> {t("journey.navigate")}
+      </button>
+      <div className="flex flex-wrap gap-2">
+        {link("uber") && (
+          <a href={link("uber")} target="_blank" rel="noopener noreferrer" className={ext}>
+            <Car className="h-4 w-4" aria-hidden="true" /> {t("journey.uber")}
+          </a>
+        )}
+        {link("ola") && (
+          <a href={link("ola")} target="_blank" rel="noopener noreferrer" className={ext}>
+            <Car className="h-4 w-4" aria-hidden="true" /> {t("journey.ola")}
+          </a>
+        )}
+        {link("transit") && (
+          <a href={link("transit")} target="_blank" rel="noopener noreferrer" className={ext}>
+            <Bus className="h-4 w-4" aria-hidden="true" /> {t("journey.transit")}
+          </a>
+        )}
+      </div>
+      {journey.share && <p className="text-xs text-slate-500">{t("journey.shared")}</p>}
+    </div>
   );
 }

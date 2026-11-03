@@ -1,9 +1,8 @@
 // Server-only: reads published Health Wiki articles. Import from Server Components and route
 // handlers only (it reaches the EasyHMS API through easyhmsFetch).
 
-import { cache } from "react";
 import { unstable_cache } from "next/cache";
-import { easyhmsFetch, isConfigured } from "@/lib/api/server";
+import { easyhmsFetch, easyhmsFetchRevalidating, isConfigured } from "@/lib/api/server";
 import { isContributorMock } from "@/lib/contributor/session";
 import type { HealthArticleDto, HealthArticlesResponseDto } from "./dto";
 import { getInterimArticles } from "./interim";
@@ -65,18 +64,26 @@ async function fetchPublishedFromSource(): Promise<HealthArticle[]> {
 export const getPublishedArticles = () => fetchPublished();
 
 /**
- * One article asked for by its slug straight from the backend, not from the cached list. An article published a moment ago (a doctor
- * approving it in EasyHMS, or the team publishing it in the CMS) is not in the cached list yet, and Doctor Dekho would answer 404 for it
- * (and keep that answer for five minutes). Only a slug that looks like a slug is asked for.
+ * One article asked for by its slug from the backend, for an article that is not in the cached list yet: one published a moment ago (a
+ * doctor approving it in EasyHMS, or the team publishing it in the CMS) would otherwise get a 404 here, and that 404 is kept for five
+ * minutes. Only a slug that looks like a slug is asked for.
+ *
+ * The call goes through easyhmsFetchRevalidating, not easyhmsFetch: a no-store fetch (or reading request headers) inside a page that is
+ * built ahead of time makes Next.js answer 500 at run time. The answer is kept for a minute, so a crowd opening the same link makes one
+ * call. A failure is treated as not found.
  */
-const fetchOnePublished = cache(async (slug: string): Promise<HealthArticle | null> => {
+async function findOnePublished(slug: string): Promise<HealthArticle | null> {
   if (!isConfigured() || process.env.HEALTH_WIKI_SAMPLE === "true" || !ARTICLE_SLUG_PATTERN.test(slug)) return null;
-  const result = await easyhmsFetch<HealthArticleDto>(`/public/health-articles/${encodeURIComponent(slug)}`, { cache: "no-store" });
+  const result = await easyhmsFetchRevalidating<HealthArticleDto>(`/public/health-articles/${encodeURIComponent(slug)}`, {
+    revalidate: 60,
+    tags: ["health-articles"],
+  });
+  if (result.status !== 404 && !result.ok) console.error(`[health-wiki] one article could not be read (status ${result.status}); treating it as not found.`);
   return result.ok && result.data ? mapArticle(result.data) : null;
-});
+}
 
 /** One published article, or null when the slug is unknown or not published. */
 export async function getPublishedArticle(slug: string): Promise<HealthArticle | null> {
   const all = await fetchPublished();
-  return all.find((a) => a.slug === slug) ?? (await fetchOnePublished(slug));
+  return all.find((a) => a.slug === slug) ?? (await findOnePublished(slug));
 }

@@ -119,6 +119,35 @@ export async function easyhmsFetch<T = unknown>(
   return { ok: res.ok, status: res.status, data, notConfigured: false, retryAfter: res.headers.get("retry-after") };
 }
 
+/**
+ * A server-side read for a page that is built ahead of time and refreshed in the background. easyhmsFetch is "no-store" and, with the proxy
+ * secret set, reads the request headers: both make Next.js treat such a page as dynamic at run time and answer 500. This one is kept in
+ * Next's fetch cache for `revalidate` seconds (and can be cleared by its tags), reads no request headers, and does not retry. Its answer
+ * does not depend on who is visiting, so no visitor address is sent.
+ */
+export async function easyhmsFetchRevalidating<T = unknown>(
+  path: string,
+  opts: { revalidate: number; tags?: string[] }
+): Promise<UpstreamResult<T>> {
+  if (!isConfigured()) return { ok: false, status: 503, notConfigured: true, data: null };
+  let res: Response;
+  try {
+    res = await fetch(`${BASE_URL}${path}`, {
+      headers: { "Content-Type": "application/json", ...(API_KEY ? { [KEY_HEADER]: API_KEY } : {}) },
+      next: { revalidate: opts.revalidate, ...(opts.tags ? { tags: opts.tags } : {}) },
+    });
+  } catch {
+    return { ok: false, status: 0, notConfigured: false, data: null };
+  }
+  let data: T | null = null;
+  try {
+    data = (await res.json()) as T;
+  } catch {
+    /* non-JSON or empty body */
+  }
+  return { ok: res.ok, status: res.status, data, notConfigured: false };
+}
+
 export interface GetDoctorByIdResult {
   doctor: Doctor | null;
   notConfigured: boolean;

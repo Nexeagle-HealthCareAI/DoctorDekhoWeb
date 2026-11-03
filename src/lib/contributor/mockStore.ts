@@ -325,7 +325,6 @@ export function submitArticle(id: string, slug: string): MyArticle {
   const selfPublish = canSelfPublish(p, a);
   if (a.myRole !== "AUTHOR" || !(a.status === "DRAFT" || (selfPublish && a.status === "PUBLISHED"))) throw new MockError(409, "Only a draft can be submitted.");
   if (!a.title.trim() || !a.content.trim()) throw new MockError(400, "Add a title and some content first.");
-  if (a.coverImageUrl && !(a.coverImageAlt ?? "").trim()) throw new MockError(400, "Add alt text for the cover image.");
   // A verified doctor publishes their own article at once; everyone else goes through review.
   if (selfPublish) Object.assign(a, { status: "PUBLISHED", returnedComment: null, waitingDays: null, publishedAt: a.publishedAt ?? new Date().toISOString(), reviewerName: null, updatedAt: new Date().toISOString() });
   else Object.assign(a, { status: "IN_REVIEW", returnedComment: null, waitingDays: 0, updatedAt: new Date().toISOString() });

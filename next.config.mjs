@@ -43,7 +43,9 @@ const securityHeaders = [
   // router.project-osrm.org is gone -- geo.ts no longer calls the OSRM demo server (see
   // "Swap OSRM public demo server for Mapbox Matrix API"). BigDataCloud's reverse-geocode
   // endpoint redirects from api.bigdatacloud.net to api-bdc.io, so both are needed.
-  { key: 'Content-Security-Policy', value: `default-src 'self'; script-src 'self' 'unsafe-eval' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://nexeagle-dev.in-south1-objectstore.e2enetworks.net https://api.mapbox.com${healthWikiImageOrigins ? ` ${healthWikiImageOrigins}` : ''}; worker-src 'self' blob:; connect-src 'self' https://api.bigdatacloud.net https://api-bdc.io https://api.mapbox.com https://events.mapbox.com;` }
+  // media-src: Vita's spoken replies are played from blob: URLs (the audio /api/voice/speak returns), and a data: silence
+  // unlocks playback on the tap that starts a voice conversation.
+  { key: 'Content-Security-Policy', value: `default-src 'self'; script-src 'self' 'unsafe-eval' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://nexeagle-dev.in-south1-objectstore.e2enetworks.net https://api.mapbox.com${healthWikiImageOrigins ? ` ${healthWikiImageOrigins}` : ''}; worker-src 'self' blob:; media-src 'self' blob: data:; connect-src 'self' https://api.bigdatacloud.net https://api-bdc.io https://api.mapbox.com https://events.mapbox.com;` }
 ];
 
 /** @type {import('next').NextConfig} */

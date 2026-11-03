@@ -227,6 +227,19 @@ export default function DoctorDirectory({
   const aiFiltered = useMemo(() => {
     if (!aiIntent) return null;
     let list = baseFiltered;
+    // Vita read a doctor's name ("dr neha sarma" -> "neha sharma", spelled as listed) or a degree ("MD doctor")
+    const name = aiIntent.filters?.doctorName?.toLowerCase().split(/\s+/).filter((w) => w.length >= 2) ?? [];
+    if (name.length > 0) {
+      const byName = list.filter((d) => name.every((w) => d.name.toLowerCase().includes(w)));
+      if (byName.length > 0) return byName;
+    }
+    const degree = aiIntent.filters?.degree?.toUpperCase();
+    if (degree) {
+      const byDegree = list.filter((d) =>
+        d.qualifications.toUpperCase().replace(/\./g, "").split(/[^A-Z]+/).includes(degree.toUpperCase())
+      );
+      if (byDegree.length > 0) list = byDegree;
+    }
     if (aiIntent.specialtyIds.length > 0) {
       // Merge silently across every close-call candidate the router returned (not just the
       // top pick) — a plain headache genuinely might mean Neurology OR General Physician,

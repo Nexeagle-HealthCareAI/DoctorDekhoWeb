@@ -1,5 +1,5 @@
 /**
- * Vita, the Doctor Dekho assistant: the app's chat with the NLP router's `/chat` agent (symptoms in Hinglish / Hindi /
+ * Vita, the Doctor Dekho assistant: the app's chat with Vita (the NLP router's `/v2/agent/chat`) (symptoms in Hinglish / Hindi /
  * English → follow-up questions → the right kind of doctor → bookable doctors from 1HMSAPI). This file turns the router's
  * reply into the small, stable shape the app reads; the route in app/api/vita/app-chat holds the router key.
  *

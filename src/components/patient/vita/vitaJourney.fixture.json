@@ -1,0 +1,74 @@
+{
+ "navigate": {
+  "session_id": "sess_f6804199762b",
+  "turn": 13,
+  "kind": "visit",
+  "message": "Shubh yatra! Salt Lake Care ka rasta:\nNeeche ke button se cab book karein; hospital ka pata pehle se bhara hai.\nLagbhag 59 minute.\nPehchaan: Opposite City Centre.\nDer ho rahi ho to bata dein. Pahunch kar \"pahunch gaye\" likhein.",
+  "question": null,
+  "card": null,
+  "state": null,
+  "severity": null,
+  "keywords": [],
+  "language": "hinglish",
+  "degraded": [],
+  "clarify": null,
+  "visit": {
+   "appointmentId": "abcdef12-3456-7890-abcd-ef1234567890",
+   "reference": "ABCDEF12",
+   "statusCode": "PRE_APPOINTMENT",
+   "status": "Requested",
+   "confirmed": false,
+   "cancelled": false,
+   "completed": false,
+   "doctorName": "Dr. Anita Sen",
+   "hospitalName": "Salt Lake Care",
+   "address": "Sector V",
+   "city": "Kolkata",
+   "latitude": 22.58,
+   "longitude": 88.42,
+   "mapUrl": "https://www.google.com/maps/dir/?api=1&destination=22.58,88.42",
+   "date": "2026-10-26",
+   "time": "09:00",
+   "isToday": true,
+   "fee": 600,
+   "guide": {
+    "landmark": "Opposite City Centre",
+    "entranceNote": "Use Gate 2",
+    "opdLocation": "1st floor, left of the lift",
+    "registrationDesk": "Counter 3, ground floor",
+    "paymentNote": "Cash and UPI accepted."
+   },
+   "canCheckIn": true,
+   "token": null,
+   "journey": {
+    "status": "planned",
+    "shareWithHospital": true,
+    "travelMode": "auto_cab"
+   }
+  },
+  "visit_step": "navigate",
+  "journey": {
+   "mode": "auto_cab",
+   "etaMinutes": 59,
+   "links": [
+    {
+     "id": "navigate",
+     "kind": "navigate",
+     "url": "https://www.google.com/maps/dir/?api=1&destination=22.58,88.42"
+    },
+    {
+     "id": "uber",
+     "kind": "cab",
+     "url": "https://m.uber.com/ul/?action=setPickup&pickup=my_location&dropoff%5Blatitude%5D=22.58&dropoff%5Blongitude%5D=88.42&dropoff%5Bnickname%5D=Salt+Lake+Care&dropoff%5Bformatted_address%5D=Salt+Lake+Care%2C+Sector+V%2C+Kolkata"
+    },
+    {
+     "id": "ola",
+     "kind": "cab",
+     "url": "https://book.olacabs.com/?drop_lat=22.58&drop_lng=88.42&drop_name=Salt+Lake+Care&dsw=yes"
+    }
+   ],
+   "appointmentId": "abcdef12-3456-7890-abcd-ef1234567890",
+   "share": true
+  }
+ }
+}

@@ -144,6 +144,15 @@ export interface VitaEmergency {
 
 import type { PublicVisit } from "@/lib/visit/types";
 
+export interface VitaJourney {
+  mode?: "drive" | "auto_cab" | "transit" | "walk" | null;
+  etaMinutes?: number | null;
+  appointmentId?: string;
+  /** The patient agreed the hospital may see the arrival time: the in-app navigation reports it. */
+  share?: boolean;
+  links: { id: "navigate" | "uber" | "ola" | "transit" | string; kind: string; url: string }[];
+}
+
 export interface VitaReply {
   session_id: string;
   turn: number | null;
@@ -162,7 +171,9 @@ export interface VitaReply {
   emergency?: VitaEmergency;
   /** kind "visit" (after booking): 1HMS's visit page data, and which answer it is. */
   visit?: PublicVisit;
-  visit_step?: "directions" | "arrival" | "checked_in" | "status";
+  visit_step?: "directions" | "arrival" | "checked_in" | "status" | "navigate" | "eta" | "late";
+  /** "nikal raha hoon" / "kitni der": how they are coming, the time left, and the buttons (in-app navigation, Uber / Ola, transit). */
+  journey?: VitaJourney;
   card?: {
     kind?: string;
     outputs?: { role: string; specialist: string }[];

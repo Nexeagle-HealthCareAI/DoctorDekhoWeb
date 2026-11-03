@@ -4,15 +4,18 @@ import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ImagePlus } from "lucide-react";
+import { ImagePlus, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { contributorApi } from "@/lib/contributor/client";
-import { CONDITION_OPTIONS, SLUG_LABEL } from "@/lib/contributor/conditions";
+import { CONDITION_OPTIONS } from "@/lib/contributor/conditions";
 import { messageOf } from "@/lib/contributor/hooks";
+import { IMAGE_ACCEPT, ImageProblem, checkImageFile, prepareImage } from "@/lib/contributor/prepareImage";
 import { ARTICLE_TYPE_LABEL } from "@/lib/health-wiki/types";
 import { canSelfPublish, isDoctorRole, type ArticleDraftInput, type ArticleType, type ContributorMe, type MyArticle } from "@/lib/contributor/types";
 import { Banner, Field, card, input, primaryBtn, secondaryBtn } from "./ui";
 import SubmitConsentDialog from "./SubmitConsentDialog";
+import CoverCropDialog from "./CoverCropDialog";
+import ConditionField from "./ConditionField";
 
 // The editor needs the browser, so it is not rendered on the server.
 const RichTextEditor = dynamic(() => import("./RichTextEditor"), {
@@ -20,7 +23,6 @@ const RichTextEditor = dynamic(() => import("./RichTextEditor"), {
   loading: () => <div className="h-72 rounded-xl border border-slate-200 bg-slate-50 animate-pulse" aria-label="Loading editor" />,
 });
 
-const MAX_COVER = 2 * 1024 * 1024;
 type Errors = Partial<Record<"title" | "content" | "cover" | "form", string>>;
 
 interface Props {
@@ -34,6 +36,11 @@ export default function ArticleForm({ me, existing }: Props) {
   const doctor = isDoctorRole(me.role);
   const writer = me.role === "WRITER";
   const coverInput = useRef<HTMLInputElement>(null);
+  const [coverBusy, setCoverBusy] = useState(false);
+  // The picture being cropped, and the picture the current cover came from (kept so the crop can be adjusted again in this visit).
+  const [cropFile, setCropFile] = useState<File | null>(null);
+  const [coverSource, setCoverSource] = useState<File | null>(null);
+  const [coverOver, setCoverOver] = useState(false);
   const selfPublish = canSelfPublish(me, existing);
   // A verified doctor can keep editing their live article: the changes go live when they publish them.
   const locked = !!existing && existing.status !== "DRAFT" && !(selfPublish && existing.status === "PUBLISHED");
@@ -72,7 +79,7 @@ export default function ArticleForm({ me, existing }: Props) {
 
   const payload = (): ArticleDraftInput => ({
     type, title: title.trim(), description: description.trim(), content,
-    coverImageUrl: coverUrl, coverImageAlt: coverUrl ? coverAlt.trim() : null,
+    coverImageUrl: coverUrl, coverImageAlt: coverUrl ? coverAlt.trim() || null : null,
     relatedConditionSlug: medical ? condition : null, disclosure: disclosure.trim() || null, references: references.trim() || null,
   });
 
@@ -80,20 +87,41 @@ export default function ArticleForm({ me, existing }: Props) {
     const e: Errors = {};
     if (!title.trim()) e.title = "Add a title.";
     if (submit && !content.trim()) e.content = "Write some content before you submit.";
-    if (coverUrl && !coverAlt.trim()) e.cover = "Add alt text for the cover image.";
     return e;
   };
 
-  const pickCover = async (file: File | undefined) => {
-    if (!file) return;
-    if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) return setErrors((e) => ({ ...e, cover: "Use a JPG, PNG or WebP file." }));
-    if (file.size > MAX_COVER) return setErrors((e) => ({ ...e, cover: `That file is ${(file.size / 1048576).toFixed(1)} MB. The limit is 2 MB.` }));
+  // A chosen, dropped or pasted picture opens the crop window first.
+  const pickCover = (file: File | undefined) => {
+    if (!file || coverBusy || locked) return;
     try {
-      setCoverUrl(await contributorApi.uploadImage(file));
+      checkImageFile(file);
+      setErrors((e) => ({ ...e, cover: undefined }));
+      setCropFile(file);
+    } catch (err) {
+      setErrors((e) => ({ ...e, cover: err instanceof ImageProblem ? err.message : messageOf(err) }));
+    }
+  };
+  const uploadCover = async (make: () => Promise<File>, source: File) => {
+    setCoverBusy(true);
+    try {
+      setCoverUrl(await contributorApi.uploadImage(await make()));
+      setCoverSource(source);
       setErrors((e) => ({ ...e, cover: undefined }));
     } catch (err) {
-      setErrors((e) => ({ ...e, cover: messageOf(err) }));
+      setErrors((e) => ({ ...e, cover: err instanceof ImageProblem ? err.message : messageOf(err) }));
+    } finally {
+      setCoverBusy(false);
     }
+  };
+  // Paste a picture (a screenshot, or one copied from another page) while the cover area is in focus.
+  const pasteCover = (e: React.ClipboardEvent) => {
+    const file = Array.from(e.clipboardData.files).find((f) => f.type.startsWith("image/"));
+    if (file) { e.preventDefault(); pickCover(file); }
+  };
+  const dropCover = (e: React.DragEvent) => {
+    e.preventDefault();
+    setCoverOver(false);
+    pickCover(e.dataTransfer.files[0]);
   };
 
   const save = async (submit: boolean) => {
@@ -144,27 +172,34 @@ export default function ArticleForm({ me, existing }: Props) {
         <input id="af-desc" className={input} maxLength={1000} value={description} disabled={locked} onChange={(e) => setDescription(e.target.value)} />
       </Field>
 
-      <div className="space-y-1.5">
+      <div className="space-y-1.5" onPaste={pasteCover}>
         <span className="block text-sm font-bold text-slate-800">Cover image <span className="font-normal text-slate-400">(optional)</span></span>
-        <input ref={coverInput} type="file" accept="image/jpeg,image/png,image/webp" hidden onChange={(e) => { void pickCover(e.target.files?.[0]); e.target.value = ""; }} />
+        <input ref={coverInput} type="file" accept={IMAGE_ACCEPT} hidden onChange={(e) => { pickCover(e.target.files?.[0]); e.target.value = ""; }} />
         {coverUrl ? (
           <div className="grid sm:grid-cols-[14rem_1fr] gap-4 items-start">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={coverUrl} alt="" className="w-full aspect-video object-cover rounded-xl border border-slate-200" />
             <div className="space-y-3">
-              <Field label="Alt text" htmlFor="af-alt" error={errors.cover}>
+              <Field label="Alt text" htmlFor="af-alt" optional hint="Helps people who use a screen reader. Add it if you can." error={errors.cover}>
                 <input id="af-alt" className={input} maxLength={200} value={coverAlt} disabled={locked} onChange={(e) => setCoverAlt(e.target.value)} placeholder="Describe the image for screen readers" />
               </Field>
               <div className="flex gap-2">
-                <button type="button" className={secondaryBtn} disabled={locked} onClick={() => coverInput.current?.click()}>Replace</button>
-                <button type="button" className={secondaryBtn} disabled={locked} onClick={() => { setCoverUrl(null); setCoverAlt(""); }}>Remove</button>
+                <button type="button" className={secondaryBtn} disabled={locked || coverBusy} onClick={() => coverInput.current?.click()}>{coverBusy ? "Uploading…" : "Replace"}</button>
+                {coverSource && <button type="button" className={secondaryBtn} disabled={locked || coverBusy} onClick={() => setCropFile(coverSource)}>Crop and position</button>}
+                <button type="button" className={secondaryBtn} disabled={locked} onClick={() => { setCoverUrl(null); setCoverAlt(""); setCoverSource(null); }}>Remove</button>
               </div>
             </div>
           </div>
         ) : (
           <>
-            <button type="button" disabled={locked} onClick={() => coverInput.current?.click()} className="w-full border-2 border-dashed border-slate-300 rounded-xl py-6 text-sm text-slate-500 hover:border-brand-teal hover:text-brand-teal disabled:opacity-50 flex flex-col items-center gap-1">
-              <ImagePlus className="w-5 h-5" aria-hidden="true" /><b className="text-slate-700">Add a cover image</b>JPG, PNG or WebP, up to 2 MB. 16:9 works best.
+            <button
+              type="button" disabled={locked || coverBusy} onClick={() => coverInput.current?.click()}
+              onDragOver={(e) => { e.preventDefault(); setCoverOver(true); }} onDragLeave={() => setCoverOver(false)} onDrop={dropCover}
+              className={`w-full border-2 border-dashed rounded-xl py-6 text-sm text-slate-500 hover:border-brand-teal hover:text-brand-teal disabled:opacity-60 flex flex-col items-center gap-1 ${coverOver ? "border-brand-teal bg-teal-50" : "border-slate-300"}`}
+            >
+              {coverBusy ? <Loader2 className="w-5 h-5 animate-spin" aria-hidden="true" /> : <ImagePlus className="w-5 h-5" aria-hidden="true" />}
+              <b className="text-slate-700">{coverBusy ? "Getting your picture ready…" : "Add a cover image"}</b>
+              {!coverBusy && <span>Choose, drop or paste a picture. Big photos are made smaller for you. 16:9 works best.</span>}
             </button>
             {errors.cover && <p role="alert" className="text-xs font-medium text-red-600">{errors.cover}</p>}
           </>
@@ -178,11 +213,7 @@ export default function ArticleForm({ me, existing }: Props) {
       </div>
 
       {medical && (
-        <Field label="Related condition" htmlFor="af-cond" optional>
-          <select id="af-cond" className={input} value={condition ?? ""} disabled={locked} onChange={(e) => setCondition(e.target.value || null)}>
-            <option value="">None</option>{CONDITION_OPTIONS.map((c) => <option key={c} value={c}>{SLUG_LABEL(c)}</option>)}
-          </select>
-        </Field>
+        <ConditionField value={condition} options={CONDITION_OPTIONS} disabled={locked} onChange={setCondition} />
       )}
       <Field label="References" htmlFor="af-refs" optional hint="One source per line. Shown at the end of the article.">
         <textarea id="af-refs" rows={3} className={input} value={references} disabled={locked} onChange={(e) => setReferences(e.target.value)} />
@@ -208,6 +239,15 @@ export default function ArticleForm({ me, existing }: Props) {
         <button type="button" disabled={busy || locked || !canSubmit} onClick={askToSubmit} className={primaryBtn}>{selfPublish ? (existing?.status === "PUBLISHED" ? "Publish changes" : "Publish") : "Submit for review"}</button>
         <Link href="/contribute" className="inline-flex items-center px-3 text-sm font-semibold text-slate-500 hover:text-brand-teal">Cancel</Link>
       </div>
+      {cropFile && (
+        <CoverCropDialog
+          file={cropFile}
+          onCancel={() => setCropFile(null)}
+          onError={(message) => { setCropFile(null); setErrors((e) => ({ ...e, cover: message })); }}
+          onApply={(cover) => { const original = cropFile; setCropFile(null); void uploadCover(async () => cover, original); }}
+          onSkip={() => { const original = cropFile; setCropFile(null); void uploadCover(() => prepareImage(original), original); }}
+        />
+      )}
       <SubmitConsentDialog open={asking} medical={medical} busy={busy} selfPublish={selfPublish} onCancel={() => setAsking(false)} onConfirm={() => void save(true)} />
     </form>
   );

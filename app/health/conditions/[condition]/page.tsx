@@ -52,7 +52,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
       type: "article",
       publishedTime: article.publishedAt,
       modifiedTime: article.updatedAt,
-      ...(article.coverImageUrl ? { images: [{ url: article.coverImageUrl, alt: article.coverImageAlt ?? article.title }] } : {}),
+      ...(article.coverImageUrl ? { images: [{ url: article.coverImageUrl, alt: article.coverImageAlt || article.title }] } : {}),
     },
     twitter: { card: article.coverImageUrl ? "summary_large_image" : "summary" },
   };
@@ -106,7 +106,7 @@ export default async function HealthArticlePage({ params }: PageProps) {
             {article.description && <p className="text-lg text-slate-600 mb-8 leading-relaxed max-w-3xl">{article.description}</p>}
 
             {article.coverImageUrl && (
-              <ArticleCover src={article.coverImageUrl} alt={article.coverImageAlt ?? ""} priority className="rounded-2xl border border-slate-100 mb-8" />
+              <ArticleCover src={article.coverImageUrl} alt={article.coverImageAlt || article.title} priority className="rounded-2xl border border-slate-100 mb-8" />
             )}
 
             <ArticleByline article={article} />

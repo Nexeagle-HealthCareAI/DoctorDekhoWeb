@@ -103,10 +103,10 @@ describe("articles", () => {
     expect(s.submitArticle(id, a.slug).status).toBe("IN_REVIEW");
     expect(() => s.updateDraft(id, a.slug, draft)).toThrowError(expect.objectContaining({ status: 409 }));
   });
-  it("needs alt text on a cover image to submit", () => {
+  it("does not need alt text on a cover image to submit", () => {
     const id = verified();
     const a = s.createDraft(id, { ...draft, coverImageUrl: "/x.png", coverImageAlt: " " });
-    expect(() => s.submitArticle(id, a.slug)).toThrowError(expect.objectContaining({ status: 400 }));
+    expect(s.submitArticle(id, a.slug).status).toBe("PUBLISHED");
   });
   it("keeps a writer to sector updates", () => {
     const id = s.contributorForSession(s.verifyOtp("9000033333", "123456", { role: "WRITER" }).sessionId);

@@ -53,6 +53,8 @@ function ManeuverIcon({ type, modifier, className }: { type: string; modifier?: 
 interface NavigationModalProps {
   destination: NavDestination;
   onClose: () => void;
+  /** While navigating: time and distance left, and whether they have arrived (called on every GPS update; throttle it). */
+  onProgress?: (p: { seconds: number; meters: number; arrived: boolean }) => void;
 }
 
 // In-page turn-by-turn navigation: an interactive Mapbox map with the route drawn on it, distance
@@ -60,7 +62,7 @@ interface NavigationModalProps {
 // advances through the steps, speaks them (opt-in) and re-routes if they leave the route.
 // Loaded on demand (see NavigationProvider) so mapbox-gl only ships to people who actually ask
 // for directions, not to every doctor page visit.
-export default function NavigationModal({ destination, onClose }: NavigationModalProps) {
+export default function NavigationModal({ destination, onClose, onProgress }: NavigationModalProps) {
   const { t } = useTranslation();
 
   const mapContainerRef = useRef<HTMLDivElement>(null);
@@ -74,7 +76,7 @@ export default function NavigationModal({ destination, onClose }: NavigationModa
   const hasPin = destination.latitude != null && destination.longitude != null;
   const [phase, setPhase] = useState<Phase>("locating");
   const [errorKey, setErrorKey] = useState<TranslationKey | null>(null);
-  const [profile, setProfile] = useState<TravelProfile>("driving");
+  const [profile, setProfile] = useState<TravelProfile>(destination.profile ?? "driving");
   // `origin` is where the *current route* starts (initial fix, or the spot a re-route began);
   // `livePos` is the latest known position and only drives the marker + guidance.
   const [origin, setOrigin] = useState<LonLat | null>(null);
@@ -393,6 +395,12 @@ export default function NavigationModal({ destination, onClose }: NavigationModa
     const fraction = Math.max(0, 1 - progress.alongM / geometryLen);
     return { meters: route.distanceM * fraction, seconds: route.durationS * fraction };
   }, [route, progress.alongM]);
+
+  const onProgressRef = useRef(onProgress);
+  onProgressRef.current = onProgress;
+  useEffect(() => {
+    if (navigating && remaining) onProgressRef.current?.({ seconds: remaining.seconds, meters: remaining.meters, arrived });
+  }, [navigating, remaining, arrived]);
 
   useEffect(() => {
     if (navigating) stepRefs.current[stepIdx]?.scrollIntoView({ block: "nearest", behavior: "smooth" });

@@ -19,6 +19,17 @@ export interface VisitToken {
   estimatedWaitMinutes?: number | null;
 }
 
+/** How the patient is getting there (Vita's journey plan). Never their location. */
+export interface PublicJourney {
+  travelMode?: "drive" | "auto_cab" | "transit" | "walk" | null;
+  plannedLeaveAt?: string | null;
+  shareWithHospital?: boolean;
+  status?: "planned" | "on_the_way" | "late" | "arrived" | "cancelled" | null;
+  etaMinutes?: number | null;
+  distanceKm?: number | null;
+  lateByMinutes?: number | null;
+}
+
 export interface PublicVisit {
   appointmentId: string;
   reference: string;
@@ -46,6 +57,7 @@ export interface PublicVisit {
   token?: VisitToken | null;
   followUpDate?: string | null;
   language?: string | null;
+  journey?: PublicJourney | null;
 }
 
 /** Where the "too far from the hospital" refusal from 1HMS is recognised. */
