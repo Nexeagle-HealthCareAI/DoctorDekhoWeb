@@ -61,6 +61,25 @@ export function useDoctors(seed?: DoctorsResult) {
   });
 }
 
+// ── Doctors by name, in every city ──────────────────────────────────────────────
+// The results grid only holds the pages loaded so far, in the chosen city; a name ("dr avinash") is looked up on the
+// server instead, across all cities. 1HMS matches part of the name ("avinash" finds "Dr. Avinash Kumar"); the longest
+// word is sent and the caller keeps the doctors whose names have every word.
+export function useDoctorNameSearch(words: string[]) {
+  const longest = [...words].sort((a, b) => b.length - a.length)[0] ?? "";
+  return useQuery<Doctor[]>({
+    queryKey: ["public", "doctors", "byName", longest],
+    enabled: longest.length >= 3,
+    queryFn: async () => {
+      const params = new URLSearchParams({ page: "1", pageSize: "60", search: longest });
+      const json = await getJson(`/api/public/doctors?${params.toString()}`);
+      if (json?.notConfigured) return [];
+      return mapDoctors(Array.isArray(json) ? json : json?.doctors ?? []);
+    },
+    staleTime: 5 * 60 * 1000,
+  });
+}
+
 // ── Paginated doctors (results grid) ────────────────────────────────────────────
 export interface DoctorsFilterParams {
   city?: string;

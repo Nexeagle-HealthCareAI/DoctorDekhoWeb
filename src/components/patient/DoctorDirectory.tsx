@@ -10,7 +10,8 @@ import EmergencyBanner from "./EmergencyBanner";
 import SearchFollowUp from "./SearchFollowUp";
 import { specialties, cityLabel } from "@/data/patient";
 import type { CityOption, Doctor } from "@/data/patient";
-import { usePaginatedDoctors, useSmartSearch, type SmartSearchIntent } from "@/lib/api/hooks";
+import { useDoctorNameSearch, usePaginatedDoctors, useSmartSearch, type SmartSearchIntent } from "@/lib/api/hooks";
+import { looksLikeDoctorName, nameMatches, nameWords } from "@/lib/filters/doctorName";
 import { haversineDistance, getDrivingDistances, type GeoStatus } from "@/lib/geo";
 import { cn } from "@/lib/utils";
 import { trackEvent, recordLead } from "@/lib/analytics";
@@ -140,9 +141,11 @@ export default function DoctorDirectory({
   const keywordFiltered = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return baseFiltered;
+    const words = nameWords(q);                    // "dr avinash" matches "Dr. Avinash Kumar" (title and dot aside)
     return baseFiltered.filter(
       (d) =>
         d.name.toLowerCase().includes(q) ||
+        nameMatches(d.name, words) ||
         d.specialty.toLowerCase().includes(q) ||
         d.focusAreas.some((a) => a.toLowerCase().includes(q))
     );
@@ -279,12 +282,28 @@ export default function DoctorDirectory({
     return rank;
   }, [aiIntent]);
 
-  const usingAiResults = keywordFiltered.length === 0 && aiFiltered !== null && aiFiltered.length > 0;
+  // A doctor's name ("dr avinash", or a name Vita read and spelled as listed): looked up on the server in every city,
+  // since the grid holds only the loaded pages of the chosen city.
+  const nameAsk = useMemo(() => {
+    const vitaName = aiIntent?.filters?.kind === "name" ? aiIntent.filters.doctorName : null;
+    if (vitaName) return nameWords(vitaName);
+    return looksLikeDoctorName(query) ? nameWords(query) : [];
+  }, [aiIntent, query]);
+  const byName = useDoctorNameSearch(nameAsk);
+  const nameFound = useMemo(() => {
+    if (nameAsk.length === 0) return [];
+    const seen = new Set<string>();
+    return [...keywordFiltered.filter((d) => nameMatches(d.name, nameAsk)), ...(byName.data ?? [])]
+      .filter((d) => nameMatches(d.name, nameAsk) && !seen.has(d.id) && seen.add(d.id));
+  }, [nameAsk, keywordFiltered, byName.data]);
+  const usingNameResults = nameFound.length > 0;
+
+  const usingAiResults = !usingNameResults && keywordFiltered.length === 0 && aiFiltered !== null && aiFiltered.length > 0;
   const aiSpecialtyMeta = aiIntent?.specialtyId ? specialties.find((s) => s.id === aiIntent.specialtyId) : undefined;
   const aiSpecialtyName = aiSpecialtyMeta ? translateSpecialty(aiSpecialtyMeta.id, aiSpecialtyMeta.name, locale) : undefined;
 
   const filtered = useMemo(() => {
-    const base = usingAiResults && aiFiltered ? aiFiltered : keywordFiltered;
+    const base = usingNameResults ? nameFound : usingAiResults && aiFiltered ? aiFiltered : keywordFiltered;
     // Inject driving data if available
     const mapped = base.map(d => {
       const drive = drivingData[d.id];
@@ -323,7 +342,7 @@ export default function DoctorDirectory({
         });
     }
     return sorted;
-  }, [keywordFiltered, aiFiltered, usingAiResults, aiCandidateRank, sort, drivingData]);
+  }, [keywordFiltered, aiFiltered, usingAiResults, usingNameResults, nameFound, aiCandidateRank, sort, drivingData]);
 
   // ── Pagination ───────────────────────────────────────────────────────────
   const [page, setPage] = useState(1);
