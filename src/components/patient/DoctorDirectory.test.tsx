@@ -7,12 +7,17 @@ import type { Doctor } from "@/data/patient";
 // ── Mocks: the doctor list, the search-parse calls, analytics, and the doctor card ────────────
 const doctors = vi.hoisted(() => ({ list: [] as unknown[] }));
 const parse = vi.hoisted(() => ({ respond: (_input: unknown): unknown => ({}), calls: [] as unknown[] }));
+const byName = vi.hoisted(() => ({ list: [] as unknown[], asked: [] as string[] }));
 
 vi.mock("@/lib/api/hooks", () => ({
   usePaginatedDoctors: () => ({
     doctors: doctors.list, totalCount: doctors.list.length, isLoading: false, isFetchingNextPage: false,
     hasNextPage: false, fetchNextPage: vi.fn(), isError: false,
   }),
+  useDoctorNameSearch: (words: string[]) => {
+    if (words.length) byName.asked.push(words.join(" "));
+    return { data: words.length ? byName.list : undefined };
+  },
   useSmartSearch: () => ({
     isPending: false,
     mutate: (input: unknown, opts?: { onSuccess?: (v: unknown) => void }) => {
@@ -47,6 +52,8 @@ const show = (query: string) =>
 
 beforeEach(() => {
   parse.calls = [];
+  byName.list = [];
+  byName.asked = [];
   doctors.list = [
     doctor("1", "Dr. Heart", "cardiology", "Cardiology", ["chest pain", "palpitations"]),
     doctor("2", "Dr. Emergency", "emergencymedicine", "Emergency Medicine", ["trauma"]),
@@ -150,3 +157,24 @@ describe("Doctor Dekho search page: emergency warning", () => {
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
 });
+
+describe("Doctor Dekho search page: a doctor's name", () => {
+  it("finds 'dr avinash' as Dr. Avinash Kumar in the loaded list (title and dot aside)", async () => {
+    doctors.list.push(doctor("3", "Dr. Avinash Kumar", "general", "General Physician", []));
+    parse.respond = () => ({ ...intent(), safetyOnly: true });
+    show("dr avinash");
+    expect(await screen.findByText("Dr. Avinash Kumar")).toBeInTheDocument();
+    expect(screen.queryByText("Dr. Heart")).not.toBeInTheDocument();
+  });
+
+  it("looks a name up in every city when the loaded list doesn't have it", async () => {
+    byName.list = [doctor("9", "Dr. Avinash Kumar", "general", "General Physician", []),
+      doctor("10", "Dr. Avinash Jha", "general", "General Physician", [])];
+    parse.respond = () => intent({ filters: { kind: "name", doctorName: "avinash kumar", degree: null } });
+    show("dr avinsahh kumar");
+    expect(await screen.findByText("Dr. Avinash Kumar")).toBeInTheDocument();
+    expect(screen.queryByText("Dr. Avinash Jha")).not.toBeInTheDocument();
+    expect(byName.asked).toContain("avinash kumar");
+  });
+});
+
