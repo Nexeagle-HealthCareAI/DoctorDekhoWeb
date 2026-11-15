@@ -275,14 +275,15 @@ jobs:
           # Build-time vars — see the dev job's comment and the Dockerfile. These equal the
           # in-code / .env.production defaults, passed explicitly so prod's values are visible here.
           # HEALTH_WIKI_IMAGE_ORIGINS is the bucket Health Wiki article images are served from (next.config.mjs adds it
-          # to the CSP img-src). NEXT_PUBLIC_CONTRIBUTOR_ENABLED is deliberately not set: the contributor area stays
-          # closed on prod until the prod end-to-end test is done.
+          # to the CSP img-src). NEXT_PUBLIC_CONTRIBUTOR_ENABLED=true opens the Health Wiki contributor area on prod
+          # (the code compares it with the lowercase string "true").
           build-args: |
             NEXT_PUBLIC_SITE_URL=https://doctordekho.nexeagle.com
             NEXT_PUBLIC_BUSINESS_URL=https://nexeagle.com
             EASYHMS_API_BASE_URL=https://1hms-api.nexeagle.com
             NEXT_PUBLIC_MAPBOX_TOKEN=${{ secrets.MAPBOX_TOKEN }}
             HEALTH_WIKI_IMAGE_ORIGINS=${{ vars.PROD_HEALTHWIKI_IMAGE_ORIGIN || 'https://nexeagle-healthwiki-prod.in-south1-objectstore.e2enetworks.net' }}
+            NEXT_PUBLIC_CONTRIBUTOR_ENABLED=true
 
       - name: Prepare SSH key
         run: |
