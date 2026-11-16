@@ -5,6 +5,7 @@ import { ArrowRight, RefreshCw, ShieldCheck, Smartphone } from "lucide-react";
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
 import { contributorApi } from "@/lib/contributor/client";
 import { messageOf } from "@/lib/contributor/hooks";
+import { COUNTRIES, DEFAULT_COUNTRY, cleanNational, displayMobile, toApiMobile } from "@/lib/contributor/phone";
 import type { EnrolRole } from "@/lib/contributor/types";
 import { cn } from "@/lib/utils";
 import { card, primaryBtn } from "./ui";
@@ -23,7 +24,9 @@ interface Props {
 
 export default function OtpStep({ inviteToken, role, title = "Confirm it is you", onVerified }: Props) {
   const [phase, setPhase] = useState<"mobile" | "code">("mobile");
+  const [country, setCountry] = useState(DEFAULT_COUNTRY);
   const [mobile, setMobile] = useState("");
+  const apiMobile = toApiMobile(country, mobile);
   const [code, setCode] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -37,14 +40,14 @@ export default function OtpStep({ inviteToken, role, title = "Confirm it is you"
   }, [resendIn]);
 
   const send = async () => {
-    if (mobile.length !== 10) {
-      setError("Enter your 10-digit mobile number.");
+    if (!apiMobile) {
+      setError(country.dial === "91" ? "Enter your 10-digit mobile number." : "Enter your WhatsApp number with the right country.");
       return;
     }
     setError(null);
     setBusy(true);
     try {
-      const r = await contributorApi.sendOtp(mobile, inviteToken);
+      const r = await contributorApi.sendOtp(apiMobile, inviteToken);
       setDemoCode(r.devCode ?? null);
       setCode("");
       setPhase("code");
@@ -62,7 +65,7 @@ export default function OtpStep({ inviteToken, role, title = "Confirm it is you"
     setError(null);
     setBusy(true);
     try {
-      const r = await contributorApi.verifyOtp(mobile, value, { inviteToken, role });
+      const r = await contributorApi.verifyOtp(apiMobile ?? mobile, value, { inviteToken, role });
       onVerified(r.needsRegistration);
     } catch (e) {
       setError(messageOf(e));
@@ -83,18 +86,24 @@ export default function OtpStep({ inviteToken, role, title = "Confirm it is you"
           </div>
           <div className="space-y-1.5">
             <label htmlFor="otp-mobile" className="block text-sm font-bold text-slate-800">WhatsApp number</label>
-            <div className="relative">
-              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-medium">+91</span>
+            <div className="flex gap-2">
+              <select
+                aria-label="Country" value={country.iso}
+                onChange={(e) => { const c = COUNTRIES.find((x) => x.iso === e.target.value) ?? DEFAULT_COUNTRY; setCountry(c); setMobile((m) => cleanNational(c, m)); }}
+                className="w-28 shrink-0 px-2 py-3.5 bg-slate-50 border border-slate-200 rounded-xl font-medium focus:outline-none focus:border-brand-teal focus:ring-2 focus:ring-brand-teal/20"
+              >
+                {COUNTRIES.map((c) => <option key={c.iso} value={c.iso}>{c.iso} +{c.dial}</option>)}
+              </select>
               <input
                 id="otp-mobile" type="tel" inputMode="numeric" autoComplete="tel-national" autoFocus value={mobile}
-                onChange={(e) => setMobile(e.target.value.replace(/\D/g, "").slice(0, 10))}
-                placeholder="98765 43210" aria-invalid={!!error}
-                className={cn("w-full pl-12 pr-4 py-3.5 bg-slate-50 border rounded-xl font-medium focus:outline-none focus:ring-2 focus:ring-brand-teal/20", error ? "border-red-300" : "border-slate-200 focus:border-brand-teal")}
+                onChange={(e) => setMobile(cleanNational(country, e.target.value))}
+                placeholder={country.dial === "91" ? "98765 43210" : "Your WhatsApp number"} aria-invalid={!!error}
+                className={cn("min-w-0 flex-1 px-4 py-3.5 bg-slate-50 border rounded-xl font-medium focus:outline-none focus:ring-2 focus:ring-brand-teal/20", error ? "border-red-300" : "border-slate-200 focus:border-brand-teal")}
               />
             </div>
             {error && <p role="alert" className="text-xs font-medium text-red-600">{error}</p>}
           </div>
-          <button type="submit" disabled={busy || mobile.length !== 10} className={cn(primaryBtn, "w-full py-3.5")}>
+          <button type="submit" disabled={busy || !apiMobile} className={cn(primaryBtn, "w-full py-3.5")}>
             {busy ? <RefreshCw className="w-4 h-4 animate-spin" aria-label="Sending" /> : <>Send code on WhatsApp <ArrowRight className="w-4 h-4" aria-hidden="true" /></>}
           </button>
         </form>
@@ -103,7 +112,7 @@ export default function OtpStep({ inviteToken, role, title = "Confirm it is you"
           <div className="text-center space-y-2">
             <div className="w-12 h-12 bg-sky-50 rounded-full flex items-center justify-center mx-auto border border-sky-100"><ShieldCheck className="w-6 h-6 text-sky-500" aria-hidden="true" /></div>
             <h2 className="text-xl font-display font-bold text-slate-900">Enter the code</h2>
-            <p className="text-sm text-slate-500">Sent on WhatsApp to <b className="text-slate-700">+91 {mobile}</b>. It works for 10 minutes.</p>
+            <p className="text-sm text-slate-500">Sent on WhatsApp to <b className="text-slate-700">{displayMobile(country, mobile)}</b>. It works for 10 minutes.</p>
           </div>
           {demoCode && <p className="text-center text-xs rounded-lg bg-amber-50 text-amber-800 border border-amber-200 py-2">Test server only: your code is <b>{demoCode}</b></p>}
           <div className="flex justify-center">
