@@ -38,7 +38,7 @@ interface Invite extends Omit<InviteInfo, "maskedMobile"> {
 
 const DAY = 86_400_000;
 const ago = (days: number) => new Date(Date.now() - days * DAY).toISOString();
-const mask = (m: string) => `+91 ${m.slice(0, 2)}••• ••${m.slice(-3)}`;
+const mask = (m: string) => (m.startsWith("+") ? `+${m.slice(1, 3)}••• ••${m.slice(-3)}` : `+91 ${m.slice(0, 2)}••• ••${m.slice(-3)}`);
 const slugify = (t: string) => t.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 120);
 
 const person = (p: Partial<Person> & Pick<Person, "id" | "role" | "fullName" | "mobile" | "status">): Person => ({
@@ -154,7 +154,7 @@ export function getInvite(token: string): InviteInfo {
 }
 
 export function sendOtp(mobile: string, inviteToken?: string | null): { sent: true; devCode: string } {
-  if (!/^\d{10}$/.test(mobile)) throw new MockError(400, "Enter a 10-digit mobile number.");
+  if (!/^(\d{10}|\+[1-9]\d{7,14})$/.test(mobile)) throw new MockError(400, "Enter a valid WhatsApp number.");
   if (inviteToken) {
     const inv = state.invites[inviteToken];
     if (!inv || inv.state !== "OK") throw new MockError(410, "This link is no longer valid.");
