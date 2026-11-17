@@ -24,6 +24,9 @@ const withSerwist = withSerwistInit({
 // Cover and inline images in Health Wiki articles are uploaded to the object store. Add its public
 // origin(s), space separated, in HEALTH_WIKI_IMAGE_ORIGINS at build time (for example the prod bucket
 // host) so the browser is allowed to load them. The dev bucket is already allowed below.
+// They go in connect-src as well as img-src: the service worker (app/sw.ts) fetches cross-origin images
+// itself, and a worker's fetch() is checked against connect-src, not img-src. Without it the image shows
+// broken until a hard refresh (which bypasses the worker).
 const healthWikiImageOrigins = (process.env.HEALTH_WIKI_IMAGE_ORIGINS || "")
   .split(/\s+/)
   .filter((o) => /^https:\/\/[a-z0-9.-]+(:\d+)?$/i.test(o))
@@ -45,7 +48,7 @@ const securityHeaders = [
   // endpoint redirects from api.bigdatacloud.net to api-bdc.io, so both are needed.
   // media-src: Vita's spoken replies are played from blob: URLs (the audio /api/voice/speak returns), and a data: silence
   // unlocks playback on the tap that starts a voice conversation.
-  { key: 'Content-Security-Policy', value: `default-src 'self'; script-src 'self' 'unsafe-eval' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://nexeagle-dev.in-south1-objectstore.e2enetworks.net https://api.mapbox.com${healthWikiImageOrigins ? ` ${healthWikiImageOrigins}` : ''}; worker-src 'self' blob:; media-src 'self' blob: data:; connect-src 'self' https://api.bigdatacloud.net https://api-bdc.io https://api.mapbox.com https://events.mapbox.com;` }
+  { key: 'Content-Security-Policy', value: `default-src 'self'; script-src 'self' 'unsafe-eval' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://nexeagle-dev.in-south1-objectstore.e2enetworks.net https://api.mapbox.com${healthWikiImageOrigins ? ` ${healthWikiImageOrigins}` : ''}; worker-src 'self' blob:; media-src 'self' blob: data:; connect-src 'self' https://api.bigdatacloud.net https://api-bdc.io https://api.mapbox.com https://events.mapbox.com${healthWikiImageOrigins ? ` ${healthWikiImageOrigins}` : ''};` }
 ];
 
 /** @type {import('next').NextConfig} */
