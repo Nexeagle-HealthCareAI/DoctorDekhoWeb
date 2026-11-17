@@ -5,6 +5,10 @@ import { doctorSlug, specialties, CITIES, AREAS_BY_CITY } from "@/data/patient";
 import { labSlug } from "@/data/labs";
 import { getPublishedArticles } from "@/lib/health-wiki/server";
 import { articlePath } from "@/lib/health-wiki/seo";
+import { filterDoctorsByCondition, filterDoctorsByLocation } from "@/lib/filters/doctorLocation";
+
+// Same naming the area pages use for their own doctor filter, so "has a doctor" here means the same as on the page.
+const unslugify = (slug: string) => slug.split("-").map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
 
 // Must be dynamic. As a statically prerendered route (the old `revalidate = 3600`) the sitemap runs
 // at BUILD time, where the doctors fetch fails and the try/catch below swallows it, freezing a
@@ -22,11 +26,8 @@ const STATIC_ROUTES: { path: string; priority: number; changeFrequency: Metadata
 ];
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const now = new Date();
-
   const staticEntries: MetadataRoute.Sitemap = STATIC_ROUTES.map((r) => ({
     url: `${BASE_URL}${r.path}`,
-    lastModified: now,
     changeFrequency: r.changeFrequency,
     priority: r.priority,
   }));
@@ -38,7 +39,6 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     const { doctors } = await getAllDoctors();
     doctorEntries = doctors.map((d) => ({
       url: `${BASE_URL}/doctors/${doctorSlug(d, d.city)}`,
-      lastModified: now,
       changeFrequency: "weekly",
       priority: 0.7,
     }));
@@ -53,17 +53,18 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
     const conditions = Array.from(conditionSet);
 
+    // A listing page with no doctor on it is noindex (see robotsWhenEmpty), so it is left out of the sitemap too.
     for (const s of specialties) {
+      if (filterDoctorsByLocation(doctors, { specialtyId: s.id }).length === 0) continue;
       pseoEntries.push({
         url: `${BASE_URL}/specialties/${s.id}`,
-        lastModified: now,
         changeFrequency: "weekly",
         priority: 0.8,
       });
       for (const c of CITIES) {
+        if (filterDoctorsByLocation(doctors, { specialtyId: s.id, city: c.name, state: c.state }).length === 0) continue;
         pseoEntries.push({
           url: `${BASE_URL}/specialties/${s.id}/${c.id}`,
-          lastModified: now,
           changeFrequency: "weekly",
           priority: 0.8,
         });
@@ -71,9 +72,9 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         const areas = AREAS_BY_CITY[c.id] || [];
         for (const a of areas) {
           const areaSlug = a.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
+          if (filterDoctorsByLocation(doctors, { specialtyId: s.id, city: c.name, state: c.state, area: unslugify(areaSlug) }).length === 0) continue;
           pseoEntries.push({
             url: `${BASE_URL}/specialties/${s.id}/${c.id}/${areaSlug}`,
-            lastModified: now,
             changeFrequency: "weekly",
             priority: 0.9, // Higher priority for hyper-local intent
           });
@@ -82,10 +83,11 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     }
 
     for (const cond of conditions) {
+      const withCondition = filterDoctorsByCondition(doctors, cond);
       for (const c of CITIES) {
+        if (filterDoctorsByLocation(withCondition, { city: c.name, state: c.state }).length === 0) continue;
         pseoEntries.push({
           url: `${BASE_URL}/conditions/${cond}/${c.id}`,
-          lastModified: now,
           changeFrequency: "weekly",
           priority: 0.8,
         });
@@ -93,9 +95,9 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         const areas = AREAS_BY_CITY[c.id] || [];
         for (const a of areas) {
           const areaSlug = a.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
+          if (filterDoctorsByLocation(withCondition, { city: c.name, state: c.state, area: unslugify(areaSlug) }).length === 0) continue;
           pseoEntries.push({
             url: `${BASE_URL}/conditions/${cond}/${c.id}/${areaSlug}`,
-            lastModified: now,
             changeFrequency: "weekly",
             priority: 0.9, // Higher priority for hyper-local intent
           });
@@ -114,7 +116,6 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     for (const hospital of Array.from(hospitalSet)) {
       pseoEntries.push({
         url: `${BASE_URL}/hospitals/${hospital}`,
-        lastModified: now,
         changeFrequency: "weekly",
         priority: 0.8,
       });
@@ -135,7 +136,6 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     const { labs } = await getAllLabs();
     labEntries = labs.map((l) => ({
       url: `${BASE_URL}/labs/${labSlug(l, l.city)}`,
-      lastModified: now,
       changeFrequency: "weekly",
       priority: 0.6,
     }));
@@ -148,7 +148,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   try {
     const articles = await getPublishedArticles();
     wikiEntries = [
-      { url: `${BASE_URL}/health`, lastModified: articles[0] ? new Date(articles[0].updatedAt) : now, changeFrequency: "weekly", priority: 0.7 },
+      { url: `${BASE_URL}/health`, ...(articles[0] ? { lastModified: new Date(articles[0].updatedAt) } : {}), changeFrequency: "weekly", priority: 0.7 },
       ...articles.map((a) => ({
         url: `${BASE_URL}${articlePath(a.slug)}`,
         lastModified: new Date(a.updatedAt),
