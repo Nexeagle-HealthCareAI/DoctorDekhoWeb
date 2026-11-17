@@ -6,6 +6,7 @@ import { getAllDoctors } from "@/lib/api/server";
 import { filterDoctorsByHospital } from "@/lib/filters/doctorLocation";
 import type { Doctor } from "@/data/patient";
 import { SITE_URL } from "@/lib/site";
+import { descriptions, titles } from "@/lib/seo/titles";
 import PageBreadcrumb from "@/components/patient/PageBreadcrumb";
 
 export const revalidate = 3600;
@@ -50,8 +51,8 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const { doctors } = await getAllDoctors();
   const hospitalName = resolveHospitalName(params.hospital, doctors);
 
-  const title = `Top Doctors in ${hospitalName} | Book Appointment Online`;
-  const description = `Find and book appointments with the best doctors practicing at ${hospitalName}. Compare verified reviews, experience, and book instantly on NexEagle Doctor Dekho.`;
+  const title = titles.hospital(hospitalName);
+  const description = descriptions.hospital(hospitalName);
 
   return {
     title,

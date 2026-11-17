@@ -6,6 +6,7 @@ import { getAllDoctors } from "@/lib/api/server";
 import { filterDoctorsByCondition, filterDoctorsByLocation } from "@/lib/filters/doctorLocation";
 import { SITE_URL } from "@/lib/site";
 import { robotsWhenEmpty } from "@/lib/seo/indexing";
+import { descriptions, titles } from "@/lib/seo/titles";
 import PageBreadcrumb from "@/components/patient/PageBreadcrumb";
 
 export const revalidate = 3600;
@@ -57,8 +58,8 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const { doctors } = await getAllDoctors();
   const listed = filterDoctorsByLocation(filterDoctorsByCondition(doctors, params.condition), { city: city.name, state: city.state, area: areaName });
 
-  const title = `Best Doctors for ${conditionName} in ${areaName}, ${city.name} | Book Appointment`;
-  const description = `Find the best doctors specializing in ${conditionName} in ${areaName}, ${city.name}. Compare experience, ratings, and book appointments online instantly on NexEagle Doctor Dekho.`;
+  const title = titles.conditionArea(conditionName, areaName, city.name);
+  const description = descriptions.condition(conditionName, `${areaName}, ${city.name}`);
 
   return {
     title,
