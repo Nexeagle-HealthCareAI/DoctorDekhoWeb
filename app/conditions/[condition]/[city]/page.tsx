@@ -5,6 +5,7 @@ import HomeClient from "@/app/home-client";
 import { getAllDoctors } from "@/lib/api/server";
 import { filterDoctorsByCondition, filterDoctorsByLocation } from "@/lib/filters/doctorLocation";
 import { SITE_URL } from "@/lib/site";
+import { robotsWhenEmpty } from "@/lib/seo/indexing";
 import PageBreadcrumb from "@/components/patient/PageBreadcrumb";
 
 export const revalidate = 3600;
@@ -45,6 +46,8 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   if (!city) return { title: "Not Found" };
 
   const conditionName = unslugify(params.condition);
+  const { doctors } = await getAllDoctors();
+  const listed = filterDoctorsByLocation(filterDoctorsByCondition(doctors, params.condition), { city: city.name, state: city.state });
   const title = `Best Doctors for ${conditionName} in ${city.name}, ${city.state} | Book Appointment`;
   const description = `Find the best doctors specializing in ${conditionName} in ${city.name}, ${city.state}. Compare experience, ratings, and book appointments online instantly on NexEagle Doctor Dekho.`;
 
@@ -53,6 +56,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     description,
     alternates: { canonical: `/conditions/${params.condition}/${params.city}` },
     openGraph: { title, description, url: `/conditions/${params.condition}/${params.city}` },
+    ...robotsWhenEmpty(listed.length),
   };
 }
 
