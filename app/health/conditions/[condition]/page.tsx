@@ -5,7 +5,7 @@ import { ChevronRight, ShieldCheck, Stethoscope } from "lucide-react";
 import { SITE_URL } from "@/lib/site";
 import { CITIES, cityId } from "@/data/patient";
 import { getPublishedArticle, getPublishedArticles } from "@/lib/health-wiki/server";
-import { articlePath, buildArticleJsonLd, buildBreadcrumbJsonLd, jsonLdString } from "@/lib/health-wiki/seo";
+import { articleDescription, articlePath, buildArticleJsonLd, buildBreadcrumbJsonLd, jsonLdString } from "@/lib/health-wiki/seo";
 import PatientTopBar from "@/components/patient/PatientTopBar";
 import PatientFooter from "@/components/patient/PatientFooter";
 import ArticleBody from "@/components/health-wiki/ArticleBody";
@@ -43,11 +43,11 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   return {
     // The root layout's title template already appends "| Doctor Dekho".
     title: `${article.title} | Health Wiki`,
-    description: article.description,
+    description: articleDescription(article),
     alternates: { canonical: url },
     openGraph: {
       title: article.title,
-      description: article.description,
+      description: articleDescription(article),
       url,
       type: "article",
       publishedTime: article.publishedAt,

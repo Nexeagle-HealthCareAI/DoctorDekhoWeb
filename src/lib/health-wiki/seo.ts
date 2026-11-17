@@ -1,4 +1,5 @@
 import { SITE_URL } from "@/lib/site";
+import { DESCRIPTION_MAX } from "@/lib/seo/titles";
 import type { ArticlePerson, HealthArticle } from "./types";
 
 export const articlePath = (slug: string) => `/health/conditions/${slug}`;
@@ -12,6 +13,37 @@ const person = (p: ArticlePerson, physician: boolean) => ({
   ...(p.organisation ? { affiliation: { "@type": "Organization", name: p.organisation } } : {}),
 });
 
+/** Markdown to plain words: no images, link addresses, heading marks, list markers or emphasis. */
+const plain = (md: string) =>
+  md
+    .replace(/!\[[^\]]*\]\([^)]*\)/g, " ")
+    .replace(/\[([^\]]*)\]\([^)]*\)/g, "$1")
+    .replace(/^\s*>\s?/gm, "")
+    .replace(/^\s*(?:[-*+]|\d+\.)\s+/gm, "")
+    .replace(/[*_`~]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+
+/**
+ * What a search result and a shared link say about the article. The author's own description when there is
+ * one; otherwise the opening of the text (skipping headings and pictures), cut at a word, so the page never
+ * goes out with an empty description.
+ */
+export function articleDescription(a: Pick<HealthArticle, "description" | "content">): string {
+  const own = a.description.trim();
+  if (own) return own;
+  const body = a.content
+    .split(/\n{2,}/)
+    .map((block) => block.trim())
+    .filter((block) => block && !block.startsWith("#") && !block.startsWith("!["))
+    .map(plain)
+    .filter(Boolean)
+    .join(" ");
+  if (body.length <= DESCRIPTION_MAX) return body;
+  const cut = body.slice(0, DESCRIPTION_MAX - 1);
+  return `${cut.slice(0, cut.lastIndexOf(" ")).replace(/[\s,;:.\-–—]+$/, "")}…`;
+}
+
 /**
  * JSON-LD for an article page.
  * A MEDICAL article is a MedicalWebPage and names its reviewer. A SECTOR_UPDATE is a plain
@@ -21,7 +53,7 @@ export function buildArticleJsonLd(a: HealthArticle) {
   const base = {
     "@context": "https://schema.org",
     headline: a.title,
-    description: a.description,
+    description: articleDescription(a),
     datePublished: a.publishedAt,
     dateModified: a.updatedAt,
     mainEntityOfPage: `${SITE_URL}${articlePath(a.slug)}`,
