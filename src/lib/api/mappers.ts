@@ -131,6 +131,17 @@ function resolveSpecialty(dto: DoctorDto): { id: string; label: string } {
   return matchSpecialtyId(specialtyRaw);
 }
 
+/**
+ * A city or state as the listing pages key on it. Hospitals type it by hand, so the same place arrives as
+ * "Kishanganj", "kishanganj" and "Kishanganj " and the exact-match filter on the city pages dropped the
+ * last two. Extra spaces go, and a name typed entirely in lower case is capitalised word by word; anything
+ * with a capital in it ("WB", "Delhi NCR") is left as written.
+ */
+export function tidyPlace(value: string | null | undefined): string {
+  const v = (value ?? "").trim().replace(/\s+/g, " ");
+  return v === v.toLowerCase() ? v.replace(/\b[a-z]/g, (c) => c.toUpperCase()) : v;
+}
+
 export function mapDoctor(dto: DoctorDto): Doctor {
   const id = String(dto.doctorId);
   const name = dto.fullName?.trim() || "Doctor";
@@ -169,8 +180,8 @@ export function mapDoctor(dto: DoctorDto): Doctor {
     hospitalName: dto.hospitalName ?? undefined,
     hospitalId: dto.hospitalId || undefined,
     address: dto.address ?? undefined,
-    city: dto.city ?? "",
-    state: dto.state ?? "",
+    city: tidyPlace(dto.city),
+    state: tidyPlace(dto.state),
     pincode: dto.pincode ?? undefined,
     hospitalPhone: dto.hospitalContact?.trim() || undefined,
     area: "",
