@@ -54,6 +54,8 @@ describe("doctor labels", () => {
     fits(titles.conditionArea("Consultant Neurosurgeon", "Salt Lake", "Kolkata"));
     fits(titles.hospital("R.K. MultiSpeciality Hospital"));
     // A very long name keeps the word "Doctors" and gives up only the brand's tail, rather than becoming just the name.
+    expect(titles.hospital("Nova Hospital Trauma Centra", "Kishanganj")).toBe("Nova Hospital Trauma Centra, Kishanganj");
+    expect(titles.hospital("R.K. MultiSpeciality Hospital", "Purnea")).toBe("R.K. MultiSpeciality Hospital, Purnea");
     expect(titles.hospital("Glisan Akbari Super Speciality Hospital")).toBe("Doctors at Glisan Akbari Super Speciality Hospital");
     expect(descriptions.condition("Intensive Critical Care", "Kolkata, West Bengal").length).toBeLessThanOrEqual(DESCRIPTION_MAX);
     expect(descriptions.hospital("Glisan Akbari Super Speciality Hospital").length).toBeLessThanOrEqual(DESCRIPTION_MAX);
