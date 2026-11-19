@@ -5,6 +5,7 @@ import HomeClient from "@/app/home-client";
 import { getAllDoctors } from "@/lib/api/server";
 import { filterDoctorsByCondition, filterDoctorsByLocation } from "@/lib/filters/doctorLocation";
 import { SITE_URL } from "@/lib/site";
+import { placeLabel } from "@/lib/seo/placeAliases";
 import { robotsWhenEmpty } from "@/lib/seo/indexing";
 import { descriptions, titles } from "@/lib/seo/titles";
 import PageBreadcrumb from "@/components/patient/PageBreadcrumb";
@@ -52,14 +53,15 @@ export async function generateStaticParams() {
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const city = CITIES.find((c) => c.id === params.city);
   if (!city) return { title: "Not Found" };
+  const cityLabel = placeLabel(city.name);
 
   const conditionName = unslugify(params.condition);
   const areaName = unslugify(params.area);
   const { doctors } = await getAllDoctors();
   const listed = filterDoctorsByLocation(filterDoctorsByCondition(doctors, params.condition), { city: city.name, state: city.state, area: areaName });
 
-  const title = titles.conditionArea(conditionName, areaName, city.name);
-  const description = descriptions.condition(conditionName, `${areaName}, ${city.name}`);
+  const title = titles.conditionArea(conditionName, areaName, cityLabel);
+  const description = descriptions.condition(conditionName, `${areaName}, ${cityLabel}`);
 
   return {
     title,
@@ -73,6 +75,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 export default async function ConditionCityAreaPage({ params }: PageProps) {
   const city = CITIES.find((c) => c.id === params.city);
   if (!city) notFound();
+  const cityLabel = placeLabel(city.name);
 
   const conditionName = unslugify(params.condition);
   const areaName = unslugify(params.area);
@@ -93,10 +96,10 @@ export default async function ConditionCityAreaPage({ params }: PageProps) {
     "mainEntity": [
       {
         "@type": "Question",
-        "name": `Which are the best doctors for ${conditionName} in ${areaName}, ${city.name}?`,
+        "name": `Which are the best doctors for ${conditionName} in ${areaName}, ${cityLabel}?`,
         "acceptedAnswer": {
           "@type": "Answer",
-          "text": `NexEagle lists the top-rated specialists for ${conditionName} in ${areaName}, ${city.name}. You can filter by patient reviews and experience to find the right doctor for you.`
+          "text": `NexEagle lists the top-rated specialists for ${conditionName} in ${areaName}, ${cityLabel}. You can filter by patient reviews and experience to find the right doctor for you.`
         }
       },
       {
@@ -143,7 +146,7 @@ export default async function ConditionCityAreaPage({ params }: PageProps) {
         initialQuery={conditionName}
         initialCityId={city.id}
         initialArea={areaName}
-        pageHeading={`Doctors for ${conditionName} in ${areaName}, ${city.name}`}
+        pageHeading={`Doctors for ${conditionName} in ${areaName}, ${cityLabel}`}
         initialDoctors={initialDoctors}
         breadcrumb={<PageBreadcrumb items={breadcrumbItems} />}
       />
