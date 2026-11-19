@@ -86,6 +86,15 @@ const nextConfig = {
       },
     ],
   },
+  // "Purnia" is how most people spell the town; the pages live under the official "purnea-bihar".
+  async redirects() {
+    return [
+      { source: '/specialties/:specialty/purnia-bihar', destination: '/specialties/:specialty/purnea-bihar', permanent: true },
+      { source: '/specialties/:specialty/purnia-bihar/:area', destination: '/specialties/:specialty/purnea-bihar/:area', permanent: true },
+      { source: '/conditions/:condition/purnia-bihar', destination: '/conditions/:condition/purnea-bihar', permanent: true },
+      { source: '/conditions/:condition/purnia-bihar/:area', destination: '/conditions/:condition/purnea-bihar/:area', permanent: true },
+    ];
+  },
   async headers() {
     return [
       {

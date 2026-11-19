@@ -5,6 +5,7 @@ import HomeClient from "@/app/home-client";
 import { getAllDoctors } from "@/lib/api/server";
 import { filterDoctorsByLocation } from "@/lib/filters/doctorLocation";
 import { SITE_URL } from "@/lib/site";
+import { placeLabel } from "@/lib/seo/placeAliases";
 import { robotsWhenEmpty } from "@/lib/seo/indexing";
 import { descriptions, doctorLabel, doctorLabelPlural, titles } from "@/lib/seo/titles";
 import PageBreadcrumb from "@/components/patient/PageBreadcrumb";
@@ -40,14 +41,15 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const specialty = specialties.find((s) => s.id === params.specialty);
   const city = CITIES.find((c) => c.id === params.city);
   if (!specialty || !city) return { title: "Not Found" };
+  const cityLabel = placeLabel(city.name);
   const label = doctorLabel(specialty.id, specialty.name);
   const plural = doctorLabelPlural(specialty.id, specialty.name);
 
   const areaName = unslugify(params.area);
   const { doctors } = await getAllDoctors();
   const listed = filterDoctorsByLocation(doctors, { specialtyId: specialty.id, city: city.name, state: city.state, area: areaName });
-  const title = titles.specialtyArea(label, areaName, city.name);
-  const description = descriptions.specialty(plural, `${areaName}, ${city.name}`);
+  const title = titles.specialtyArea(label, areaName, cityLabel);
+  const description = descriptions.specialty(plural, `${areaName}, ${cityLabel}`);
 
   return {
     title,
@@ -62,6 +64,7 @@ export default async function SpecialtyCityAreaPage({ params }: PageProps) {
   const specialty = specialties.find((s) => s.id === params.specialty);
   const city = CITIES.find((c) => c.id === params.city);
   if (!specialty || !city) notFound();
+  const cityLabel = placeLabel(city.name);
   const plural = doctorLabelPlural(specialty.id, specialty.name);
 
   const areaName = unslugify(params.area);
@@ -83,7 +86,7 @@ export default async function SpecialtyCityAreaPage({ params }: PageProps) {
     "mainEntity": [
       {
         "@type": "Question",
-        "name": `What is the consultation fee for a ${specialty.name} in ${areaName}, ${city.name}?`,
+        "name": `What is the consultation fee for a ${specialty.name} in ${areaName}, ${cityLabel}?`,
         "acceptedAnswer": {
           "@type": "Answer",
           "text": `Consultation fees vary by doctor, experience, and hospital affiliation. NexEagle shows each ${specialty.name}'s actual fee upfront on their profile before you book, so there are no surprises.`
@@ -131,7 +134,7 @@ export default async function SpecialtyCityAreaPage({ params }: PageProps) {
         initialSpecialtyId={specialty.id}
         initialCityId={city.id}
         initialArea={areaName}
-        pageHeading={`${plural} in ${areaName}, ${city.name}`}
+        pageHeading={`${plural} in ${areaName}, ${cityLabel}`}
         initialDoctors={initialDoctors}
         breadcrumb={<PageBreadcrumb items={breadcrumbItems} />}
       />
