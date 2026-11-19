@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import VitaPeek from "@/components/patient/vita/VitaPeek";
 import { useIsRestoring } from "@tanstack/react-query";
+import { fuzzyMatches } from "@/lib/filters/fuzzyMatch";
 import { motion, useReducedMotion } from "framer-motion";
 import { Loader2, ChevronDown, ChevronLeft, ChevronRight, SlidersHorizontal, MapPin, Sparkles } from "lucide-react";
 import DoctorCard from "./DoctorCard";
@@ -142,12 +143,17 @@ export default function DoctorDirectory({
     const q = query.trim().toLowerCase();
     if (!q) return baseFiltered;
     const words = nameWords(q);                    // "dr avinash" matches "Dr. Avinash Kumar" (title and dot aside)
-    return baseFiltered.filter(
+    const exact = baseFiltered.filter(
       (d) =>
         d.name.toLowerCase().includes(q) ||
         nameMatches(d.name, words) ||
         d.specialty.toLowerCase().includes(q) ||
         d.focusAreas.some((a) => a.toLowerCase().includes(q))
+    );
+    if (exact.length > 0) return exact;
+    // Nothing matched as typed: try again forgiving the spelling ("taqdees noori", "urolgist", "purnia").
+    return baseFiltered.filter((d) =>
+      fuzzyMatches(q, [d.name, d.specialty, d.city ?? "", d.hospitalName ?? "", ...(d.focusAreas ?? [])])
     );
   }, [baseFiltered, query]);
 
