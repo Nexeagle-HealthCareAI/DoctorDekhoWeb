@@ -1,3 +1,5 @@
+import { placeLabel } from "@/lib/seo/placeAliases";
+import { placeSpellings } from "@/lib/seo/keywords";
 import { SITE_URL } from "@/lib/site";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
@@ -91,6 +93,8 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     return { title: "Doctor not found", robots: { index: false, follow: true } };
   }
   const place = [doctor.hospitalName, doctor.city].filter(Boolean).join(", ");
+  // The description names the town both ways ("Purnea (Purnia)"); the title keeps the plain city to stay short.
+  const descPlace = [doctor.hospitalName, doctor.city ? placeLabel(doctor.city) : ""].filter(Boolean).join(", ");
   // Absolute: the layout's "%s | NexEagle" template would otherwise stack a second suffix on
   // top of "Doctor Dekho" here, pushing longer name/specialty combinations well past 60-70
   // chars and into Google's truncation range. Brand is included directly instead.
@@ -100,7 +104,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     doctor.qualifications ? ` (${doctor.qualifications})` : "",
     `, ${doctor.specialty}`,
     doctor.experienceYears ? ` — ${doctor.experienceYears}+ years experience` : "",
-    place ? ` at ${place}` : "",
+    descPlace ? ` at ${descPlace}` : "",
     ". Verify by OTP. No login required.",
   ].filter(Boolean).join("");
   const canonicalSlug = doctorSlug(doctor, doctor.city);
@@ -116,7 +120,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     description,
     // Doctor pages don't need the root layout's site-wide keyword list (which includes
     // "pathology lab near me" — irrelevant here); override with terms specific to this doctor.
-    keywords: [doctor.name, doctor.specialty, doctor.city, `${doctor.specialty} near me`, `book appointment ${doctor.specialty.toLowerCase()}`].filter(Boolean),
+    keywords: [doctor.name, doctor.specialty, ...(doctor.city ? placeSpellings(doctor.city) : []), ...(doctor.city ? placeSpellings(doctor.city).map((c) => `${doctor.name} ${c}`) : []), `${doctor.specialty} near me`, `book appointment ${doctor.specialty.toLowerCase()}`].filter(Boolean),
     alternates: { canonical: `/doctors/${canonicalSlug}` },
     openGraph: {
       title,

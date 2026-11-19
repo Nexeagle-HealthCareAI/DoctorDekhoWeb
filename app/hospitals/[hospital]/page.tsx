@@ -51,8 +51,9 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const { doctors } = await getAllDoctors();
   const hospitalName = resolveHospitalName(params.hospital, doctors);
 
-  const title = titles.hospital(hospitalName);
-  const description = descriptions.hospital(hospitalName);
+  const city = filterDoctorsByHospital(doctors, params.hospital)[0]?.city?.trim() || undefined;
+  const title = titles.hospital(hospitalName, city);
+  const description = descriptions.hospital(hospitalName, city);
 
   return {
     title,

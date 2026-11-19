@@ -35,6 +35,8 @@ interface HomeClientProps {
   breadcrumb?: ReactNode;
   /** This page's heading (the H1's readable text), e.g. "General Physicians in Kishanganj, Bihar". Omitted on the plain homepage. */
   pageHeading?: string;
+  /** Written guide shown under the doctor list (see LocalGuideSection). Omitted where none is written. */
+  guide?: ReactNode;
 }
 
 export default function HomeClient({
@@ -46,6 +48,7 @@ export default function HomeClient({
   whatsAppQrCodeDataUrl,
   breadcrumb,
   pageHeading,
+  guide,
 }: HomeClientProps = {}) {
   const { t } = useTranslation();
   const { data: doctorsData } = useDoctors(
@@ -155,6 +158,8 @@ export default function HomeClient({
           initialDoctors={initialDoctors}
         />
       </main>
+
+      {guide}
 
       {whatsAppQrCodeDataUrl && (
         <section className="border-t border-slate-200 bg-slate-50 py-12">
