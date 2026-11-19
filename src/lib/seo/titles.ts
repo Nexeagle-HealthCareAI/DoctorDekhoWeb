@@ -97,7 +97,14 @@ export const titles = {
       `Doctors for ${condition} in ${area}`,
       `${condition} in ${area}`,
     ]),
-  hospital: (name: string) => fitTitle([`Top Doctors in ${name} | Book Appointment Online`, `Doctors at ${name} | Book Online`, `Doctors at ${name}`]),
+  /** `city` ("Kishanganj") is added when given, since people search "<hospital> <town>". */
+  hospital: (name: string, city?: string) =>
+    fitTitle([
+      ...(city ? [`Doctors at ${name}, ${city} | Book Online`, `Doctors at ${name}, ${city}`, `${name}, ${city}`] : []),
+      `Top Doctors in ${name} | Book Appointment Online`,
+      `Doctors at ${name} | Book Online`,
+      `Doctors at ${name}`,
+    ]),
 };
 
 export const descriptions = {
@@ -114,10 +121,12 @@ export const descriptions = {
       `Find the best doctors specializing in ${condition} in ${where}. Compare experience, ratings, and book appointments online instantly on NexEagle Doctor Dekho.`,
       `Find doctors for ${condition} in ${where}. Compare experience and ratings, then book online instantly.`,
     ]),
-  hospital: (name: string) =>
-    fitDescription([
-      `Find and book appointments with the best doctors practicing at ${name}. Compare verified reviews, experience, and book instantly on NexEagle Doctor Dekho.`,
-      `Book appointments with doctors at ${name}. Compare reviews and experience on NexEagle Doctor Dekho.`,
-      `Book doctors at ${name} online on NexEagle Doctor Dekho.`,
-    ]),
+  hospital: (name: string, city?: string) => {
+    const at = city ? `${name}, ${city}` : name;
+    return fitDescription([
+      `Find and book appointments with the best doctors practicing at ${at}. Compare verified reviews, experience, and book instantly on NexEagle Doctor Dekho.`,
+      `Book appointments with doctors at ${at}. Compare reviews and experience on NexEagle Doctor Dekho.`,
+      `Book doctors at ${at} online on NexEagle Doctor Dekho.`,
+    ]);
+  },
 };

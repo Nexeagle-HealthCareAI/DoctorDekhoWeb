@@ -8,6 +8,7 @@ import { SITE_URL } from "@/lib/site";
 import { placeLabel } from "@/lib/seo/placeAliases";
 import { robotsWhenEmpty } from "@/lib/seo/indexing";
 import { descriptions, doctorLabel, doctorLabelPlural, titles } from "@/lib/seo/titles";
+import { specialtyCityKeywords } from "@/lib/seo/keywords";
 import { localGuide } from "@/data/seo/localGuides";
 import LocalGuideSection from "@/components/patient/LocalGuideSection";
 import PageBreadcrumb from "@/components/patient/PageBreadcrumb";
@@ -47,6 +48,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   return {
     title,
     description,
+    keywords: specialtyCityKeywords(label, specialty.name, city.name),
     alternates: { canonical: `/specialties/${params.specialty}/${params.city}` },
     openGraph: { title, description, url: `/specialties/${params.specialty}/${params.city}` },
     ...robotsWhenEmpty(listed.length),

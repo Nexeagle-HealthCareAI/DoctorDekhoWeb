@@ -15,9 +15,9 @@ export interface LocalGuide {
 
 export const LOCAL_GUIDES: Record<string, LocalGuide> = {
   "urology:purnea-bihar": {
-    heading: "Urologists in Purnea (Purnia): when to see one",
+    heading: "Urology doctor near me in Purnea (Purnia): when to see a urologist",
     intro:
-      "A urologist treats the kidneys, ureters, bladder and urinary passage in men and women, and the male reproductive system. If you live in Purnea (Purnia), Kishanganj or nearby towns of Seemanchal, you can compare the urologists listed above by experience and fee, and book a slot without travelling to a bigger city first.",
+      "A urologist treats the kidneys, ureters, bladder and urinary passage in men and women, and the male reproductive system. If you are looking for a top urologist in Purnea (Purnia), or in Kishanganj and nearby towns of Seemanchal, you can compare the urology doctors listed above by experience, qualification and fee, and book a slot without travelling to a bigger city first.",
     conditions: [
       { name: "Kidney stones", note: "Sharp pain in the side or back that comes in waves, sometimes with blood in the urine or vomiting." },
       { name: "Urinary infection", note: "Burning while passing urine, passing it often, or a strong smell. It is common in women and in people with diabetes." },
@@ -42,6 +42,10 @@ export const LOCAL_GUIDES: Record<string, LocalGuide> = {
       {
         q: "Which is the best urologist in Purnea (Purnia)?",
         a: "The right urologist depends on your problem. On Doctor Dekho you can compare each urologist's experience, qualifications and consultation fee on their profile, then book the one that suits you.",
+      },
+      {
+        q: "How do I find a top urology doctor near me in Purnia?",
+        a: "Open the list above and compare each urologist's experience, qualification and fee, and the hospital where they sit. Pick a slot that suits you and confirm it online; the doctor's profile shows the clinic address.",
       },
       {
         q: "Do I need a referral to see a urologist?",
