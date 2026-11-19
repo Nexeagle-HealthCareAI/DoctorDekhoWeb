@@ -19,6 +19,7 @@ describe("titles for Purnea", () => {
     (label) => {
       const t = titles.specialtyCity(label, placeLabel("Purnea"), "Bihar");
       expect(t).toContain("Purnea");
+      if (label === "Urologist") expect(t).toBe("Best Urologist in Purnea (Purnia)");
       expect(t.length + TITLE_BRAND.length).toBeLessThanOrEqual(TITLE_MAX);
     },
   );
