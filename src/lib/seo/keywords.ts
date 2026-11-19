@@ -13,6 +13,10 @@ export function placeSpellings(name: string): string[] {
   return alias ? [name, alias] : [name];
 }
 
+// Other ways the same towns are typed. They go in the keywords tag only, never in visible text: Google corrects most
+// misspellings itself, so this is a small extra, not a way to rank.
+const TYPED_VARIANTS: Record<string, string[]> = { purnea: ["Purniya", "Poornia", "Purnya"] };
+
 /** Search phrases for a speciality in a town, once for each spelling of the town. */
 export function specialtyCityKeywords(label: string, specialtyName: string, city: string): string[] {
   const out: string[] = [];
@@ -25,6 +29,9 @@ export function specialtyCityKeywords(label: string, specialtyName: string, city
       `${specialtyName.toLowerCase()} doctor ${place}`,
       `${specialtyName.toLowerCase()} doctor near me ${place}`,
     );
+  }
+  for (const v of TYPED_VARIANTS[city.trim().toLowerCase()] ?? []) {
+    out.push(`${label.toLowerCase()} in ${v}`, `${specialtyName.toLowerCase()} doctor ${v}`);
   }
   return Array.from(new Set(out));
 }
