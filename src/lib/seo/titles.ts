@@ -72,6 +72,7 @@ export const titles = {
       `Best ${label} in ${city}, ${state} | Book Appointment`,
       `Best ${label} in ${city} | Book Appointment`,
       `Best ${label} in ${city} | Book Online`,
+      `Best ${label} in ${city}`,
       `${label} in ${city}`,
     ]),
   specialtyArea: (label: string, area: string, city: string) =>
