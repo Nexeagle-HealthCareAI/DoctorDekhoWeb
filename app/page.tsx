@@ -12,9 +12,9 @@ export const metadata: Metadata = {
   // layout template), so this used to be the one page breaking that pattern — a split-brand
   // signal that risks an AI engine merging this entity with an unrelated "Doctor Dekho" app on
   // the Play Store. The NexEagle relationship is stated in the description below instead.
-  title: { absolute: "Doctor Dekho by NexEagle – Find & Book Doctors in Purnea & Kishanganj" },
+  title: { absolute: "Doctor Dekho – Book Doctors in Purnea (Purnia) & Kishanganj" },
   description:
-    "Doctor Dekho by NexEagle: find and book verified doctors near you in Purnea & Kishanganj — cardiologists, pediatricians, dermatologists and more. Compare experience, specialities and location, then reserve your slot online in under a minute. No app, no login.",
+    "Doctor Dekho by NexEagle: find and book verified doctors near you in Purnea (Purnia) & Kishanganj — cardiologists, pediatricians, dermatologists and more. Compare experience, specialities and location, then reserve your slot online in under a minute. No app, no login.",
   keywords: [
     "find doctor near me",
     "book doctor appointment online",
@@ -23,15 +23,17 @@ export const metadata: Metadata = {
     "verified doctors India",
     "online appointment booking",
     "doctor in Purnea",
+    "doctor in Purnia",
+    "doctors in Purnia Bihar",
     "doctor in Kishanganj",
     "Doctor Dekho",
     "NexEagle",
   ],
   alternates: { canonical: "/" },
   openGraph: {
-    title: "Doctor Dekho by NexEagle – Find & Book Doctors in Purnea & Kishanganj",
+    title: "Doctor Dekho – Book Doctors in Purnea (Purnia) & Kishanganj",
     description:
-      "Find and book verified doctors near you in Purnea & Kishanganj — compare specialities and experience, then reserve your slot online in under a minute.",
+      "Find and book verified doctors near you in Purnea (Purnia) & Kishanganj — compare specialities and experience, then reserve your slot online in under a minute.",
     url: "/",
     type: "website",
     // A child route's own `openGraph` object doesn't inherit the layout's `images` array, so
@@ -41,9 +43,9 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "Doctor Dekho by NexEagle – Find & Book Doctors in Purnea & Kishanganj",
+    title: "Doctor Dekho – Book Doctors in Purnea (Purnia) & Kishanganj",
     description:
-      "Find and book verified doctors near you in Purnea & Kishanganj — compare specialities and experience, then reserve your slot online in under a minute.",
+      "Find and book verified doctors near you in Purnea (Purnia) & Kishanganj — compare specialities and experience, then reserve your slot online in under a minute.",
     images: [`${SITE_URL}/api/og`],
   },
 };

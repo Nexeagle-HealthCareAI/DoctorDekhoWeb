@@ -5,8 +5,12 @@ import HomeClient from "@/app/home-client";
 import { getAllDoctors } from "@/lib/api/server";
 import { filterDoctorsByLocation } from "@/lib/filters/doctorLocation";
 import { SITE_URL } from "@/lib/site";
+import { placeLabel } from "@/lib/seo/placeAliases";
 import { robotsWhenEmpty } from "@/lib/seo/indexing";
 import { descriptions, doctorLabel, doctorLabelPlural, titles } from "@/lib/seo/titles";
+import { specialtyCityKeywords } from "@/lib/seo/keywords";
+import { localGuide } from "@/data/seo/localGuides";
+import LocalGuideSection from "@/components/patient/LocalGuideSection";
 import PageBreadcrumb from "@/components/patient/PageBreadcrumb";
 
 export const revalidate = 3600;
@@ -32,17 +36,19 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const { doctors: metaDoctors } = await getAllDoctors();
   const city = resolveCity(params.city, metaDoctors);
   if (!specialty || !city) return { title: "Not Found" };
+  const cityLabel = placeLabel(city.name);
   const label = doctorLabel(specialty.id, specialty.name);
   const plural = doctorLabelPlural(specialty.id, specialty.name);
 
   const listed = filterDoctorsByLocation(metaDoctors, { specialtyId: specialty.id, city: city.name, state: city.state });
 
-  const title = titles.specialtyCity(label, city.name, city.state);
-  const description = descriptions.specialty(plural, `${city.name}, ${city.state}`);
+  const title = titles.specialtyCity(label, cityLabel, city.state);
+  const description = descriptions.specialty(plural, `${cityLabel}, ${city.state}`);
 
   return {
     title,
     description,
+    keywords: specialtyCityKeywords(label, specialty.name, city.name),
     alternates: { canonical: `/specialties/${params.specialty}/${params.city}` },
     openGraph: { title, description, url: `/specialties/${params.specialty}/${params.city}` },
     ...robotsWhenEmpty(listed.length),
@@ -60,6 +66,7 @@ export default async function SpecialtyCityPage({ params }: PageProps) {
   // redeploy needed to add e.g. Siliguri once a Siliguri doctor exists in the API.
   const city = resolveCity(params.city, doctors);
   if (!specialty || !city) notFound();
+  const cityLabel = placeLabel(city.name);
   const plural = doctorLabelPlural(specialty.id, specialty.name);
 
   const initialDoctors = filterDoctorsByLocation(doctors, {
@@ -68,13 +75,15 @@ export default async function SpecialtyCityPage({ params }: PageProps) {
     state: city.state,
   });
 
+  const guide = localGuide(specialty.id, city.id);
+
   const faqSchema = {
     "@context": "https://schema.org",
     "@type": "FAQPage",
     "mainEntity": [
       {
         "@type": "Question",
-        "name": `What is the consultation fee for a ${specialty.name} in ${city.name}?`,
+        "name": `What is the consultation fee for a ${specialty.name} in ${cityLabel}?`,
         "acceptedAnswer": {
           "@type": "Answer",
           "text": `Consultation fees vary by doctor, experience, and hospital affiliation. NexEagle shows each ${specialty.name}'s actual fee upfront on their profile before you book, so there are no surprises.`
@@ -82,12 +91,17 @@ export default async function SpecialtyCityPage({ params }: PageProps) {
       },
       {
         "@type": "Question",
-        "name": `How can I find the best ${plural} in ${city.name}?`,
+        "name": `How can I find the best ${plural} in ${cityLabel}?`,
         "acceptedAnswer": {
           "@type": "Answer",
-          "text": `You can use NexEagle to compare the top-rated ${plural} in ${city.name} based on patient reviews, experience, and proximity to your location.`
+          "text": `You can use NexEagle to compare the top-rated ${plural} in ${cityLabel} based on patient reviews, experience, and proximity to your location.`
         }
-      }
+      },
+      ...(guide?.faqs ?? []).map((f) => ({
+        "@type": "Question",
+        "name": f.q,
+        "acceptedAnswer": { "@type": "Answer", "text": f.a },
+      })),
     ]
   };
 
@@ -119,9 +133,10 @@ export default async function SpecialtyCityPage({ params }: PageProps) {
       <HomeClient
         initialSpecialtyId={specialty.id}
         initialCityId={city.id}
-        pageHeading={`${plural} in ${city.name}, ${city.state}`}
+        pageHeading={`${plural} in ${cityLabel}, ${city.state}`}
         initialDoctors={initialDoctors}
         breadcrumb={<PageBreadcrumb items={breadcrumbItems} />}
+        guide={guide ? <LocalGuideSection guide={guide} /> : undefined}
       />
     </>
   );
